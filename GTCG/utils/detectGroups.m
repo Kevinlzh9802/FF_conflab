@@ -1,16 +1,16 @@
 function [groups,px,weights,ALLWeights]=detectGroups(frames,param)
-% DETECTGROUPS Detect conversational groups given a set of frames each one 
-% containing the positions, the head orientation and the IDs of the 
+% DETECTGROUPS Detect conversational groups given a set of frames each one
+% containing the positions, the head orientation and the IDs of the
 % individuals in the scene.
 %
 % The last frame is the reference frame because the method used the past
-% information to smooth the actual values. For this reason the further 
+% information to smooth the actual values. For this reason the further
 % evaluation should be made on it.
-% 
+%
 % INPUT:
 % ======
 %  frames     := a 1xm vector of cells containing on each cell a matrix of
-%                persons. Each matrix is of size nx4 having on each row: 
+%                persons. Each matrix is of size nx4 having on each row:
 %               | Person ID | Pos X | Pos Y | Orientation (radiants) |
 %
 %  param      := a struct containing the following parameters. If not
@@ -24,14 +24,14 @@ function [groups,px,weights,ALLWeights]=detectGroups(frames,param)
 %
 %                Histogram paramters
 %                   - param.hist.n_x=20;            number of bin per rows
-%                   - param.hist.n_y=20;            number of bin per cols    
+%                   - param.hist.n_y=20;            number of bin per cols
 %                Affinity matrix parameter
-%                   - param.sigma=0.2;              normalizing factor 
+%                   - param.sigma=0.2;              normalizing factor
 %                   - param.checkFacing=0;          check if the persons are facing
 %                   - param.method='JS';            type of distance (JS or
 %                                                   KL)
 %                Weights for multi-frames
-%                   - param.weight.mode;            if not set weights are found by using MLCP 
+%                   - param.weight.mode;            if not set weights are found by using MLCP
 %                                                   'EQUAL' use equal weights for the frames
 %                                                   'MAXENTROPY' use the
 %                                                   set of weights that
@@ -41,13 +41,13 @@ function [groups,px,weights,ALLWeights]=detectGroups(frames,param)
 %
 % OUTPUT:
 % =======
-%  groups     := vector of cells in which each cell represents a group 
-%                containing the Persons ID 
+%  groups     := vector of cells in which each cell represents a group
+%                containing the Persons ID
 %
 %  frustums   := a list of cells containing the generated frustum per each
 %                persons and the corresponding 2D histogram
 %
-%  weights    := the average of the weights that the MCLP optimizer has 
+%  weights    := the average of the weights that the MCLP optimizer has
 %                assigned to each frame
 %
 %  ALLWeights := the base set of weights generated
@@ -56,14 +56,14 @@ function [groups,px,weights,ALLWeights]=detectGroups(frames,param)
 % EXAMPLE:
 % =======
 %  frames=[];
-%  frame_t1=[1 , 100, 100 , pi; 2 , 120, 120 , pi/2; 3 , 90, 90 , pi/4]; 
+%  frame_t1=[1 , 100, 100 , pi; 2 , 120, 120 , pi/2; 3 , 90, 90 , pi/4];
 %  frames=[frames , {frame_t1}];
-%  frame_t2=[1 , 110, 110 , pi; 2 , 125, 125 , pi/2; 3 , 100, 100 , pi/4]; 
+%  frame_t2=[1 , 110, 110 , pi; 2 , 125, 125 , pi/2; 3 , 100, 100 , pi/4];
 %  frames=[frames , {frame_t2}];
-%  frame_t3=[1 , 105, 110 , pi; 2 , 130, 125 , pi/2; 3 , 105, 95 , pi/4]; 
+%  frame_t3=[1 , 105, 110 , pi; 2 , 130, 125 , pi/2; 3 , 105, 95 , pi/4];
 %  frames=[frames , {frame_t3}];
 %  [groups, frustums,weights]= detectGroups(frames);
-% 
+%
 %
 % -------------------------------------------------------------------------
 % Sebastiano Vascon      Version 1.01
@@ -71,7 +71,7 @@ function [groups,px,weights,ALLWeights]=detectGroups(frames,param)
 % Please email me if you have any questions.
 %
 % Please cite one (or both) of these works
-% [1] S. Vascon, E. Zemene , M. Cristani, H. Hung, M.Pelillo and V. Murino 
+% [1] S. Vascon, E. Zemene , M. Cristani, H. Hung, M.Pelillo and V. Murino
 % Detecting conversational groups in images and sequences: A robust game-theoretic approach
 % Computer Vision and Image Understanding (CVIU), 2016
 %
@@ -94,12 +94,12 @@ if nargin<2
     param.sigma=0.4;
     param.method='JS';
     param.checkFacing=1;
- 
+
     %head orientation quantization
     param.HO_quantization=0;
 end
 
-if ~isfield(param.frustum,'mode') 
+if ~isfield(param.frustum,'mode')
     param.frustum.mode='CVIU';
 end
 
@@ -109,7 +109,7 @@ IDs=[];
 for f=1:numel(frames)
     frame=frames{f};
     [IDs]=[IDs ; frame(:,1)];
-    frame=sortrows(frame,1); %sort the ID the ensure consistency when zero 
+    frame=sortrows(frame,1); %sort the ID the ensure consistency when zero
                              %pad is added to the final matrix
     frames{f}=frame;
 end
@@ -125,12 +125,12 @@ if isfield(param, 'FillMissDetection') &&  param.FillMissDetection>0
         %find the miss detection
         mds{f}=find(ismember(IDs,frames{f}(:,1))==0);
     end
-    
+
     for f=1:numel(mds)
-        
+
         %search for the frames that do not have the missdetection of frame
         %f
-        
+
         md=IDs(mds{f});
         if ~isempty(md)
             for j=1:numel(md)
@@ -142,7 +142,7 @@ if isfield(param, 'FillMissDetection') &&  param.FillMissDetection>0
                        nmds{m}=[];
                     end
                 end
-                
+
                 %in nmds there are the pointer to the data in the other frames,
                 %now we make an average and substitute the miss detection
                 tData=zeros(1,size(frames{f},2));
@@ -159,33 +159,33 @@ if isfield(param, 'FillMissDetection') &&  param.FillMissDetection>0
                 frames{f}=frame;
             end
         end
-    end 
+    end
     %{
     for f=1:numel(frames)
         tFrame=[];
         for p=1:numel(IDs)
             for i=1:size(frames{f},1)
                 if frames{f}(i,1)==IDs(p)
-                    tFrame=[tFrame ; frames{f}(i,:)]; 
+                    tFrame=[tFrame ; frames{f}(i,:)];
                 else
                     %copy the average informations from the other frames
-                    
+
                     tFrame=[tFrame ; t];
                 end
             end
         end
         frames{f}=tFrame;
         [IDs]=[IDs ; frame(:,1)];
-        frame=sortrows(frame,1); %sort the ID the ensure consistency when zero 
+        frame=sortrows(frame,1); %sort the ID the ensure consistency when zero
                                  %pad is added to the final matrix
         frames{f}=frame;
     end
-    
+
     r={};
     for i=1:numel(As)
         r{i}=find(sum(As{i},2)==0);
     end
-    
+
     %evaluate average filling for each empty row from the other matrices
     for i=1:numel(As)
         if ~isempty(r{i}) %if there are some row to fill in the matrix As{i}
@@ -221,7 +221,7 @@ As=[];
 for f=1:numel(frames)
 
     persons=frames{f};
-    
+
     % generate a frustum for each person
     minX=inf;
     minY=inf;
@@ -230,36 +230,43 @@ for f=1:numel(frames)
 
     px={};
     for i=1:size(persons,1)
-        
+
         if isfield(param,'HO_quantization') && param.HO_quantization>0
             px{i}.frustum=frustumModel([persons(i,2),persons(i,3)],angleQuantization(persons(i,4),[0,2*pi],param.HO_quantization),param.frustum.length,param.frustum.aperture,param.frustum.samples,param.frustum.mode);
         else
             px{i}.frustum=frustumModel([persons(i,2),persons(i,3)],persons(i,4),param.frustum.length,param.frustum.aperture,param.frustum.samples,param.frustum.mode);
         end
-        
+
         %evaluate space boundaries for the histogram
-        if minX>min(px{i}.frustum(:,1)) 
+        if minX>min(px{i}.frustum(:,1))
             minX=min(px{i}.frustum(:,1));
         end
-        if minY>min(px{i}.frustum(:,2)) 
+        if minY>min(px{i}.frustum(:,2))
             minY=min(px{i}.frustum(:,2));
         end
-        if maxX<max(px{i}.frustum(:,1)) 
+        if maxX<max(px{i}.frustum(:,1))
             maxX=max(px{i}.frustum(:,1));
         end
-        if maxY<max(px{i}.frustum(:,2)) 
+        if maxY<max(px{i}.frustum(:,2))
             maxY=max(px{i}.frustum(:,2));
         end
 
     end
+
+
+    % figure;
+    % for kp=1:length(px)
+    %     scatter(px{kp}.frustum(:,1),px{kp}.frustum(:,2))
+    %     hold on;
+    % end
 
     %generate 2D histogram for each person and on the entire space
     for i=1:size(persons,1)
         px{i}.hist2D=hist2D(px{i}.frustum(:,1),px{i}.frustum(:,2),param.hist.n_x,param.hist.n_y,[minX,maxX],[minY,maxY]); %get the 2D histogram
         px{i}.hist=reshape(px{i}.hist2D,1,param.hist.n_x*param.hist.n_y); %create a row vector of the histogram
     end
-    
-    %evaluate pairwise affinity matrix    
+
+    %evaluate pairwise affinity matrix
     if numel(px)>1
         A=zeros(numel(px),numel(px));
         if strcmp(param.method,'JS')==1
@@ -276,7 +283,7 @@ for f=1:numel(frames)
                         A(i,j)=KLDiv(px{i}.hist,px{j}.hist);
                     end
                 end
-            end    
+            end
         else
             fprintf('Unrecognized distance function (use JS or KL)\n');
         end
@@ -284,12 +291,12 @@ for f=1:numel(frames)
     else
         A=0;
     end
-    
+
     %zero padding the matrix so all the matrices have the same size
     if size(A,1)<numel(IDs)
         %find the row and cols to pad
         ind=find(ismember(IDs,persons(:,1))==0);
-        
+
         A=zeropadding(A,ind);
     end
     As=[As ; {A}];
@@ -299,9 +306,9 @@ EnsembleWeights=[];
 
 if numel(As)>1
     %if the number of frames is greater than one we are working in a
-    %multiframe setting and thus we have to compute the weight to mix 
+    %multiframe setting and thus we have to compute the weight to mix
     %the affinity matrices
-    
+
     %find the weights using MCLP
     weights=[];
     if isfield(param,'weight') && isfield(param.weight,'mode')
@@ -309,30 +316,30 @@ if numel(As)>1
             weights=ones(numel(As),1)./numel(As);
         elseif strcmp(param.weight.mode,'MAXENTROPY')
             [~,weights] =calculateMCLPWeights(As);
-            
+
             ALLWeights=weights;
-            
+
             %calculate entropy for each set of weights
             Hs=zeros(1,size(weights,2));
             for wi=1:size(weights,2)
                 Hs(wi)=weights_entropy(weights(:,wi));
             end
-            
+
             [v,indH]=max(Hs);
-            
+
             weights=weights(:,indH);
-            
+
             fprintf(['Maximal entropy ' num2str(v) ' correspondes to weights: ' num2str(weights') '\n']);
         elseif strcmp(param.weight.mode,'ENSEMBLE')
-            [weights,EnsembleWeights] =calculateMCLPWeights(As);  
+            [weights,EnsembleWeights] =calculateMCLPWeights(As);
             ALLWeights=EnsembleWeights;
-            
+
         else
-            [weights,EnsembleWeights] =calculateMCLPWeights(As); 
+            [weights,EnsembleWeights] =calculateMCLPWeights(As);
             ALLWeights=EnsembleWeights;
         end
     else
-        [weights,ALLWeights]=calculateMCLPWeights(As); 
+        [weights,ALLWeights]=calculateMCLPWeights(As);
     end
 else
     A=As{1};
@@ -363,7 +370,7 @@ if ~isfield(param,'weight') || ~isfield(param.weight,'mode') || ~strcmp(param.we
     for i=1:numel(As)
         A=A+weights(i).*As{i};
     end
-        
+
     % extract groups using dominant set library
     d=DSF('RD',3000,1e-5,0);
     %d=DSF('RD',3000,1e-10,0); %%SEBA
@@ -372,10 +379,10 @@ if ~isfield(param,'weight') || ~isfield(param.weight,'mode') || ~strcmp(param.we
     else
         d.globalContext=param.globalcontext;
     end
-    
+
     theta=0.00001;
     %theta=0.0000001;
-    
+
     d=d.setSimilarityMatrix(A);
     d=d.clusterize(theta);
     d=d.setDataset(IDs);
@@ -392,16 +399,16 @@ elseif strcmp(param.weight.mode,'ENSEMBLE')
     %for each set of weight compute the clusters and find an agreements
     %between the solutions
     groupsEnsemble=zeros(size(As{1}));
-    
+
     for wi=1:size(EnsembleWeights,2)
         w=EnsembleWeights(:,wi);
-        
+
         %create a pairwise matrix using the weighted average
         A=zeros(size(As{1}));
         for i=1:numel(As)
             A=A+w(i).*As{i};
         end
-        
+
         % extract groups using dominant set library
         d=DSF('RD',3000,1e-5,0);
         if ~isfield(param,'globalcontext')
@@ -427,7 +434,7 @@ elseif strcmp(param.weight.mode,'ENSEMBLE')
                 end
             end
         end
-       
+
     end
     if size(EnsembleWeights,2)>1
         % searching for ensemble consistency
@@ -448,6 +455,6 @@ elseif strcmp(param.weight.mode,'ENSEMBLE')
             groups{i}=d.clusters(i).elements';
         end
     end
-    fprintf(['Found ' num2str(numel(groups)) ' groups\n']); 
+    fprintf(['Found ' num2str(numel(groups)) ' groups\n']);
 end
 end

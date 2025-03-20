@@ -3,7 +3,7 @@
 % Please email me if you have any questions.
 %
 % Please cite one of these works
-% [1] S. Vascon, E. Zemene , M. Cristani, H. Hung, M.Pelillo and V. Murino 
+% [1] S. Vascon, E. Zemene , M. Cristani, H. Hung, M.Pelillo and V. Murino
 % Detecting conversational groups in images and sequences: A robust game-theoretic approach
 % Computer Vision and Image Understanding (CVIU), 2016
 %
@@ -15,8 +15,7 @@
 %                Detect Groups in Single Frame %
 % -------------------------------------------- %
 
-clc
-clear
+clear variables; close all;
 warning off;
 
 addpath(genpath('utils'));
@@ -41,7 +40,7 @@ param.hist.n_y=20;                          %number of columns for the frustum d
 %displaying options
 param.show.weights=0;                       %show the weight used to condense the similarity matrices
 param.show.groups=0;                        %show a figure with the current frame, the decetion and the groundtruth
-param.show.frustum=0;                       %show the frustum 
+param.show.frustum=1;                       %show the frustum
 param.show.results=1;                       %display the precision/recall/F1-score values
 
 %weight calculation parameters
@@ -61,11 +60,12 @@ datasetDir=[datasetDir seqDir];
 load([datasetDir '/filtered_features.mat'],'features','timestamp');
 load([datasetDir '/groundtruth.mat'],'GTgroups','GTtimestamp');
 
-[~,indFeat] = intersect(timestamp,int64(GTtimestamp));
+% [~,indFeat] = intersect(timestamp,int64(GTtimestamp));
+[~,indFeat] = intersect(timestamp,GTtimestamp);
 timestamp = timestamp(indFeat);
 features  = features(indFeat);
 
-precisions=[]; 
+precisions=[];
 recalls=[];
 TPs=[];
 FPs=[];
@@ -75,36 +75,41 @@ detections=[];
 
 for f=1:numel(features)
     if ~isempty(features{f})
-        
+
         feat=features(f:f+param.numFrames-1);                   %copy the frames
-        
+
         fprintf(['******* Frames ' num2str(f:f+param.numFrames-1) ' *******\n']);
-        
+
         [groups, frustums,weights]=detectGroups(feat,param);    %detect groups
-        
-        if param.show.weights>0 
+
+        kp = 5;
+        if floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp))
+            plotFrustums(feat{1}, param.frustum);
+        end
+
+        if param.show.weights>0
             %display the weights
             figure(param.show.weights);
             bar(weights);
-            title(['Weights used in Eq 8 of ACCV']);
+            title('Weights used in Eq 8 of ACCV');
         end
-        
+
         detections=[detections ; {groups}];
-        
+
         if param.show.groups>0
             fr=f+param.numFrames-1; %frame used as reference for the evaluation
             showGroups(fr,groups,GTgroups,param);
         end
-        
+
         [p,r,tp,fp,fn] = evalgroups(groups,GTgroups(:,f+param.numFrames-1),param.evalMethod);
-        
+
         %add the evaluation results to the queue
         precisions=[precisions ; p'];
         recalls=[recalls ; r'];
         TPs=[TPs ; tp'];
         FPs=[FPs ; fp'];
         FNs=[FNs ; fn'];
-        
+
         showResults(precisions,recalls);
 
     end
@@ -117,7 +122,7 @@ results.FPs = FPs;
 results.detections = detections;
 results.FNs = FNs;
 results.precisions = precisions;
-results.recalls = recalls; 
+results.recalls = recalls;
 results.body_orientations = 'head';
 
 saving_name = strcat('results_',dataset);

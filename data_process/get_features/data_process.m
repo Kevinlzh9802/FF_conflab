@@ -3,27 +3,33 @@ clc
 close all
 
 disp("**identify files**")
-Files=dir('../processed/annotation/pose_v2/*.json'); % edit your own path to the pose data!!!
+pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
+    'annotations/pose/coco/'];
+Files=dir([pose_data_path, '*.json']); % edit your own path to the pose data!!!
 
+orient_choice = "shoulder";
+mkdir(sprintf(orient_choice))
+mkdir(orient_choice + "/seg2");
+mkdir(orient_choice + "/seg3");
 for k=1:length(Files)
     disp("***filenumber****")
     k
     FileName=Files(k).name;
-    path = strcat('../annotation/pose_v2/',FileName); % edit your own path to the pose data!!!
+    path = strcat(pose_data_path,FileName); % edit your own path to the pose data!!!
 
     data = jsondecode(fileread(path));
     annotations = data.annotations;
     disp("loaded annotations")
-    
+
     if ~isstruct(data.annotations.skeletons)
         continue;
     end
-    
+
     timestamps = uint64(1:1:length(data.annotations.skeletons));
     L  = length(timestamps);
     colNames = fieldnames(data.annotations.skeletons);
     total_people_no = length(colNames);
-    
+
     disp("enter time loop")
     for t = 1:length(timestamps)
         frame_data = zeros(total_people_no,4);
@@ -52,42 +58,117 @@ for k=1:length(Files)
             shoulder_vector = [(leftShoulderX-rightShoulderX),(leftShoulderY-rightShoulderY)];
             hip_vector = [(leftHipX-rightHipX),(leftHipY-rightHipY)];
             foot_vector = [(leftFootX-rightFootX),(leftFootY-rightFootY)];
-            body_vector = [shoulder_vector(:,2),-(shoulder_vector(:,1))]; % edit to your choice of head, shoulder, hip, foot!!! 
-            
-            
+            if orient_choice == "head"
+                body_vector = [head_vector(:,2),-(head_vector(:,1))]; % edit to your choice of head, shoulder, hip, foot!!!
+            elseif orient_choice == "shoulder"
+                body_vector = [shoulder_vector(:,2),-(shoulder_vector(:,1))];
+            elseif orient_choice == "hip"
+                body_vector = [hip_vector(:,2),-(hip_vector(:,1))];
+            elseif orient_choice == "foot"
+                body_vector = [foot_vector(:,2),-(foot_vector(:,1))];
+            end
+
             dotProduct = dot(head_vector(:),body_vector(:));
             if (dotProduct<0)
             body_vector(:) = [-body_vector(1),-body_vector(2)];
             elseif(dotProduct==0)
             disp('warning: head and body exactly perpendicular')
             end
-          
+
             head_orientation = FixRangeOfAngles(get_angle(head_vector));
-            body_orientation = FixRangeOfAngles(get_angle(body_vector)); 
+            body_orientation = FixRangeOfAngles(get_angle(body_vector));
 
             % person id, position X, position Y, orientation
             frame_data(p,1) = data.annotations.skeletons(t).(colNames{p}).id;
             frame_data(p,2) = headX*1960;
             frame_data(p,3) = headY*1080;
             frame_data(p,4) = body_orientation;
-
+            % frame_data.size = # of people * 4
+            % head orientation is not recorded. Instead, use headX and
+            % headY.
 
         end
     features{1,t} = frame_data;
-    
+
     end
     % subsample
     timestamps = timestamps(1:59.96:end);
     features = features(1:59.96:end);
-    
-    saving
-    folderName = FileName(1:end-10);
-    mkdir(sprintf(folderName))
-    
-    save(strcat(sprintf(folderName),'/features.mat'),'features')
-    save(strcat(sprintf(folderName),'/timestamps.mat'),'timestamps')
+
+    % saving
+    fn = FileName(1:end-10);
+    videoFrames = extractFramesFromVideo(fn, timestamps);
+    mat_name = fn + "_" + orient_choice + ".mat";
+    % ts_name = fn + "_" + orient_choice + ".mat";
+    % mkdir(sprintf(fn))
+    segn = "seg" + get_seg_num(fn);
+
+    save(orient_choice + "/" + segn + "/" + mat_name, 'features', 'timestamps')
+end
+
+function frames = extractFramesFromVideo(nameString, timestamps)
+% EXTRACTFRAMESFROMVIDEO Finds a video file and extracts specified frames.
+%
+% Inputs:
+%   - nameString: A string of format "camx_vidy_segz".
+%   - timestamps: A vector of frame numbers to extract.
+%
+% Output:
+%   - frames: A concatenated cell array of extracted frames.
+%
+% Example Usage:
+%   frames = extractFramesFromVideo("cam1_vid2_seg3", [10, 20, 30]);
+
+    % Parse nameString to extract camX, vidY, segZ
+    tokens = regexp(nameString, 'cam(\d+)_vid(\d+)_seg(\d+)', 'tokens');
+    if isempty(tokens)
+        error('Invalid format for nameString. Expected format: camx_vidy_segz');
+    end
+
+    x = tokens{1}{1};
+    y = tokens{1}{2};
+    z = tokens{1}{3};
+
+    % Construct the expected video file path
+    videoPathPattern = sprintf(['/home/zonghuan/tudelft/projects/datasets/' ...
+        'conflab/data_processed/cameras/video_segments/cam%s/vid%s-seg%s-*.mp4'], x, y, z);
+
+    % Find the matching video file
+    videoFiles = dir(videoPathPattern);
+    if isempty(videoFiles)
+        error('No matching video file found for %s', videoPathPattern);
+    end
+
+    % Take the first match (assuming only one correct file exists)
+    videoFilePath = fullfile(videoFiles(1).folder, videoFiles(1).name);
+
+    % Open the video file
+    videoObj = VideoReader(videoFilePath);
+
+    % Initialize frames cell array
+    frames = cell(1, length(timestamps));
+
+    % Read frames at specified timestamps
+    for i = 1:length(timestamps)
+        frameNum = timestamps(i);
+
+        % Ensure the frame number is within valid range
+        numFrames = floor(videoObj.Duration * videoObj.FrameRate);
+        if frameNum > 0 && frameNum <= numFrames
+            videoObj.CurrentTime = (frameNum - 1) / videoObj.FrameRate;
+            frames{i} = readFrame(videoObj);
+        else
+            warning('Frame number %d is out of range for video %s', frameNum, videoFilePath);
+            frames{i} = [];
+        end
+    end
 end
 
 
+function n = get_seg_num(file_name)
+    x = split(file_name,"_");
+    x = x(2);
+    n = x{1}(end);
+end
 
 

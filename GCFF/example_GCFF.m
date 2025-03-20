@@ -12,27 +12,36 @@
 %% INITIALIZATION
 
 % Clean the workspace
-clear all,
-close all,
-clc,
+clear variables, close all;
+addpath(genpath('../GCFF')) % add your own path
 
-addpath(genpath('../GCFF')) % add your own path 
+%% Zonghuan exp
+% % Set data folder
+% seqpath = 'data/zh_exp';
+% % NB: edit here your own path to data!!!
+% cam = 6;
+% seg = 3;
+%
+% % Load features
+% featureFile = load(fullfile(seqpath, "seg" + seg + ".mat"));
+% % Load groundtruth
+% GTFile = load(fullfile(seqpath,"seg" + seg + "_gt.mat"));
+% %Load settings
+% load(fullfile(seqpath,'settings_gc.mat'));
+%
+% camField = sprintf('cam%d', cam);
+% features = featureFile.features.(camField);
+% GTgroups = GTFile.cameraData.(camField);
+% timestamp = 1:length(features);
+% GTtimestamp = 1:length(GTgroups);
 
-% Set data folder
-seqpath = 'data/sample_data' ;
-% NB: edit here your own path to data!!!
+%% original loading
+seqpath = 'data/sample_data';
+load(fullfile(seqpath, "filtered_features.mat"));
+load(fullfile(seqpath, "groundtruth.mat"));
+load(fullfile(seqpath, "settings_gc.mat"));
 
-
-% Load features
-load(fullfile(seqpath,'filtered_features.mat')) ;
-
-%Load settings
-load(fullfile(seqpath,'settings_gc.mat') ) ;
-
-
-% Load groundtruth
-load(fullfile(seqpath,'groundtruth.mat')) ;
-
+%% Computing
 
 % If only some frames are annotated, delete all the others from features.
 [~,indFeat] = intersect(timestamp,GTtimestamp) ;
@@ -107,10 +116,10 @@ fprintf('Average F1 score: -- %d\n',F1_avg)
 results = struct;
 results.dataset = seqpath;
 results.precisions = precision(indFeat);
-results.recalls = recall(indFeat); 
+results.recalls = recall(indFeat);
 results.F1s = F1;
 results.F1_avg = F1_avg;
 results.body_orientations = 'head';
 
-saving_name = strcat('results_',seqpath);
-save(saving_name,'results');
+saving_name = "results/";
+% save(saving_name,'results');
