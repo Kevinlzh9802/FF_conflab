@@ -16,6 +16,7 @@
 % -------------------------------------------- %
 
 % clear variables; 
+clearvars -except frames;
 close all;
 warning off;
 
@@ -68,11 +69,11 @@ datasetDir=[datasetDir seqDir];
 % features  = features(indFeat);
 
 %% Zonghuan loading
-load('../data/filtered/head.mat', 'all_data');
+load('../data/filtered/shoulder.mat', 'all_data');
 % load('../data/filtered/frames.mat', 'frames');
 
 % frames2 = table(frame_seg2)
-used_data = filterTable(all_data, [6], [3], 'all');
+used_data = filterTable(all_data, [8], [3], 'all');
 GTgroups = (used_data.GT)';
 features = (used_data.Features)';
 
@@ -87,19 +88,31 @@ detections=[];
 
 for f=1:numel(features)
     if ~isempty(features{f})
-
-        feat=features(f:f+param.numFrames-1);                   %copy the frames
-        img = findMatchingFrame(used_data, frames, f+param.numFrames-1);
-
+        last_f = f+param.numFrames-1;
+        feat=features(f:last_f);                   %copy the frames
+        
         fprintf(['******* Frames ' num2str(f:f+param.numFrames-1) ' *******\n']);
 
         [groups, frustums,weights]=detectGroups(feat,param);    %detect groups
 
         kp = 5;
         if floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp))
-            plotFrustumsWithImage(feat{1}, param.frustum, img, GTgroups{f});
-            disp(GTgroups{f});
-            % v = 9;
+            % fig = figure;
+            % plotFrustums(feat{1}, param.frustum, fig);
+            img = findMatchingFrame(used_data, frames, last_f);
+            
+            sp_info = [used_data.Vid(last_f), used_data.Seg(last_f), used_data.Timestamp(last_f)];
+            [sp_ids, cf_ids] = readSpeakingStatus(sp_info(1), sp_info(2), 1);
+            [speaking, confidence] = readSpeakingStatus(sp_info(1), sp_info(2), sp_info(3));
+            
+            disp_info = struct();
+            disp_info.GT = GTgroups{last_f};
+            disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{last_f});
+            disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{last_f});
+
+            plotFrustumsWithImage(feat{1}, param.frustum, img, disp_info);
+            % disp(GTgroups{f});
+            v = 9;
         end
 
         if param.show.weights>0
