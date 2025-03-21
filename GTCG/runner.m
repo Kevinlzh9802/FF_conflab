@@ -15,7 +15,8 @@
 %                Detect Groups in Single Frame %
 % -------------------------------------------- %
 
-clear variables; close all;
+% clear variables; 
+close all;
 warning off;
 
 addpath(genpath('utils'));
@@ -57,14 +58,25 @@ frustumMode='CVIU';                         %'CVIU' use the CVIU model (cite [1]
 seqDir=''; %if a sub-sequence exists write the folder name here
 datasetDir=[datasetDir seqDir];
 
-load([datasetDir '/filtered_features.mat'],'features','timestamp');
-load([datasetDir '/groundtruth.mat'],'GTgroups','GTtimestamp');
+%% original loading
+% load([datasetDir '/filtered_features.mat'],'features','timestamp');
+% load([datasetDir '/groundtruth.mat'],'GTgroups','GTtimestamp');
+% 
+% % [~,indFeat] = intersect(timestamp,int64(GTtimestamp));
+% [~,indFeat] = intersect(timestamp,GTtimestamp);
+% timestamp = timestamp(indFeat);
+% features  = features(indFeat);
 
-% [~,indFeat] = intersect(timestamp,int64(GTtimestamp));
-[~,indFeat] = intersect(timestamp,GTtimestamp);
-timestamp = timestamp(indFeat);
-features  = features(indFeat);
+%% Zonghuan loading
+load('../data/filtered/head.mat', 'all_data');
+% load('../data/filtered/frames.mat', 'frames');
 
+% frames2 = table(frame_seg2)
+used_data = filterTable(all_data, [6], [3], 'all');
+GTgroups = (used_data.GT)';
+features = (used_data.Features)';
+
+%% Computation
 precisions=[];
 recalls=[];
 TPs=[];
@@ -77,6 +89,7 @@ for f=1:numel(features)
     if ~isempty(features{f})
 
         feat=features(f:f+param.numFrames-1);                   %copy the frames
+        img = findMatchingFrame(used_data, frames, f+param.numFrames-1);
 
         fprintf(['******* Frames ' num2str(f:f+param.numFrames-1) ' *******\n']);
 
@@ -84,7 +97,9 @@ for f=1:numel(features)
 
         kp = 5;
         if floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp))
-            plotFrustums(feat{1}, param.frustum);
+            plotFrustumsWithImage(feat{1}, param.frustum, img, GTgroups{f});
+            disp(GTgroups{f});
+            % v = 9;
         end
 
         if param.show.weights>0
@@ -127,5 +142,4 @@ results.body_orientations = 'head';
 
 % saving_name = strcat('results_',dataset);
 % save(saving_name,'results');
-
 
