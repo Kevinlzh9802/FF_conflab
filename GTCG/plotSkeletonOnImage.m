@@ -30,10 +30,13 @@ function plotSkeletonOnImage(figHandle, img, keypoints)
     
     % Labels for body parts
     labels = {"Head", "Shoulder", "Hip", "Foot"};
+
+    lengthScale = 0.03 * imgWidth; % Scale perpendicular length
     
     % Loop through each person's keypoints
     for k = 1:length(colNames)
         kp = keypoints.(colNames{k});
+        person_id = colNames{k}(2:end);
         if ~isempty(kp)
             % Convert keypoints from ratio to pixel coordinates
             pixelCoordsX = kp(:,1) * imgWidth; % Scale x-coordinates
@@ -48,39 +51,52 @@ function plotSkeletonOnImage(figHandle, img, keypoints)
                 y1 = pixelCoordsY(i); y2 = pixelCoordsY(i+1);
                 
                 % Skip if points are invalid (NaN or too close)
-                if isnan(x1) || isnan(y1) || isnan(x2) || isnan(y2) || (x1 == x2 && y1 == y2)
-                    continue;
-                end
+                all_valid = ~(isnan(x1) || isnan(y1) || isnan(x2) || isnan(y2) || (x1 == x2 && y1 == y2));
                 
                 % Draw main segment
-                plot([x1, x2], [y1, y2], '-', 'Color', colors(k, :), 'LineWidth', 2);
+                if all_valid
+                    plot([x1, x2], [y1, y2], '-', 'Color', colors(k, :), 'LineWidth', 2);
+                end
                 
                 % Compute middle point
                 midX = (x1 + x2) / 2;
                 midY = (y1 + y2) / 2;
                 
+                % labelIdx = (i + 1) / 2;
                 % Label left and right positions
-                text(x1, y1, 'L', 'Color', colors(k, :), 'FontSize', 8, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
-                text(x2, y2, 'R', 'Color', colors(k, :), 'FontSize', 8, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
-                
-                % Compute half perpendicular segment (counterclockwise 90 degrees from L->R)
                 dx = x2 - x1;
                 dy = y2 - y1;
-                lengthScale = 0.02 * imgWidth; % Scale perpendicular length
                 
-                if dx ~= 0 || dy ~= 0
-                    % Perpendicular direction (-dy, dx), counterclockwise half segment
-                    perpX = midX - lengthScale * (dy / sqrt(dx^2 + dy^2));
-                    perpY = midY + lengthScale * (dx / sqrt(dx^2 + dy^2));
-
-                    % Draw perpendicular segment with arrows
-                    quiver(midX, midY,  - perpX + midX, -perpY + midY, 0, 'Color', colors(k, :), 'LineWidth', 1.5, 'MaxHeadSize', 1);
-
-                    % Add labels if within predefined body parts (1-2: Head, 3-4: Shoulder, etc.)
-                    labelIdx = (i + 1) / 2;
-                    if labelIdx <= length(labels)
-                        text(midX, midY, labels{labelIdx}, 'Color', colors(k, :), 'FontSize', 8, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+                % Special case for head (first two rows)
+                if i == 1
+                    % Label Head and Nose
+                    text(x1, y1, 'H', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+                    text(x2, y2, 'N', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
+                    text(x1 - 10, y1 - 10, person_id, 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+                    if (dx ~= 0 || dy ~= 0) && all_valid
+                        x_diff = lengthScale * (dx / sqrt(dx^2 + dy^2));
+                        y_diff = lengthScale * (dy / sqrt(dx^2 + dy^2));
+                        % Draw arrow in the same direction as L->R
+                        quiver(midX, midY, x_diff, y_diff, 0, 'Color', colors(k, :), 'LineWidth', 1.5, 'MaxHeadSize', 1);
+                        
                     end
+                else
+                    % Compute half perpendicular segment (counterclockwise 90 degrees from L->R)
+                    text(x1, y1, 'L', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+                    text(x2, y2, 'R', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
+                    
+                    if (dx ~= 0 || dy ~= 0) && all_valid
+                        % Perpendicular direction (-dy, dx), counterclockwise half segment
+                        x_diff = lengthScale * (dy / sqrt(dx^2 + dy^2));
+                        y_diff = -lengthScale * (dx / sqrt(dx^2 + dy^2));
+                        % Draw perpendicular segment with arrows
+                        quiver(midX, midY, x_diff, y_diff, 0, 'Color', colors(k, :), 'LineWidth', 1.5, 'MaxHeadSize', 1);
+                    end
+                end
+                % Add labels if within predefined body parts (1-2: Head, 3-4: Shoulder, etc.)
+                labelIdx = (i + 1) / 2;
+                if labelIdx <= length(labels)
+                    text(midX, midY, labels{labelIdx}, 'Color', colors(k, :), 'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
                 end
             end
         end

@@ -69,11 +69,10 @@ datasetDir=[datasetDir seqDir];
 % features  = features(indFeat);
 
 %% Zonghuan loading
-load('../data/filtered/head.mat', 'all_data');
+load('../data/filtered/foot.mat', 'all_data');
 % load('../data/filtered/frames.mat', 'frames');
 
-% frames2 = table(frame_seg2)
-used_data = filterTable(all_data, [6], [2, 3], 'all');
+used_data = filterTable(all_data, [8], [3], 'all');
 GTgroups = (used_data.GT)';
 features = (used_data.Features)';
 
@@ -113,7 +112,7 @@ for f=1:numel(features)
 
             plotFrustumsWithImage(feat{1}, param.frustum, img, disp_info);
             % disp(GTgroups{f});
-            v = 9;
+            nv = 9;
         end
 
         if param.show.weights>0

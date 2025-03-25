@@ -1,12 +1,11 @@
 clear variables; close all;
 
-feature_folder = "./get_features";
-seg = 3;
+feature_folder = "../data/in_process/";
 
 for orient_choice = ["head", "shoulder", "hip", "foot"]
     all_data = {};
     for seg=2:3
-        feature_path = feature_folder + "/" + orient_choice + "/seg" + seg + "/";
+        feature_path = feature_folder + orient_choice + "/seg" + seg + "/";
         gt_path = "./groundtruth/seg" + seg + "_gt.mat";
         
         GT = load(gt_path);
@@ -24,8 +23,8 @@ for orient_choice = ["head", "shoulder", "hip", "foot"]
             all_data = [all_data; features.(camField), GTgroups];
         end
     end
-    all_data = cell2table(all_data, 'VariableNames', ["features", ...
-        "timestamp", "cam", "vid", "seg","GT"]);
+    all_data = cell2table(all_data, 'VariableNames', ["Features", ...
+        "Cam", "Vid", "Seg", "Timestamp", "GT"]);
     save("../data/filtered/" + orient_choice + ".mat", "all_data");
 end
 
@@ -153,12 +152,11 @@ function camData = concatCamFeatures(folderPath)
             vid = cell(seq_len, 1); vid(:) = {yzFeatures{j, 1}};
             seg = cell(seq_len, 1); seg(:) = {yzFeatures{j, 2}};
             % Concatenate horizontally (or adapt as needed)
-            allFeatures = [allFeatures; subFeature, subTimestamp, cam, vid, seg];
+            allFeatures = [allFeatures; subFeature, cam, vid, seg, subTimestamp];
         end
         
         % Store in the output struct under camData(xVal).features
         camField = sprintf('cam%d', xVal);  % e.g. 'cam1'
         camData.(camField) = allFeatures;
-        g = 9;
     end
 end

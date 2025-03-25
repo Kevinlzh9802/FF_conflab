@@ -7,15 +7,21 @@ pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
 Files=dir([pose_data_path, '*.json']); % edit your own path to the pose data!!!
 
 orient_choice = "foot";
-mkdir(sprintf(orient_choice))
-mkdir(orient_choice + "/seg2");
-mkdir(orient_choice + "/seg3");
+save_path = "../../data/in_process/";
+mkdir(sprintf(save_path + orient_choice));
+mkdir(save_path + orient_choice + "/seg2/");
+mkdir(save_path + orient_choice + "/seg3/");
+
+imgSize = [1920, 1080];
 for k=1:length(Files)
     disp("***filenumber****")
     k
     FileName=Files(k).name;
     path = strcat(pose_data_path,FileName); % edit your own path to the pose data!!!
-
+    
+    % if k<21
+    %     continue;
+    % end
     data = jsondecode(fileread(path));
     annotations = data.annotations;
     disp("loaded annotations")
@@ -53,25 +59,31 @@ for k=1:length(Files)
             rightFootX = data.annotations.skeletons(t).(colNames{p}).keypoints(31);
             rightFootY = data.annotations.skeletons(t).(colNames{p}).keypoints(32);
 
-            head_vector = [(noseX-headX),(noseY-headY)];
-            shoulder_vector = [(leftShoulderX-rightShoulderX),(leftShoulderY-rightShoulderY)];
-            hip_vector = [(leftHipX-rightHipX),(leftHipY-rightHipY)];
-            foot_vector = [(leftFootX-rightFootX),(leftFootY-rightFootY)];
+            head_vector = [(noseX-headX),(noseY-headY)].* imgSize;
+            shoulder_vector = [(leftShoulderX-rightShoulderX),(leftShoulderY-rightShoulderY)].* imgSize;
+            hip_vector = [(leftHipX-rightHipX),(leftHipY-rightHipY)].* imgSize;
+            foot_vector = [(leftFootX-rightFootX),(leftFootY-rightFootY)].* imgSize;
+            % Head vector is special. Head -> Nose is the same direction as
+            % body orientation
             if orient_choice == "head"
-                body_vector = [head_vector(:,2),-(head_vector(:,1))]; % edit to your choice of head, shoulder, hip, foot!!!
+                body_vector = head_vector;
+            % Otherwise, body vector is perpendicular to the R->L (counterclockwise 90 degrees)
+            % MODIFIED: If R->L is (x,y), then orientation should be
+            % (-y,x)! The y-axis in images is from top to bottom, which is
+            % different from usual right-hand coordinate system.
             elseif orient_choice == "shoulder"
-                body_vector = [shoulder_vector(:,2),-(shoulder_vector(:,1))];
+                body_vector = [-shoulder_vector(:,2),(shoulder_vector(:,1))]; 
             elseif orient_choice == "hip"
-                body_vector = [hip_vector(:,2),-(hip_vector(:,1))];
+                body_vector = [-hip_vector(:,2),(hip_vector(:,1))];
             elseif orient_choice == "foot"
-                body_vector = [foot_vector(:,2),-(foot_vector(:,1))];
+                body_vector = [-foot_vector(:,2),(foot_vector(:,1))];
             end
 
             dotProduct = dot(head_vector(:),body_vector(:));
             if (dotProduct<0)
-            body_vector(:) = [-body_vector(1),-body_vector(2)];
+                body_vector(:) = [-body_vector(1),-body_vector(2)];
             elseif(dotProduct==0)
-            disp('warning: head and body exactly perpendicular')
+                disp('warning: head and body exactly perpendicular')
             end
 
             head_orientation = FixRangeOfAngles(get_angle(head_vector));
@@ -79,7 +91,7 @@ for k=1:length(Files)
 
             % person id, position X, position Y, orientation
             frame_data(p,1) = data.annotations.skeletons(t).(colNames{p}).id;
-            frame_data(p,2) = headX*1960;
+            frame_data(p,2) = headX*1920;
             frame_data(p,3) = headY*1080;
             frame_data(p,4) = body_orientation;
             % frame_data.size = # of people * 4
@@ -100,8 +112,8 @@ for k=1:length(Files)
     % ts_name = fn + "_" + orient_choice + ".mat";
     % mkdir(sprintf(fn))
     segn = "seg" + get_seg_num(fn);
-
-    save(orient_choice + "/" + segn + "/" + mat_name, 'features', 'timestamps')
+    save_name = orient_choice + "/" + segn + "/" + mat_name;
+    save(save_path + save_name, 'features', 'timestamps')
 end
 
 %% Extract frames

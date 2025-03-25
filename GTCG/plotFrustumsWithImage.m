@@ -14,7 +14,7 @@ function plotFrustumsWithImage(personData, frustum, img, disp_info)
 
     fig = figure;
     subplot(1,2,1);
-    plotFrustums(personData, frustum, fig, size(img));
+    plotFrustums(personData, frustum, fig);
     title('Frustum View');
 
     subplot(1,2,2);

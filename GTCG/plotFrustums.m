@@ -1,4 +1,4 @@
-function plotFrustums(personData, frustum, figHandle, imgSize)
+function plotFrustums(personData, frustum, figHandle)
 % PLOTFRUSTUMS Plots frustums for persons and highlights their intersections.
 % 
 % Inputs:
