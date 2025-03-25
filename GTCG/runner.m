@@ -69,11 +69,11 @@ datasetDir=[datasetDir seqDir];
 % features  = features(indFeat);
 
 %% Zonghuan loading
-load('../data/filtered/shoulder.mat', 'all_data');
+load('../data/filtered/head.mat', 'all_data');
 % load('../data/filtered/frames.mat', 'frames');
 
 % frames2 = table(frame_seg2)
-used_data = filterTable(all_data, [8], [3], 'all');
+used_data = filterTable(all_data, [6], [2, 3], 'all');
 GTgroups = (used_data.GT)';
 features = (used_data.Features)';
 
@@ -101,14 +101,15 @@ for f=1:numel(features)
             % plotFrustums(feat{1}, param.frustum, fig);
             img = findMatchingFrame(used_data, frames, last_f);
             
-            sp_info = [used_data.Vid(last_f), used_data.Seg(last_f), used_data.Timestamp(last_f)];
-            [sp_ids, cf_ids] = readSpeakingStatus(sp_info(1), sp_info(2), 1);
-            [speaking, confidence] = readSpeakingStatus(sp_info(1), sp_info(2), sp_info(3));
-            
+            info = table2struct(used_data(last_f, 2:5));
+            [sp_ids, cf_ids] = readSpeakingStatus(info.Vid, info.Seg, 1);
+            [speaking, confidence] = readSpeakingStatus(info.Vid, info.Seg, info.Timestamp);
+
             disp_info = struct();
             disp_info.GT = GTgroups{last_f};
             disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{last_f});
             disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{last_f});
+            disp_info.kp = readPoseInfo(info, feat{1}(:,1));
 
             plotFrustumsWithImage(feat{1}, param.frustum, img, disp_info);
             % disp(GTgroups{f});
