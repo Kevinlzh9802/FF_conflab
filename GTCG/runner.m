@@ -69,10 +69,10 @@ datasetDir=[datasetDir seqDir];
 % features  = features(indFeat);
 
 %% Zonghuan loading
-load('../data/filtered/foot.mat', 'all_data');
+load('../data/filtered/head.mat', 'all_data');
 % load('../data/filtered/frames.mat', 'frames');
 
-used_data = filterTable(all_data, [8], [3], 'all');
+used_data = filterTable(all_data, 'all', [2,3], 'all');
 GTgroups = (used_data.GT)';
 features = (used_data.Features)';
 
