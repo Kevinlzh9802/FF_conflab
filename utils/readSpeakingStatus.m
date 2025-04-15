@@ -1,4 +1,4 @@
-function [sp, cf] = readSpeakingStatus(x, y, n)
+function [sp, cf] = readSpeakingStatus(sp_status, vid, seg, n)
 % READNTHROWFROMCSV Reads the nth row from a CSV file named "vidX_segY.csv".
 %
 % Inputs:
@@ -12,23 +12,27 @@ function [sp, cf] = readSpeakingStatus(x, y, n)
 % Example Usage:
 %   row = readNthRowFromCSV(3, 2, 5);
 
-    % Construct the filename based on x and y
-    speaking = sprintf(['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
-        'annotations/actions/speaking_status/processed/speaking/vid%d_seg%d.csv'], x, y);
-    confidence = sprintf(['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
-        'annotations/actions/speaking_status/processed/confidence/vid%d_seg%d.csv'], x, y);
-
-    % Check if file exists
-    if ~isfile(speaking)
-        error('File %s does not exist.', speaking);
-    end
-    if ~isfile(confidence)
-        error('File %s does not exist.', confidence);
-    end
-
-    % Read the CSV file
-    sp = readmatrix(speaking);
-    cf = readmatrix(confidence);
+    % Read from mat file
+    fn = "vid" + vid + "_seg" + seg;
+    sp = sp_status.speaking.(fn);
+    cf = sp_status.confidence.(fn);
+    % % Construct the filename based on x and y
+    % speaking = sprintf(['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
+    %     'annotations/actions/speaking_status/processed/speaking/vid%d_seg%d.csv'], x, y);
+    % confidence = sprintf(['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
+    %     'annotations/actions/speaking_status/processed/confidence/vid%d_seg%d.csv'], x, y);
+    % 
+    % % Check if file exists
+    % if ~isfile(speaking)
+    %     error('File %s does not exist.', speaking);
+    % end
+    % if ~isfile(confidence)
+    %     error('File %s does not exist.', confidence);
+    % end
+    % 
+    % % Read the CSV file
+    % sp = readmatrix(speaking);
+    % cf = readmatrix(confidence);
 
     % Validate n
     if n < 1 || n > size(sp, 1)
