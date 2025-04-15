@@ -1,5 +1,6 @@
 function [samples, weights] = generate_samples(positions, orientations, sigma_pos, sigma_ang, N)
 % Generates N samples per person with Gaussian noise
+% samples are [x_pos(starting/root), y_pos, orientation] of the vector
 K = size(positions, 1);
 samples = zeros(K * N, 3);
 weights = zeros(K * N, 1);

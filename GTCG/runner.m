@@ -22,6 +22,7 @@ warning off;
 
 addpath(genpath('utils'));
 addpath(genpath('libs'));
+addpath(genpath('../utils'));
 
 %% ALGORITHM PARAMETERS
 
