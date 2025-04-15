@@ -10,19 +10,20 @@ addpath(genpath('../utils'));
 used_data = filterTable(all_data, 'all', [2,3], 'all');
 GTgroups = (used_data.GT)';
 
-params.r = 30;               % o-space radius
-params.sigma_pos = 0.2;
-params.sigma_ang = 0.05;
+params.r = 100;               % o-space radius
+params.sigma_pos = 10;
+params.sigma_ang = 1;
 params.N = 800;
 params.grid_size = [1920, 1080];
 params.tau_intr = 0.7;
-params.peak_thresh = 5;
+params.peak_thresh = 1e-7;
 
-for k=1:50
+all_groups = [];
+for k=200:200
     feature = used_data.Features{k};
-    groups = detect_f_formations(feature, params);
-    groups.members
-    groups.center
+    all_groups{k} = detect_f_formations(feature, params);
+    % all_groups{k}.members
+    % all_groups{k}.center
 end
 
 function groups = detect_f_formations(feature, params)
@@ -42,6 +43,7 @@ Atilde = compute_accumulator(AI, AL);
 
 groups = [];
 center_count = 0;
+max_val_1 = max(Atilde(:));
 while true
     [max_val, idx] = max(Atilde(:));
     if max_val < params.peak_thresh || center_count > num_person
@@ -57,6 +59,7 @@ while true
         groups(end).center = center;
         center_count = center_count + 1;
     end
+    imshow(Atilde / max_val_1);
     Atilde(row, col) = 0; % suppress this peak
 end
 end
