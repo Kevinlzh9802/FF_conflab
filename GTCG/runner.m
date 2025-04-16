@@ -26,10 +26,7 @@ addpath(genpath('../utils'));
 
 %% ALGORITHM PARAMETERS
 
-% dataset directory
-dataset = 'sample_data';
-datasetDir=strcat('data/',dataset); % edit your own path!
-run([datasetDir '/dsetParameter.m']); %load the dataset parameters
+
 param.evalMethod='card';                    %'card' require that 2/3 of individals are correctly matched in a group
                                             %'all'  require that 3/3 of individals are correctly matched in a group (more stricter evaluation)
 
@@ -53,6 +50,56 @@ param.weight.mode='MOLP';                   %the multiframe mode is activated on
                                             %'MAXENTROPY' pick the
                                             %combination that maximize the entropy of the weight
 
+results = struct;
+for clue = ["foot", "hip", "shoulder", "head"]
+    results.(clue) = GTCG_main(param, clue);
+end
+
+a = figure;
+for clue = ["foot", "hip", "shoulder", "head"]
+    plotUniqueVals(results.(clue).group_sizes, a, true, clue);
+    hold on;
+end
+hold off
+legend
+
+b = figure;
+for k=4:7
+    subplot(2,2,k-3);
+    for clue = ["foot", "hip", "shoulder", "head"]
+        gs = results.(clue).group_sizes;
+        sp = results.(clue).s_speaker;
+        card = gs(gs == k);
+        card_ss = sp(gs == k);
+        card_ss = card_ss(card_ss <= k);
+        card_ss = card_ss(card_ss >= 0);
+        % plotUniqueVals(results.(clue).s_speaker, ab);
+
+        [C,~,ic] = unique(card_ss);
+        a_counts = accumarray(ic,1);
+        normalized = true;
+        % figure(fig);
+        if normalized
+            count_normalized = a_counts / length(card_ss);
+            plot(C, count_normalized, 'DisplayName',clue);
+        else
+            plot(C, a_counts);
+        end
+        hold on;
+    end
+    legend
+end
+hold off
+% legend
+c = 0;
+
+function results = GTCG_main(param, clue)
+clear all_data;
+% dataset directory
+dataset = 'sample_data';
+datasetDir=strcat('data/',dataset); % edit your own path!
+run([datasetDir '/dsetParameter.m']); %load the dataset parameters
+
 %set the frustum modality
 frustumMode='CVIU';                         %'CVIU' use the CVIU model (cite [1])
                                             %'ACCV' use the ACCV model (cite [2])
@@ -70,11 +117,12 @@ datasetDir=[datasetDir seqDir];
 % features  = features(indFeat);
 
 %% Zonghuan loading
-load('../data/foot.mat', 'all_data');
+file_name = "../data/" + clue + ".mat";
+load(file_name, 'all_data');
 load('../data/speaking_status.mat', 'speaking_status');
 % load('../data/filtered/frames.mat', 'frames');
 
-used_data = filterTable(all_data, 'all', [2,3], 'all');
+used_data = filterTable(all_data, [6,8], [2,3], 'all');
 GTgroups = (used_data.GT)';
 features = (used_data.Features)';
 
@@ -87,13 +135,14 @@ FNs=[];
 
 detections=[];
 s_speaker = [];
+group_sizes = [];
 
 for f=1:numel(features)
     if ~isempty(features{f})
         last_f = f+param.numFrames-1;
         feat=features(f:last_f);                   %copy the frames
         
-        fprintf(['******* Frames ' num2str(f:f+param.numFrames-1) ' *******\n']);
+        fprintf(['******* Frames ' num2str(f:last_f) ' *******\n']);
 
         [groups, frustums,weights]=detectGroups(feat,param);    %detect groups
         info = table2struct(used_data(last_f, 2:5));
@@ -117,12 +166,12 @@ for f=1:numel(features)
         %     % disp(GTgroups{f});
         % end
 
-        if param.show.weights>0
-            %display the weights
-            figure(param.show.weights);
-            bar(weights);
-            title('Weights used in Eq 8 of ACCV');
-        end
+        % if param.show.weights>0
+        %     %display the weights
+        %     figure(param.show.weights);
+        %     bar(weights);
+        %     title('Weights used in Eq 8 of ACCV');
+        % end
 
         detections=[detections ; {groups}];
 
@@ -143,17 +192,35 @@ for f=1:numel(features)
         [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, 1);
         [speaking, confidence] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, info.Timestamp);
         ss = getStatusForGroup(sp_ids, speaking, groups);
-        ssg = zeros(length(ss), 1);
-        for k=1:length(ss)
-            ssg(k) = (sum(ss{1}) > 1);
+        % g_size = [g_size, length(groups)];
+        if ~isempty(groups)
+            ssg = zeros(length(groups), 1);
+            g_size = zeros(length(groups), 1);
+            for k=1:length(ss)
+                g_size(k) = length(groups{k});
+                ssg(k) = sum(ss{k});
+            end
+            group_sizes = [group_sizes; g_size];
+            s_speaker = [s_speaker; ssg];
         end
-        s_speaker = [s_speaker; ssg(k)];
         showResults(precisions,recalls);
     
     end
 end
 
-disp(sum(s_speaker) / length(s_speaker));
+% disp(sum(s_speaker) / length(s_speaker));
+
+% a = figure;
+% plotUniqueVals(group_sizes, a);
+
+% for k=4:7
+%     card = group_sizes(group_sizes == k);
+%     card_ss = s_speaker(group_sizes == k);
+%     [C,ia,ic] = unique(group_sizes);
+%     a_counts = accumarray(ic,1);
+%     plot(C, a_counts);
+% end
+
 results = struct;
 results.dataset = dataset;
 results.TP = TPs;
@@ -163,7 +230,10 @@ results.FNs = FNs;
 results.precisions = precisions;
 results.recalls = recalls;
 results.body_orientations = 'head';
+results.group_sizes = group_sizes;
+results.s_speaker = s_speaker;
 
 % saving_name = strcat('results_',dataset);
 % save(saving_name,'results');
 
+end
