@@ -16,96 +16,25 @@
 % -------------------------------------------- %
 
 % clear variables; 
-clearvars -except frames;
+% clearvars -except frames;
 close all;
 warning off;
 
 addpath(genpath('utils'));
 addpath(genpath('libs'));
 addpath(genpath('../utils'));
-
-%% ALGORITHM PARAMETERS
-
-
-param.evalMethod='card';                    %'card' require that 2/3 of individals are correctly matched in a group
-                                            %'all'  require that 3/3 of individals are correctly matched in a group (more stricter evaluation)
-
-%multi/single frame
-param.numFrames=1;                          %number of frames to analyze (>1 imply multiframe analysis)
-
-%parameter for the 2D histogram
-param.hist.n_x=20;                          %number of rows for the frustum descriptor
-param.hist.n_y=20;                          %number of columns for the frustum descriptor
-
-%displaying options
-param.show.weights=0;                       %show the weight used to condense the similarity matrices
-param.show.groups=0;                        %show a figure with the current frame, the decetion and the groundtruth
-param.show.frustum=1;                       %show the frustum
-param.show.results=1;                       %display the precision/recall/F1-score values
-
-%weight calculation parameters
-param.weight.mode='MOLP';                   %the multiframe mode is activated only if param.numFrames>1. Set to:
-                                            %'MOLP' (MultiObjectiveLinearProgramming)
-                                            %'EQUAL' use equal weights for the frames
-                                            %'MAXENTROPY' pick the
-                                            %combination that maximize the entropy of the weight
+param = setParams();
 
 results = struct;
 for clue = ["foot", "hip", "shoulder", "head"]
     results.(clue) = GTCG_main(param, clue);
 end
-
-a = figure;
-for clue = ["foot", "hip", "shoulder", "head"]
-    plotUniqueVals(results.(clue).group_sizes, a, true, clue);
-    hold on;
-end
-hold off
-legend
-
-b = figure;
-for k=4:7
-    subplot(2,2,k-3);
-    for clue = ["foot", "hip", "shoulder", "head"]
-        gs = results.(clue).group_sizes;
-        sp = results.(clue).s_speaker;
-        card = gs(gs == k);
-        card_ss = sp(gs == k);
-        card_ss = card_ss(card_ss <= k);
-        card_ss = card_ss(card_ss >= 0);
-        % plotUniqueVals(results.(clue).s_speaker, ab);
-
-        [C,~,ic] = unique(card_ss);
-        a_counts = accumarray(ic,1);
-        normalized = true;
-        % figure(fig);
-        if normalized
-            count_normalized = a_counts / length(card_ss);
-            plot(C, count_normalized, 'DisplayName',clue);
-        else
-            plot(C, a_counts);
-        end
-        hold on;
-    end
-    legend
-end
-hold off
-% legend
-c = 0;
+run plotGroups.m;
 
 function results = GTCG_main(param, clue)
-clear all_data;
-% dataset directory
-dataset = 'sample_data';
-datasetDir=strcat('data/',dataset); % edit your own path!
-run([datasetDir '/dsetParameter.m']); %load the dataset parameters
-
-%set the frustum modality
-frustumMode='CVIU';                         %'CVIU' use the CVIU model (cite [1])
-                                            %'ACCV' use the ACCV model (cite [2])
-
-seqDir=''; %if a sub-sequence exists write the folder name here
-datasetDir=[datasetDir seqDir];
+clear all_data;           
+% seqDir=''; %if a sub-sequence exists write the folder name here
+% datasetDir=[datasetDir seqDir];
 
 %% original loading
 % load([datasetDir '/filtered_features.mat'],'features','timestamp');
@@ -144,7 +73,7 @@ for f=1:numel(features)
         
         fprintf(['******* Frames ' num2str(f:last_f) ' *******\n']);
 
-        [groups, frustums,weights]=detectGroups(feat,param);    %detect groups
+        [groups, ~, ~]=detectGroups(feat,param);    %detect groups
         info = table2struct(used_data(last_f, 2:5));
         % kp = 5;
         % if floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp))
@@ -189,10 +118,11 @@ for f=1:numel(features)
         FPs=[FPs ; fp'];
         FNs=[FNs ; fn'];
 
-        [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, 1);
-        [speaking, confidence] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, info.Timestamp);
+        [sp_ids, ~] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, 1);
+        [speaking, ~] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, info.Timestamp);
         ss = getStatusForGroup(sp_ids, speaking, groups);
-        % g_size = [g_size, length(groups)];
+        
+        % record group sizes and speaker info
         if ~isempty(groups)
             ssg = zeros(length(groups), 1);
             g_size = zeros(length(groups), 1);
@@ -207,19 +137,6 @@ for f=1:numel(features)
     
     end
 end
-
-% disp(sum(s_speaker) / length(s_speaker));
-
-% a = figure;
-% plotUniqueVals(group_sizes, a);
-
-% for k=4:7
-%     card = group_sizes(group_sizes == k);
-%     card_ss = s_speaker(group_sizes == k);
-%     [C,ia,ic] = unique(group_sizes);
-%     a_counts = accumarray(ic,1);
-%     plot(C, a_counts);
-% end
 
 results = struct;
 results.dataset = dataset;
