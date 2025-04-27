@@ -118,20 +118,27 @@ for f=1:numel(features)
         FPs=[FPs ; fp'];
         FNs=[FNs ; fn'];
 
-        [sp_ids, ~] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, 1);
-        [speaking, ~] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, info.Timestamp);
+        [sp_ids, ~] = readSpeakingStatus(speaking_status, info.Vid, ...
+            info.Seg, 1, 1);
+        [speaking, ~] = readSpeakingStatus(speaking_status, info.Vid, ...
+            info.Seg, info.Timestamp+1, 60);
+        if speaking == -1000
+            continue;
+        end
         ss = getStatusForGroup(sp_ids, speaking, groups);
         
         % record group sizes and speaker info
         if ~isempty(groups)
-            ssg = zeros(length(groups), 1);
-            g_size = zeros(length(groups), 1);
+            % ssg = zeros(length(groups), 1);
+            % g_size = zeros(length(groups), 1);
             for k=1:length(ss)
-                g_size(k) = length(groups{k});
-                ssg(k) = sum(ss{k});
+                ssg = sum(ss{k});
+                if ~(ssg > 10 || ssg < 0)
+                    group_sizes = [group_sizes; length(groups{k})];
+                    s_speaker = [s_speaker; ssg];
+                end
             end
-            group_sizes = [group_sizes; g_size];
-            s_speaker = [s_speaker; ssg];
+            
         end
         showResults(precisions,recalls);
     
