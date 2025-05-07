@@ -11,19 +11,19 @@ used_data = filterTable(all_data, 'all', [2,3], 'all');
 GTgroups = (used_data.GT)';
 
 params.r = 100;               % o-space radius
-params.sigma_pos = 10;
+params.sigma_pos = 40;
 params.sigma_ang = 1;
-params.N = 800;
+params.N = 5000;
 params.grid_size = [1920, 1080];
 params.tau_intr = 0.7;
 params.peak_thresh = 1e-7;
 
 all_groups = [];
-for k=200:200
+for k=1:200
     feature = used_data.Features{k};
     all_groups{k} = detect_f_formations(feature, params);
-    % all_groups{k}.members
-    % all_groups{k}.center
+    all_groups{k}.members
+    all_groups{k}.center
 end
 
 function groups = detect_f_formations(feature, params)
