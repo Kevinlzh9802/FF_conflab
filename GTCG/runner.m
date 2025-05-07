@@ -66,14 +66,31 @@ detections=[];
 s_speaker = [];
 group_sizes = [];
 
+% if isempty(gcp('nocreate'))
+%     parpool;
+% end
+
 for f=1:numel(features)
     if ~isempty(features{f})
         last_f = f+param.numFrames-1;
         feat=features(f:last_f);                   %copy the frames
         
         fprintf(['******* Frames ' num2str(f:last_f) ' *******\n']);
+        [groups, ~, ~]=detectGroups(feat,param);
 
-        [groups, ~, ~]=detectGroups(feat,param);    %detect groups
+        % fDetect = parfeval(@detectGroups, 3, feat, param);
+        % completed = wait(fDetect, "finished", 30);
+        % if completed
+        %     % Attempt to fetch results with a timeout
+        %         %detect groups
+        %     [groups, ~, ~] = fetchOutputs(fDetect);
+        % else
+        %     % Timeout or other error
+        %     cancel(fDetect);
+        %     warning('evalgroups at iteration %d timed out or failed. Skipping...', f);
+        %     continue;
+        % end
+
         info = table2struct(used_data(last_f, 2:5));
         % kp = 5;
         % if floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp))
@@ -108,8 +125,9 @@ for f=1:numel(features)
             fr=f+param.numFrames-1; %frame used as reference for the evaluation
             showGroups(fr,groups,GTgroups,param);
         end
-
-        [p,r,tp,fp,fn] = evalgroups(groups,GTgroups(:,f+param.numFrames-1),param.evalMethod);
+        
+        GT = GTgroups(:,f+param.numFrames-1);
+        [p,r,tp,fp,fn] = evalgroups(groups, GT, param.evalMethod);
 
         %add the evaluation results to the queue
         precisions=[precisions ; p'];
@@ -121,7 +139,7 @@ for f=1:numel(features)
         [sp_ids, ~] = readSpeakingStatus(speaking_status, info.Vid, ...
             info.Seg, 1, 1);
         [speaking, ~] = readSpeakingStatus(speaking_status, info.Vid, ...
-            info.Seg, info.Timestamp+1, 60);
+            info.Seg, info.Timestamp+1, 1);
         if speaking == -1000
             continue;
         end
@@ -141,7 +159,8 @@ for f=1:numel(features)
             
         end
         showResults(precisions,recalls);
-    
+        result_name = clue + "Res";
+        used_data.(result_name){f} = groups;
     end
 end
 
@@ -156,6 +175,7 @@ results.recalls = recalls;
 results.body_orientations = 'head';
 results.group_sizes = group_sizes;
 results.s_speaker = s_speaker;
+results.original_data = used_data;
 
 % saving_name = strcat('results_',dataset);
 % save(saving_name,'results');
