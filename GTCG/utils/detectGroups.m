@@ -457,4 +457,6 @@ elseif strcmp(param.weight.mode,'ENSEMBLE')
     end
     fprintf(['Found ' num2str(numel(groups)) ' groups\n']);
 end
+figure;
+heatmap(IDs,IDs,As{1,1});
 end

@@ -26,7 +26,7 @@ addpath(genpath('../utils'));
 param = setParams();
 
 results = struct;
-for clue = ["foot", "hip", "shoulder", "head"]
+for clue = ["foot", "head"]
     results.(clue) = GTCG_main(param, clue);
     f_name = clue + "Res";
     results.(clue).g_count = countGroupsContainingIDs(results.(clue).original_data.(f_name), {[13,21],[35,12,19]});
@@ -52,7 +52,7 @@ clear all_data;
 file_name = "../data/" + clue + ".mat";
 load(file_name, 'all_data');
 load('../data/speaking_status.mat', 'speaking_status');
-load('../data/frames.mat', 'frames');
+% load('../data/frames.mat', 'frames');
 
 used_data = filterTable(all_data, [4], [2], [8]);
 GTgroups = (used_data.GT)';
@@ -73,12 +73,14 @@ group_sizes = [];
 %     parpool;
 % end
 
-for f=1:numel(features)
+for f=18:numel(features)
     if ~isempty(features{f})
         last_f = f+param.numFrames-1;
         feat=features(f:last_f);                   %copy the frames
         
         fprintf(['******* Frames ' num2str(f:last_f) ' *******\n']);
+        fig = figure;
+        plotFrustums(feat{1}, param.frustum, fig);
         [groups, ~, ~]=detectGroups(feat,param);
 
         % fDetect = parfeval(@detectGroups, 3, feat, param);
@@ -96,22 +98,25 @@ for f=1:numel(features)
 
         info = table2struct(used_data(last_f, 2:5));
         kp = 5;
-        if floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp))
-            % fig = figure;
-            % plotFrustums(feat{1}, param.frustum, fig);
-            img = findMatchingFrame(used_data, frames, last_f);
-            % img= 0;
-
-            [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, 1, 1);
-            [speaking, confidence] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, info.Timestamp, 1);
-
-            disp_info = struct();
-            disp_info.GT = GTgroups{last_f};
-            disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{last_f});
-            disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{last_f});
-            disp_info.kp = readPoseInfo(info, feat{1}(:,1));
-
-            plotFrustumsWithImage(feat{1}, param.frustum, img, disp_info);
+        plot_cond = (floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp)));
+        % plot_cond = true;
+        if plot_cond
+            fig = figure;
+            plotFrustums(feat{1}, param.frustum, fig);
+            % img = findMatchingFrame(used_data, frames, last_f);
+            % % img= 0;
+            % 
+            % [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, 1, 1);
+            % [speaking, confidence] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, info.Timestamp, 1);
+            % 
+            % disp_info = struct();
+            % disp_info.GT = GTgroups{last_f};
+            % disp_info.detection = groups;
+            % disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{last_f});
+            % disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{last_f});
+            % disp_info.kp = readPoseInfo(info, feat{1}(:,1));
+            % 
+            % plotFrustumsWithImage(feat{1}, param.frustum, img, disp_info);
             % disp(GTgroups{f});
         end
 

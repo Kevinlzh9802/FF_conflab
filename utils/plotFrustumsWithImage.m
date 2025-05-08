@@ -18,15 +18,17 @@ function plotFrustumsWithImage(personData, frustum, img, disp_info)
     title('Frustum View');
 
     subplot(1,2,2);
-    plotSkeletonOnImage(fig, img, disp_info.kp);
+    % plotSkeletonOnImage(fig, img, disp_info.kp);
     title('Image View');
 
     % Display cell array as text
     text(0.5, -0.1, ['GT: ', formatCellArray(disp_info.GT)], 'Units', 'normalized', ...
         'HorizontalAlignment', 'center', 'FontSize', 18);
-    text(0.5, -0.2, ['Speaking: ', formatCellArray(disp_info.speaking)], 'Units', 'normalized', ...
+    text(0.5, -0.2, ['Detection: ', formatCellArray(disp_info.detection)], 'Units', 'normalized', ...
         'HorizontalAlignment', 'center', 'FontSize', 18);
-    text(0.5, -0.3, ['Confidence: ', formatCellArray(disp_info.confidence)], 'Units', 'normalized', ...
+    text(0.5, -0.3, ['Speaking: ', formatCellArray(disp_info.speaking)], 'Units', 'normalized', ...
+        'HorizontalAlignment', 'center', 'FontSize', 18);
+    text(0.5, -0.4, ['Confidence: ', formatCellArray(disp_info.confidence)], 'Units', 'normalized', ...
         'HorizontalAlignment', 'center', 'FontSize', 18);
 end
 
