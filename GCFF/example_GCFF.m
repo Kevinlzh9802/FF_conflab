@@ -40,6 +40,9 @@ seqpath = 'data/sample_data';
 load(fullfile(seqpath, "filtered_features.mat"));
 load(fullfile(seqpath, "groundtruth.mat"));
 load(fullfile(seqpath, "settings_gc.mat"));
+addpath("../utils/");
+param.frustum.length = 275;
+param.frustum.aperture = 160;
 
 %% Computing
 
@@ -57,6 +60,7 @@ recall = zeros(1,length(timestamp)) ;
 
 
 for idxFrame = 1:length(timestamp)
+    % gg represents group_id
     gg = gc( features{idxFrame}, stride, mdl ) ;
     groups{idxFrame} = [] ;
     for ii = 1:max(gg)+1
