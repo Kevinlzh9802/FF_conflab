@@ -43,6 +43,7 @@ load(fullfile(seqpath, "settings_gc.mat"));
 addpath("../utils/");
 param.frustum.length = 275;
 param.frustum.aperture = 160;
+stride = 140;
 
 %% Computing
 
