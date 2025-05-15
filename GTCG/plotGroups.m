@@ -1,12 +1,13 @@
 a = figure;
-colors = ["red", "blue", "green", "orange"];
-clues = ["foot", "hip", "shoulder", "head"];
+colors = ["red", "blue", "green", "orange", "black"];
+clues = ["foot", "hip", "shoulder", "head", "GT"];
 for k = 1:4
     clue = clues(k);
     color = colors(k);
     plotUniqueVals(results.(clue).group_sizes, a, true, clue, color);
     hold on;
 end
+plotUniqueVals(data_results.GT, a, true, "GT", "black");
 hold off
 legend
 
