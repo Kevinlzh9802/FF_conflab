@@ -106,6 +106,8 @@ for f=18:numel(features)
         if plot_cond
             % fig = figure;
             % plotFrustums(feat{1}, param.frustum, fig);
+            % fig = figure;
+            % plotFrustums(feat{1}, param.frustum, fig);
             % img = findMatchingFrame(used_data, frames, last_f);
             % % img= 0;
             % 
