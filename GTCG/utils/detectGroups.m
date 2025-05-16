@@ -254,11 +254,12 @@ for f=1:numel(frames)
     end
 
 
-    % figure;
+    % figure; axis equal;
     % for kp=1:length(px)
     %     scatter(px{kp}.frustum(:,1),px{kp}.frustum(:,2))
     %     hold on;
     % end
+    % set(gca, 'YDir', 'reverse'); % Flip Y-axis
 
     %generate 2D histogram for each person and on the entire space
     for i=1:size(persons,1)

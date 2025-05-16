@@ -26,7 +26,7 @@ addpath(genpath('../utils'));
 param = setParams();
 
 results = struct;
-for clue = ["foot", "head"]
+for clue = ["hip", "head"]
     results.(clue) = GTCG_main(param, clue);
     f_name = clue + "Res";
     results.(clue).g_count = countGroupsContainingIDs(results.(clue).original_data.(f_name), {[13,21],[35,12,19]});
@@ -58,6 +58,7 @@ used_data = filterTable(all_data, [4], [2], [8]);
 GTgroups = (used_data.GT)';
 features = (used_data.Features)';
 
+plot_debug = false;
 %% Computation
 precisions=[];
 recalls=[];
@@ -79,8 +80,10 @@ for f=18:numel(features)
         feat=features(f:last_f);                   %copy the frames
         
         fprintf(['******* Frames ' num2str(f:last_f) ' *******\n']);
-        fig = figure;
-        plotFrustums(feat{1}, param.frustum, fig);
+        if plot_debug
+            fig = figure;
+            plotFrustums(feat{1}, param.frustum, fig);
+        end
         [groups, ~, ~]=detectGroups(feat,param);
 
         % fDetect = parfeval(@detectGroups, 3, feat, param);
@@ -101,8 +104,8 @@ for f=18:numel(features)
         plot_cond = (floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp)));
         % plot_cond = true;
         if plot_cond
-            fig = figure;
-            plotFrustums(feat{1}, param.frustum, fig);
+            % fig = figure;
+            % plotFrustums(feat{1}, param.frustum, fig);
             % img = findMatchingFrame(used_data, frames, last_f);
             % % img= 0;
             % 
