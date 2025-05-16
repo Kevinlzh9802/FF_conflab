@@ -85,13 +85,13 @@ for k = 1:4
     c = 9;
 end
 bar((diffs(1:end-1,:))');        % Transpose to group by column
-xlabel('Group (Columns)')
+xlabel('Group Cardinality')
 group_labels = {'1', '2', '3', '4', '5', '6', '7', '8'};
-ylabel('Value')
+ylabel('Diff')
 legend(clues)
 xticks(1:size(diffs,2));
 xticklabels(group_labels)
-title('Grouped Bar Chart by Column')
+title('Proportion Difference with GT')
 
 end
 function y = pad_with_zeros(x, N)

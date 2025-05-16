@@ -12,7 +12,8 @@
 %% INITIALIZATION
 
 % Clean the workspace
-clear variables, close all;
+% clear variables, close all;
+clearvars -except frames;
 addpath(genpath('../GCFF')) % add your own path
 addpath(genpath('../utils'));
 
@@ -43,7 +44,7 @@ addpath(genpath('../utils'));
 % load(fullfile(seqpath, "settings_gc.mat"));
 
 %% zonghuan loading
-load('../data/data_results.mat');
+% load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
 % load('../data/frames.mat', 'frames');
 
@@ -53,31 +54,34 @@ params.frustum.aperture = 160;
 params.stride = 130;
 params.mdl = 60000;
 
-% file_name = "../data/foot.mat";
-% load(file_name, 'all_data');
-% data_results = all_data;
-% data_results.Properties.VariableNames{1} = 'footFeat';
-% 
-% for clue = ["hip", "shoulder", "head"]
-%     f_name = clue + "Feat";
-%     file_name = "../data/" + clue + ".mat";
-%     load(file_name, 'all_data');
-%     data_results.(f_name) = all_data.Features;
-% end
+file_name = "../data/foot.mat";
+load(file_name, 'all_data');
+data_results = all_data;
+data_results.Properties.VariableNames{1} = 'footFeat';
 
-% results = struct;
-% for clue = ["foot", "hip", "shoulder", "head"]
-% 
-%     used_data = filterTable(data_results, 'all', 'all', 'all');
-%     results.(clue) = GCFF_main(used_data, params, clue, speaking_status);
-% 
-%     f_name = clue + "Res";
-%     used_data.(f_name) = results.(clue).groups;
-%     % data_results.(f_name) = used_data.(f_name);
-%     % results.(clue).g_count = countGroupsContainingIDs(used_data.(f_name), {[13,21],[35,12,19]});
-% end
+for clue = ["hip", "shoulder", "head"]
+    f_name = clue + "Feat";
+    file_name = "../data/" + clue + ".mat";
+    load(file_name, 'all_data');
+    data_results.(f_name) = all_data.Features;
+end
+data_results = data_results(:, [1 7 8 9 2 3 4 5 6]);
 
-run plotGroupsInfo.m;
+results = struct;
+for clue = ["foot", "hip", "shoulder", "head"]
+
+    used_data = filterTable(data_results, [6], [3], [5]);
+    results.(clue) = GCFF_main(used_data, params, clue, speaking_status);
+
+    f_name = clue + "Res";
+    used_data.(f_name) = results.(clue).groups;
+    results.(clue).original_data = used_data;
+    % data_results.(f_name) = used_data.(f_name);
+    % results.(clue).g_count = countGroupsContainingIDs(used_data.(f_name), {[13,21],[35,12,19]});
+end
+
+run plotGroups.m;
+% run plotGroupsInfo.m;
 
 %% Computing
 function results = GCFF_main(data, params, clue, speaking_status)

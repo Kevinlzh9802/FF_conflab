@@ -1,10 +1,11 @@
 close all;
-clue = "shoulder";
+clue = "hip";
 f_name = clue + "Res";
-features = results.(clue).original_data.(f_name);
+feat_name = clue + "Feat";
+features = results.(clue).groups;
 % load('../data/frames.mat', 'frames');
 
-output_video = 'shoulder_cam4_vid2_seg8.avi';
+output_video = clue + "_cam4_vid2_seg8.avi";
 frame_rate = 10;
 v = VideoWriter(output_video);
 v.FrameRate = frame_rate;
@@ -19,7 +20,7 @@ for f=1:height(used_data)
     imshow(img); hold on;
 
     % Plot each person
-    data = used_data.Features{f};
+    data = used_data.(feat_name){f};
     for i = 1:size(data, 1)
         x = data(i, 2) * 0.5;
         y = data(i, 3) * 0.5;
