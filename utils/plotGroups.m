@@ -45,7 +45,12 @@ for f=1:height(used_data)
 
         if size(group_data,1) >= 3
             % Plot convex hull
-            k = convhull(group_data(:,1), group_data(:,2));
+            try
+                k = convhull(group_data(:,1), group_data(:,2));
+            catch
+                continue;
+            end
+
             plot(group_data(k,1), group_data(k,2), 'g-', 'LineWidth', 2);
         elseif size(group_data,1) == 2
             % Plot line

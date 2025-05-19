@@ -46,7 +46,7 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-% load('../data/frames.mat', 'frames');
+load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;

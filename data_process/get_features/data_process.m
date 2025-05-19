@@ -6,7 +6,7 @@ pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
     'annotations/pose/coco/'];
 Files=dir([pose_data_path, '*.json']); % edit your own path to the pose data!!!
 
-orient_choice = "foot";
+orient_choice = "head";
 save_path = "../../data/in_process/";
 mkdir(sprintf(save_path + orient_choice));
 mkdir(save_path + orient_choice + "/seg2/");
@@ -63,36 +63,52 @@ for k=1:length(Files)
             shoulder_vector = [(leftShoulderX-rightShoulderX),(leftShoulderY-rightShoulderY)].* imgSize;
             hip_vector = [(leftHipX-rightHipX),(leftHipY-rightHipY)].* imgSize;
             foot_vector = [(leftFootX-rightFootX),(leftFootY-rightFootY)].* imgSize;
+
+            shoulder_orient = [-shoulder_vector(:,2),(shoulder_vector(:,1))]; 
+            hip_orient = [-hip_vector(:,2),(hip_vector(:,1))];
+            foot_orient = [-foot_vector(:,2),(foot_vector(:,1))];
+
+            vector_check = [head_vector; shoulder_orient; hip_orient; foot_orient];
+            vector_check = reverse_incorrect_vectors(vector_check);
+
+            head_vector = vector_check(1, :);
+            shoulder_orient = vector_check(2, :);
+            hip_orient = vector_check(3, :);
+            foot_orient = vector_check(4, :);
             % Head vector is special. Head -> Nose is the same direction as
             % body orientation
             if orient_choice == "head"
                 body_vector = head_vector;
+                body_pos = [headX, headY];
             % Otherwise, body vector is perpendicular to the R->L (counterclockwise 90 degrees)
             % MODIFIED: If R->L is (x,y), then orientation should be
             % (-y,x)! The y-axis in images is from top to bottom, which is
             % different from usual right-hand coordinate system.
             elseif orient_choice == "shoulder"
-                body_vector = [-shoulder_vector(:,2),(shoulder_vector(:,1))]; 
+                body_vector = shoulder_orient; 
+                body_pos = [leftShoulderX + rightShoulderX, leftShoulderY + rightShoulderY] / 2;
             elseif orient_choice == "hip"
-                body_vector = [-hip_vector(:,2),(hip_vector(:,1))];
+                body_vector = hip_orient;
+                body_pos = [leftHipX + rightHipX, leftHipY + rightHipY] / 2;
             elseif orient_choice == "foot"
-                body_vector = [-foot_vector(:,2),(foot_vector(:,1))];
+                body_vector = foot_orient;
+                body_pos = [leftFootX + rightFootX, leftFootY + rightFootY] / 2;
             end
 
-            dotProduct = dot(head_vector(:),body_vector(:));
-            if (dotProduct<0)
-                body_vector(:) = [-body_vector(1),-body_vector(2)];
-            elseif(dotProduct==0)
-                disp('warning: head and body exactly perpendicular')
-            end
+            % dotProduct = dot(head_vector(:),body_vector(:));
+            % if (dotProduct<0)
+            %     body_vector(:) = [-body_vector(1),-body_vector(2)];
+            % elseif(dotProduct==0)
+            %     disp('warning: head and body exactly perpendicular')
+            % end
 
             head_orientation = FixRangeOfAngles(get_angle(head_vector));
             body_orientation = FixRangeOfAngles(get_angle(body_vector));
 
             % person id, position X, position Y, orientation
             frame_data(p,1) = data.annotations.skeletons(t).(colNames{p}).id;
-            frame_data(p,2) = headX*1920;
-            frame_data(p,3) = headY*1080;
+            frame_data(p,2) = body_pos(1)*1920;
+            frame_data(p,3) = body_pos(2)*1080;
             frame_data(p,4) = body_orientation;
             % frame_data.size = # of people * 4
             % head orientation is not recorded. Instead, use headX and
