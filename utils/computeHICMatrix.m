@@ -8,7 +8,11 @@ function HIC = computeHICMatrix(GTgroups, Detgroups)
 %
 % Output:
 %   - HIC: a matrix where HIC(i,j) counts individuals in GT group of size i assigned to Det group of size j
-
+    
+    if isempty(GTgroups) || isempty(Detgroups)
+        HIC = 0;
+        return;
+    end
     max_gt = max(cellfun(@length, GTgroups));
     max_det = max(cellfun(@length, Detgroups));
     HIC = zeros(max_gt, max_det);
@@ -24,7 +28,7 @@ function HIC = computeHICMatrix(GTgroups, Detgroups)
     for j = 1:length(Detgroups)
         group = Detgroups{j};
         det_card = length(group);
-        for p = group
+        for p = group'
             if isKey(person_to_gt, p)
                 gt_card = person_to_gt(p);
                 HIC(gt_card, det_card) = HIC(gt_card, det_card) + 1;

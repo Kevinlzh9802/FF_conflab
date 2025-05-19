@@ -46,7 +46,7 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-% load('../data/frames.mat', 'frames');
+load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;
@@ -70,7 +70,7 @@ data_results = data_results(:, [1 7 8 9 2 3 4 5 6]);
 results = struct;
 for clue = ["foot", "hip", "shoulder", "head"]
 
-    used_data = filterTable(data_results, [6], [3], [5]);
+    used_data = filterTable(data_results, [4], [2], [8]);
     results.(clue) = GCFF_main(used_data, params, clue, speaking_status);
 
     f_name = clue + "Res";
