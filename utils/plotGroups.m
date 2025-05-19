@@ -1,5 +1,5 @@
 close all;
-clue = "head";
+clue = "foot";
 f_name = clue + "Res";
 feat_name = clue + "Feat";
 features = results.(clue).groups;

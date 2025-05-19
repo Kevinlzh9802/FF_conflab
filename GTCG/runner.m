@@ -54,7 +54,7 @@ load(file_name, 'all_data');
 load('../data/speaking_status.mat', 'speaking_status');
 % load('../data/frames.mat', 'frames');
 
-used_data = filterTable(all_data, [4], [2], [8]);
+used_data = filterTable(all_data, [6], [2], [9]);
 GTgroups = (used_data.GT)';
 features = (used_data.Features)';
 
@@ -104,25 +104,25 @@ for f=18:numel(features)
         plot_cond = (floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp)));
         % plot_cond = true;
         if plot_cond
-            % fig = figure;
-            % plotFrustums(feat{1}, param.frustum, fig);
-            % fig = figure;
-            % plotFrustums(feat{1}, param.frustum, fig);
-            % img = findMatchingFrame(used_data, frames, last_f);
-            % % img= 0;
-            % 
-            % [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, 1, 1);
-            % [speaking, confidence] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, info.Timestamp, 1);
-            % 
-            % disp_info = struct();
-            % disp_info.GT = GTgroups{last_f};
-            % disp_info.detection = groups;
-            % disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{last_f});
-            % disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{last_f});
-            % disp_info.kp = readPoseInfo(info, feat{1}(:,1));
-            % 
-            % plotFrustumsWithImage(feat{1}, param.frustum, img, disp_info);
-            % disp(GTgroups{f});
+            fig = figure;
+            plotFrustums(feat{1}, param.frustum, fig);
+            fig = figure;
+            plotFrustums(feat{1}, param.frustum, fig);
+            img = findMatchingFrame(used_data, frames, last_f);
+            % img= 0;
+
+            [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, 1, 1);
+            [speaking, confidence] = readSpeakingStatus(speaking_status, info.Vid, info.Seg, info.Timestamp, 1);
+
+            disp_info = struct();
+            disp_info.GT = GTgroups{last_f};
+            disp_info.detection = groups;
+            disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{last_f});
+            disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{last_f});
+            disp_info.kp = readPoseInfo(info, feat{1}(:,1));
+
+            plotFrustumsWithImage(feat{1}, param.frustum, img, disp_info);
+            disp(GTgroups{f});
         end
 
         if param.show.weights>0
