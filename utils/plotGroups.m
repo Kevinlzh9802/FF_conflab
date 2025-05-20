@@ -1,5 +1,5 @@
 close all;
-clue = "foot";
+clue = "head";
 f_name = clue + "Res";
 feat_name = clue + "Feat";
 features = results.(clue).groups;
@@ -7,9 +7,9 @@ features = results.(clue).groups;
 
 output_video = clue + "_cam4_vid2_seg8.avi";
 frame_rate = 10;
-v = VideoWriter(output_video);
-v.FrameRate = frame_rate;
-open(v);
+% v = VideoWriter(output_video);
+% v.FrameRate = frame_rate;
+% open(v);
 used_data = results.(clue).original_data;
 
 hfig = figure('Units','pixels','Position',[100 100 960 540]); % Fixed size
@@ -63,7 +63,7 @@ for f=1:height(used_data)
 
     % Write frame
     frame = getframe(hfig);
-    writeVideo(v, frame);
+    % writeVideo(v, frame);
 
     hold off;
     c = 9;

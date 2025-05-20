@@ -104,10 +104,8 @@ for f=18:numel(features)
         plot_cond = (floor (f / (numel(features)/kp)) ~= floor ((f+1)/ (numel(features)/kp)));
         % plot_cond = true;
         if plot_cond
-            fig = figure;
-            plotFrustums(feat{1}, param.frustum, fig);
-            fig = figure;
-            plotFrustums(feat{1}, param.frustum, fig);
+            % fig = figure;
+            % plotFrustums(feat{1}, param.frustum, fig);
             img = findMatchingFrame(used_data, frames, last_f);
             % img= 0;
 

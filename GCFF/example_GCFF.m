@@ -8,7 +8,6 @@
 % experiments on provided data.
 %
 
-
 %% INITIALIZATION
 
 % Clean the workspace
@@ -46,7 +45,7 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-load('../data/frames.mat', 'frames');
+% load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;
@@ -121,6 +120,7 @@ for idxFrame = 1:length(timestamp)
         GTgroups{idxFrame} = ff_deletesingletons(GTgroups{idxFrame}) ;
     end
     [precision(idxFrame),recall(idxFrame),TP(idxFrame),FP(idxFrame),FN(idxFrame)] = ff_evalgroups(groups{idxFrame},GTgroups{idxFrame},'card') ;
+    
 
     % DISPLAY RESULTS
     % Frame:
@@ -150,11 +150,24 @@ for idxFrame = 1:length(timestamp)
 
 
     %% record results
-    info = table2struct(data(idxFrame, {'Cam', 'Vid', 'Seg', 'Timestamp'}));
-    [sp_ids, ~] = readSpeakingStatus(speaking_status, info.Vid, ...
-        info.Seg, 1, 1);
-    [speaking, ~] = readSpeakingStatus(speaking_status, info.Vid, ...
-        info.Seg, info.Timestamp+1, 30);
+    f_info = table2struct(data(idxFrame, {'Cam', 'Vid', 'Seg', 'Timestamp'}));
+    [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, f_info.Vid, f_info.Seg, 1, 1);
+    [speaking, confidence] = readSpeakingStatus(speaking_status, f_info.Vid, f_info.Seg, f_info.Timestamp, 1);
+
+    disp_info = struct();
+    disp_info.GT = GTgroups{idxFrame};
+    disp_info.detection = groups;
+    disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{idxFrame});
+    disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{idxFrame});
+    disp_info.kp = readPoseInfo(f_info, features{idxFrame}(:,1));
+
+    plotFrustumsWithImage(features{idxFrame}{1}, params.frustum, img, disp_info);
+    disp(GTgroups{f});
+    % f_info = table2struct(data(idxFrame, {'Cam', 'Vid', 'Seg', 'Timestamp'}));
+    [sp_ids, ~] = readSpeakingStatus(speaking_status, f_info.Vid, ...
+        f_info.Seg, 1, 1);
+    [speaking, ~] = readSpeakingStatus(speaking_status, f_info.Vid, ...
+        f_info.Seg, f_info.Timestamp+1, 30);
     if speaking == -1000
         continue;
     end
