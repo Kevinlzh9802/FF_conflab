@@ -18,7 +18,7 @@ function plotFrustumsWithImage(personData, frustum, img, disp_info)
     title('Frustum View');
 
     subplot(1,2,2);
-    % plotSkeletonOnImage(fig, img, disp_info.kp);
+    plotSkeletonOnImage(fig, img, disp_info.kp);
     title('Image View');
 
     % Display cell array as text

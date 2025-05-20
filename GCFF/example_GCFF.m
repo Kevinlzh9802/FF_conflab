@@ -52,13 +52,16 @@ params.frustum.length = 275;
 params.frustum.aperture = 160;
 params.stride = 130;
 params.mdl = 60000;
+params.cams = [6];
+params.vids = [3];
+params.segs = [5];
 
-file_name = "../data/foot.mat";
+file_name = "../data/head.mat";
 load(file_name, 'all_data');
 data_results = all_data;
-data_results.Properties.VariableNames{1} = 'footFeat';
+data_results.Properties.VariableNames{1} = 'headFeat';
 
-for clue = ["hip", "shoulder", "head"]
+for clue = ["shoulder", "hip", "foot"]
     f_name = clue + "Feat";
     file_name = "../data/" + clue + ".mat";
     load(file_name, 'all_data');
@@ -67,10 +70,9 @@ end
 data_results = data_results(:, [1 7 8 9 2 3 4 5 6]);
 
 results = struct;
-for clue = ["foot", "hip", "shoulder", "head"]
-
-    used_data = filterTable(data_results, [4], [2], [8]);
-    results.(clue) = GCFF_main(used_data, params, clue, speaking_status);
+for clue = ["head", "shoulder", "hip", "foot"]
+    used_data = filterTable(data_results, params.cams, params.vids, params.segs);
+    results.(clue) = GCFF_main(used_data, params, clue, speaking_status, frames);
 
     f_name = clue + "Res";
     used_data.(f_name) = results.(clue).groups;
@@ -83,7 +85,7 @@ run plotGroups.m;
 % run plotGroupsInfo.m;
 
 %% Computing
-function results = GCFF_main(data, params, clue, speaking_status)
+function results = GCFF_main(data, params, clue, speaking_status, frames)
 % If only some frames are annotated, delete all the others from features.
 % [~,indFeat] = intersect(timestamp,GTtimestamp) ;
 % timestamp = timestamp(indFeat) ;
@@ -148,26 +150,13 @@ for idxFrame = 1:length(timestamp)
     end
     fprintf('\n');
 
-
     %% record results
     f_info = table2struct(data(idxFrame, {'Cam', 'Vid', 'Seg', 'Timestamp'}));
-    [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, f_info.Vid, f_info.Seg, 1, 1);
-    [speaking, confidence] = readSpeakingStatus(speaking_status, f_info.Vid, f_info.Seg, f_info.Timestamp, 1);
-
-    disp_info = struct();
-    disp_info.GT = GTgroups{idxFrame};
-    disp_info.detection = groups;
-    disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{idxFrame});
-    disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{idxFrame});
-    disp_info.kp = readPoseInfo(f_info, features{idxFrame}(:,1));
-
-    plotFrustumsWithImage(features{idxFrame}{1}, params.frustum, img, disp_info);
-    disp(GTgroups{f});
-    % f_info = table2struct(data(idxFrame, {'Cam', 'Vid', 'Seg', 'Timestamp'}));
-    [sp_ids, ~] = readSpeakingStatus(speaking_status, f_info.Vid, ...
+    [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, f_info.Vid, ...
         f_info.Seg, 1, 1);
-    [speaking, ~] = readSpeakingStatus(speaking_status, f_info.Vid, ...
-        f_info.Seg, f_info.Timestamp+1, 30);
+    [speaking, confidence] = readSpeakingStatus(speaking_status, f_info.Vid, ...
+        f_info.Seg, f_info.Timestamp+1, 1);
+    
     if speaking == -1000
         continue;
     end
@@ -187,6 +176,23 @@ for idxFrame = 1:length(timestamp)
     end
     result_name = clue + "Res";
     data.(result_name){idxFrame} = groups{idxFrame};
+
+    %% Plot
+    plot_cond = false;
+    if plot_cond
+        img = findMatchingFrame(data, frames, idxFrame);
+        
+        disp_info = struct();
+        disp_info.GT = GTgroups{idxFrame};
+        disp_info.detection = groups{1};
+        disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{idxFrame});
+        disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{idxFrame});
+        disp_info.kp = readPoseInfo(f_info, features{idxFrame}(:,1));
+
+        plotFrustumsWithImage(features{idxFrame}, params.frustum, img, disp_info);
+        disp(GTgroups{idxFrame});
+    end
+    
 
 end
 

@@ -1,23 +1,54 @@
 close all;
-clue = "head";
+
+clues = ["head", "shoulder", "hip", "foot"];
+for clue_id=1:4
+
+% clue_id = 1;
+clue = clues(clue_id);
 f_name = clue + "Res";
 feat_name = clue + "Feat";
-features = results.(clue).groups;
+
+seg_folder_name = "cam" + params.cams + "_vid" + params.vids +...
+    "_seg" + params.segs + "_" + clue;
+folder_path = "../data/results/" + seg_folder_name + "/";
+mkdir(folder_path);
+
 % load('../data/frames.mat', 'frames');
 
-output_video = clue + "_cam4_vid2_seg8.avi";
+% output_video = clue + "_cam4_vid2_seg8.avi";
 frame_rate = 10;
 % v = VideoWriter(output_video);
 % v.FrameRate = frame_rate;
 % open(v);
 used_data = results.(clue).original_data;
-
+features = used_data.(feat_name);
 hfig = figure('Units','pixels','Position',[100 100 960 540]); % Fixed size
 for f=1:height(used_data)
 
     img = findMatchingFrame(used_data, frames, f);
     % Show image
-    imshow(img); hold on;
+    % imshow(img); hold on;
+
+    f_info = table2struct(used_data(f, {'Cam', 'Vid', 'Seg', 'Timestamp'}));
+
+    [sp_ids, cf_ids] = readSpeakingStatus(speaking_status, f_info.Vid, ...
+        f_info.Seg, 1, 1);
+    [speaking, confidence] = readSpeakingStatus(speaking_status, f_info.Vid, ...
+        f_info.Seg, f_info.Timestamp+1, 1);
+    
+    GTgroups = used_data.GT{f};
+    % groups = used_data.(f_name){f};
+    
+    % disp_info = struct();
+    % disp_info.GT = GTgroups;
+    % disp_info.detection = groups;
+    % disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups);
+    % disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups);
+    % disp_info.kp = readPoseInfo(f_info, features{f}(:,1));
+
+    % plotFrustumsWithImage(features{f}, params.frustum, img, disp_info, [4]);
+    plotSkeletonOnImage(hfig, img, features{f}(:,[1,5:20]), [clue_id]);
+    % disp(GTgroups{idxFrame});
 
     % Plot each person
     data = used_data.(feat_name){f};
@@ -27,7 +58,7 @@ for f=1:height(used_data)
         theta = data(i, 4);
 
         % Plot position
-        plot(x, y, 'ro', 'MarkerFaceColor', 'r');
+        % plot(x, y, 'ro', 'MarkerFaceColor', 'r');
 
         % Plot orientation as arrow (length = 20 pixels)
         len = 20;
@@ -60,13 +91,37 @@ for f=1:height(used_data)
             viscircles(group_data, 15, 'Color', 'g', 'LineWidth', 1);
         end
     end
+    
+    % Text GT groups
+    text(0.5, -0.1, ['GT: ', formatCellArray(GTgroups)], 'Units', 'normalized', ...
+        'HorizontalAlignment', 'center', 'FontSize', 18);
 
     % Write frame
     frame = getframe(hfig);
+    imwrite(frame.cdata, folder_path + "frame" + num2str(f) + ".png");
     % writeVideo(v, frame);
 
     hold off;
     c = 9;
 end
-close(v);
-disp('Video saved.');
+% close(v);
+% disp('Video saved.');
+end
+
+%% Function to format cell array into string
+function outputStr = formatCellArray(cellArray)
+% FORMATCELLARRAY Converts a nested cell array into a formatted string.
+%
+% Example:
+%   cellArray = {{[32 15 2 17]}, {[22 11]}, {[25 10]}, {[3]}};
+%   outputStr = formatCellArray(cellArray);
+%
+% Output:
+%   '{{32,15,2,17}}, {{22,11}}, {{25,10}}, {{3}}'
+
+    % Convert each numeric array inside the cell to a string with commas
+    formattedCells = cellfun(@(x) mat2str(x, 2), cellArray, 'UniformOutput', false);
+
+    % Wrap each formatted cell with curly braces
+    outputStr = strjoin(formattedCells, ', ');
+end

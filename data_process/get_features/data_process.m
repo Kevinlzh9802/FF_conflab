@@ -6,7 +6,7 @@ pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
     'annotations/pose/coco/'];
 Files=dir([pose_data_path, '*.json']); % edit your own path to the pose data!!!
 
-orient_choice = "head";
+orient_choice = "foot";
 save_path = "../../data/in_process/";
 mkdir(sprintf(save_path + orient_choice));
 mkdir(save_path + orient_choice + "/seg2/");
@@ -37,7 +37,7 @@ for k=1:length(Files)
 
     disp("enter time loop")
     for t = 1:length(timestamps)
-        frame_data = zeros(total_people_no,4);
+        frame_data = zeros(total_people_no, 20);
         for p = 1:total_people_no
             headX = data.annotations.skeletons(t).(colNames{p}).keypoints(1);
             headY = data.annotations.skeletons(t).(colNames{p}).keypoints(2);
@@ -110,9 +110,30 @@ for k=1:length(Files)
             frame_data(p,2) = body_pos(1)*1920;
             frame_data(p,3) = body_pos(2)*1080;
             frame_data(p,4) = body_orientation;
+
+            frame_data(p,5) = headX;
+            frame_data(p,6) = headY;
+            frame_data(p,7) = noseX;
+            frame_data(p,8) = noseY;
+
+            frame_data(p,9) = leftShoulderX;
+            frame_data(p,10) = leftShoulderY;
+            frame_data(p,11) = rightShoulderX;
+            frame_data(p,12) = rightShoulderY;
+
+            frame_data(p,13) = leftHipX;
+            frame_data(p,14) = leftHipY;
+            frame_data(p,15) = rightHipX;
+            frame_data(p,16) = rightHipY;
+
+            frame_data(p,17) = leftFootX;
+            frame_data(p,18) = leftFootY;
+            frame_data(p,19) = rightFootX;
+            frame_data(p,20) = rightFootY;
             % frame_data.size = # of people * 4
             % head orientation is not recorded. Instead, use headX and
             % headY.
+            c = 9;
 
         end
     features{1,t} = frame_data;

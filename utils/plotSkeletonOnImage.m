@@ -1,4 +1,4 @@
-function plotSkeletonOnImage(figHandle, img, keypoints)
+function plotSkeletonOnImage(figHandle, img, keypoints, kp_set)
 % PLOTSKELETONONIMAGE Plots multiple sets of skeleton keypoints on an image, using different colors for each person.
 % Draws lines between each pair of keypoints (e.g., left & right hand, foot, etc.), and adds perpendicular segments with labels.
 %
@@ -23,10 +23,11 @@ function plotSkeletonOnImage(figHandle, img, keypoints)
     [imgHeight, imgWidth, ~] = size(img);
     
     % Get field names (each representing a different person)
-    colNames = fieldnames(keypoints);
+    % colNames = fieldnames(keypoints);
+    sz_kp = size(keypoints, 1);
     
     % Define a set of distinct colors
-    colors = lines(length(colNames)); % Generates distinguishable colors
+    colors = lines(sz_kp); % Generates distinguishable colors
     
     % Labels for body parts
     labels = {"Head", "Shoulder", "Hip", "Foot"};
@@ -34,19 +35,31 @@ function plotSkeletonOnImage(figHandle, img, keypoints)
     lengthScale = 0.03 * imgWidth; % Scale perpendicular length
     
     % Loop through each person's keypoints
-    for k = 1:length(colNames)
-        kp = keypoints.(colNames{k});
-        person_id = colNames{k}(2:end);
+    for k = 1:sz_kp
+        % kp = keypoints.(colNames{k});
+        kp = reshape(keypoints(k, 2:end), [2,8])';
+        person_id = num2str(keypoints(k,1));
         if ~isempty(kp)
+            % plot certain kps
+            kp_filter = [];
+            for kpi = kp_set
+                kp_filter = [kp_filter, 2*kpi-1:2*kpi];
+            end
             % Convert keypoints from ratio to pixel coordinates
-            pixelCoordsX = kp(:,1) * imgWidth; % Scale x-coordinates
-            pixelCoordsY = kp(:,2) * imgHeight; % Scale y-coordinates
+            pixelCoordsX = kp(kp_filter,1) * imgWidth; % Scale x-coordinates
+            pixelCoordsY = kp(kp_filter,2) * imgHeight; % Scale y-coordinates
             
             % Plot keypoints with a unique color
             scatter(pixelCoordsX, pixelCoordsY, 50, colors(k, :), 'filled');
             
             % Draw lines between each pair of keypoints
-            for i = 1:2:size(kp,1)-1
+            text_id_done = false;
+            for i = 1:size(kp_set)
+                labelIdx = kp_set(i);
+                if ~ismember(labelIdx, kp_set)
+                    continue;
+                end
+                
                 x1 = pixelCoordsX(i); x2 = pixelCoordsX(i+1);
                 y1 = pixelCoordsY(i); y2 = pixelCoordsY(i+1);
                 
@@ -68,11 +81,14 @@ function plotSkeletonOnImage(figHandle, img, keypoints)
                 dy = y2 - y1;
                 
                 % Special case for head (first two rows)
-                if i == 1
+                if labelIdx == 1
                     % Label Head and Nose
                     text(x1, y1, 'H', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
                     text(x2, y2, 'N', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
-                    text(x1 - 10, y1 - 10, person_id, 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+                    if ~text_id_done
+                        text(x1 - 10, y1 - 10, person_id, 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+                        text_id_done = true;
+                    end
                     if (dx ~= 0 || dy ~= 0) && all_valid
                         x_diff = lengthScale * (dx / sqrt(dx^2 + dy^2));
                         y_diff = lengthScale * (dy / sqrt(dx^2 + dy^2));
@@ -84,7 +100,10 @@ function plotSkeletonOnImage(figHandle, img, keypoints)
                     % Compute half perpendicular segment (counterclockwise 90 degrees from L->R)
                     text(x1, y1, 'L', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
                     text(x2, y2, 'R', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
-                    
+                    if ~text_id_done
+                        text(x1 - 10, y1 - 10, person_id, 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+                        text_id_done = true;
+                    end
                     if (dx ~= 0 || dy ~= 0) && all_valid
                         % Perpendicular direction (-dy, dx), counterclockwise half segment
                         x_diff = lengthScale * (dy / sqrt(dx^2 + dy^2));
@@ -94,7 +113,7 @@ function plotSkeletonOnImage(figHandle, img, keypoints)
                     end
                 end
                 % Add labels if within predefined body parts (1-2: Head, 3-4: Shoulder, etc.)
-                labelIdx = (i + 1) / 2;
+                
                 if labelIdx <= length(labels)
                     text(midX, midY, labels{labelIdx}, 'Color', colors(k, :), 'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
                 end
@@ -102,5 +121,5 @@ function plotSkeletonOnImage(figHandle, img, keypoints)
         end
     end
     
-    hold off;
+    % hold off;
 end
