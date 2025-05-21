@@ -4,6 +4,9 @@
 % Assume frame_data and height_ratios_map are available
 % Corresponding vertical ratio (0 for head, 1 for feet)
 
+%% testing
+load("../data/head.mat");
+frame_data = all_data.Features{142};
 worldXY_all = backProject(frame_data, K, R, t);
 
 %% Visualization
