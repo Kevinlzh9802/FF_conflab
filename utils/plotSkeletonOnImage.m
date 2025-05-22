@@ -60,7 +60,8 @@ function plotSkeletonOnImage(ax, img, keypoints, kp_set, use_real)
 
             
             % Plot keypoints with a unique color
-            scatter(ax, pixelCoordsX, pixelCoordsY, 50, colors(k, :), 'filled');
+            mask = ~(pixelCoordsX == 0 & pixelCoordsY == 0);
+            scatter(ax, pixelCoordsX(mask), pixelCoordsY(mask), 50, colors(k, :), 'filled');
             hold(ax, "on");
             
             % Draw lines between each pair of keypoints
@@ -121,6 +122,10 @@ function plotSkeletonOnImage(ax, img, keypoints, kp_set, use_real)
                         % Perpendicular direction (-dy, dx), counterclockwise half segment
                         x_diff = lengthScale * (dy / sqrt(dx^2 + dy^2));
                         y_diff = -lengthScale * (dx / sqrt(dx^2 + dy^2));
+
+                        if use_real
+                            x_diff = -x_diff; y_diff = -y_diff;
+                        end
                         % Draw perpendicular segment with arrows
                         quiver(ax, midX, midY, x_diff, y_diff, 0, 'Color', colors(k, :), 'LineWidth', 1.5, 'MaxHeadSize', 1);
                     end

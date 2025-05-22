@@ -15,7 +15,7 @@ numiter = 1 ;
 
 % close all,
 while ~isequal(seg,segold) && numiter <= MAX_ITER
-    %%%%%% TEMP
+    % %%%%% TEMP
     % figure(numiter),
     % ff_plot_person_tv(f,'b',50),
     % hold on,
@@ -41,7 +41,7 @@ while ~isequal(seg,segold) && numiter <= MAX_ITER
     % if numiter>2
     %     keyboard
     % end
-    %%%%%% END TEMP
+    % %%%%% END TEMP
 
     segold = seg ;
     mdl = ones(size(unary,2),1) * MDL_in ;

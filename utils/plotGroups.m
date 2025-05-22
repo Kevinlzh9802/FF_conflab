@@ -1,8 +1,7 @@
 close all;
 
 clues = ["head", "shoulder", "hip", "foot"];
-for clue_id=1:4
-
+for clue_id=2:2
 % clue_id = 1;
 clue = clues(clue_id);
 f_name = clue + "Res";
@@ -10,7 +9,7 @@ feat_name = clue + "Feat";
 
 seg_folder_name = "cam" + params.cams + "_vid" + params.vids +...
     "_seg" + params.segs + "_" + clue;
-folder_path = "../data/results/" + seg_folder_name + "/";
+folder_path = "../data/results/" + seg_folder_name + "_real/";
 mkdir(folder_path);
 
 % load('../data/frames.mat', 'frames');
@@ -52,67 +51,21 @@ for f=1:height(used_data)
     % plotFrustumsWithImage(features{f}, params.frustum, img, disp_info, [4]);
     feat_pixel = features{f}(:, [1, 5:20]);
     feat_real = features{f}(:, [21, 25:40]);
-    plotSkeletonOnImage(ax1, img, feat_pixel, [1,2,3,4], false);
+    % plotSkeletonOnImage(ax1, img, feat_pixel, [1,2,3,4], false);
     plotSkeletonOnImage(ax2, img, feat_real, [1,2,3,4], true);
     % disp(GTgroups{idxFrame});
 
-    % Plot each person
-    data = feat_real;
-    for i = 1:size(data, 1)
-        x = data(i, 2) * 0.5;
-        y = data(i, 3) * 0.5;
-        theta = data(i, 4);
-
-        % Plot position
-        % plot(x, y, 'ro', 'MarkerFaceColor', 'r');
-
-        % Plot orientation as arrow (length = 20 pixels)
-        len = 20;
-        u = len * cos(theta);
-        v_arrow = len * sin(theta);
-        hold(ax2, "on");
-        quiver(ax2, x, y, u, v_arrow, 0, 'Color', 'b', 'LineWidth', 1.5, 'MaxHeadSize', 2);
-    end
-
-    % Plot groups
     groups = used_data.(f_name){f};
-    for g = 1:length(groups)
-        group_ids = groups{g};
-        idx = ismember(data(:,1), group_ids);
-        group_data = data(idx, 2:3) * 0.5;  % positions
-
-        if size(group_data,1) >= 3
-            % Plot convex hull
-            try
-                k = convhull(group_data(:,1), group_data(:,2));
-            catch
-                continue;
-            end
-
-            plot(ax2, group_data(k,1), group_data(k,2), 'g-', 'LineWidth', 2);
-        elseif size(group_data,1) == 2
-            % Plot line
-            plot(ax2, group_data(:,1), group_data(:,2), 'g-', 'LineWidth', 2);
-        elseif size(group_data,1) == 1
-            % Plot a small circle around it
-            viscircles(ax2, group_data, 15, 'Color', 'g', 'LineWidth', 1);
-        end
-    end
-
-    % Text GT groups
-    text(ax2, 0.5, -0.1, ['GT: ', formatCellArray(GTgroups)], 'Units', 'normalized', ...
-        'HorizontalAlignment', 'center', 'FontSize', 18);
+    plotGroupPolygon(ax2, features{f}(:, 21:24), groups, GTgroups, 1);
 
     % Write frame
-    % frame = getframe(hfig);
-    % imwrite(frame.cdata, folder_path + "frame" + num2str(f) + ".png");
+    frame = getframe(hfig2);
+    imwrite(frame.cdata, folder_path + "frame" + num2str(f) + ".png");
     % writeVideo(v, frame);
-
-    hold(ax2, "off");
-    c = 9;
-end
+    % c = 9;
 % close(v);
 % disp('Video saved.');
+end
 end
 
 %% Function to format cell array into string
@@ -131,4 +84,54 @@ function outputStr = formatCellArray(cellArray)
 
     % Wrap each formatted cell with curly braces
     outputStr = strjoin(formattedCells, ', ');
+end
+
+function plotGroupPolygon(ax, data, groups, GTgroups, scale)
+% Plot each person
+for i = 1:size(data, 1)
+    x = data(i, 2);
+    y = data(i, 3);
+    theta = data(i, 4);
+
+    % Plot position
+    % plot(x, y, 'ro', 'MarkerFaceColor', 'r');
+
+    % Plot orientation as arrow (length = 20 pixels)
+    len = 20;
+    u = len * cos(theta);
+    v_arrow = len * sin(theta);
+    hold(ax, "on");
+    quiver(ax, x, y, u, v_arrow, 0, 'Color', 'b', 'LineWidth', 1.5, 'MaxHeadSize', 2);
+end
+
+% Plot groups
+% groups = used_data.(f_name){f};
+for g = 1:length(groups)
+    group_ids = groups{g};
+    idx = ismember(data(:,1), group_ids);
+    group_data = data(idx, 2:3) * scale;  % positions
+
+    if size(group_data,1) >= 3
+        % Plot convex hull
+        try
+            k = convhull(group_data(:,1), group_data(:,2));
+        catch
+            continue;
+        end
+
+        plot(ax, group_data(k,1), group_data(k,2), 'g-', 'LineWidth', 2);
+    elseif size(group_data,1) == 2
+        % Plot line
+        plot(ax, group_data(:,1), group_data(:,2), 'g-', 'LineWidth', 2);
+    elseif size(group_data,1) == 1
+        % Plot a small circle around it
+        viscircles(ax, group_data, 15, 'Color', 'g', 'LineWidth', 1);
+    end
+end
+
+% Text GT groups
+text(ax, 0.5, -0.1, ['GT: ', formatCellArray(GTgroups)], 'Units', 'normalized', ...
+    'HorizontalAlignment', 'center', 'FontSize', 18);
+
+hold(ax, "off");
 end

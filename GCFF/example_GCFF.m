@@ -45,17 +45,23 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-load('../data/frames.mat', 'frames');
+% load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;
 params.frustum.aperture = 160;
-params.stride = 130;
-params.mdl = 60000;
-params.cams = [6];
-params.vids = [3];
-params.segs = [5];
 use_real = true;
+if use_real
+    params.stride = 40;
+    params.mdl = 6000;
+else
+    params.stride = 130;
+    params.mdl = 60000;
+end
+
+params.cams = [4];
+params.vids = [2];
+params.segs = [9];
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
@@ -112,7 +118,7 @@ group_sizes = [];
 for idxFrame = 1:length(timestamp)
     % gg represents group_id
     feat = features{idxFrame}(:, [1:20] + 20 * use_real);
-    gg = gc(feat, stride, mdl);
+    gg = gc(feat(:, 1:4), stride, mdl);
 
     groups{idxFrame} = [] ;
     for ii = 1:max(gg)+1
