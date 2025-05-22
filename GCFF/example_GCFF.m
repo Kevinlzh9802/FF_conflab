@@ -45,7 +45,7 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-% load('../data/frames.mat', 'frames');
+load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;
@@ -55,6 +55,7 @@ params.mdl = 60000;
 params.cams = [6];
 params.vids = [3];
 params.segs = [5];
+use_real = true;
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
@@ -97,11 +98,12 @@ GTgroups = (data.GT)';
 timestamp = data.Timestamp; 
 stride = params.stride;
 mdl = params.mdl;
+use_real = true;
 
 % Initialize evaluation variables
-TP = zeros(1,length(timestamp)) ;
-FP = zeros(1,length(timestamp)) ;
-FN = zeros(1,length(timestamp)) ;
+TP = zeros(1,length(timestamp));
+FP = zeros(1,length(timestamp));
+FN = zeros(1,length(timestamp));
 precision = zeros(1,length(timestamp)) ;
 recall = zeros(1,length(timestamp)) ;
 s_speaker = [];
@@ -109,17 +111,12 @@ group_sizes = [];
 
 for idxFrame = 1:length(timestamp)
     % gg represents group_id
-    cam = data.Cam(idxFrame);
-    cp = loadCamParams(cam);
-    feat = backProject(features{idxFrame}, cp.K, cp.R, cp.t, cp.distCoeff, ...
-        cp.bodyHeight, cp.img_size, cp.height_ratios_map, cp.part_column_map);
-    feat = reshape(feat, 8, []);
-    
-    gg = gc(features{idxFrame}, stride, mdl);
+    feat = features{idxFrame}(:, [1:20] + 20 * use_real);
+    gg = gc(feat, stride, mdl);
 
     groups{idxFrame} = [] ;
     for ii = 1:max(gg)+1
-        groups{idxFrame}{ii} = features{idxFrame}(gg==ii-1,1) ;
+        groups{idxFrame}{ii} = feat(gg==ii-1,1) ;
     end
 
     if ~isempty(groups{idxFrame})
@@ -194,11 +191,15 @@ for idxFrame = 1:length(timestamp)
         disp_info.detection = groups{1};
         disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups{idxFrame});
         disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups{idxFrame});
-        disp_info.kp = readPoseInfo(f_info, features{idxFrame}(:,1));
+        disp_info.kp = readPoseInfo(f_info, feat(:,1));
 
-        plotFrustumsWithImage(features{idxFrame}, params.frustum, img, disp_info);
+        plotFrustumsWithImage(feat, params.frustum, img, disp_info);
         disp(GTgroups{idxFrame});
     end
+
+    % hfig = figure;
+    % plotSkeletonOnImage(hfig, img, )
+    
     
 
 end

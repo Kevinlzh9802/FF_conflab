@@ -22,7 +22,10 @@ frame_rate = 10;
 % open(v);
 used_data = results.(clue).original_data;
 features = used_data.(feat_name);
-hfig = figure('Units','pixels','Position',[100 100 960 540]); % Fixed size
+hfig1 = figure('Units','pixels','Position',[100 100 960 540]); % Fixed size
+hfig2 = figure('Units','pixels','Position',[100 100 960 540]); % Fixed size
+ax1 = axes(hfig1);
+ax2 = axes(hfig2);
 for f=1:height(used_data)
 
     img = findMatchingFrame(used_data, frames, f);
@@ -47,11 +50,14 @@ for f=1:height(used_data)
     % disp_info.kp = readPoseInfo(f_info, features{f}(:,1));
 
     % plotFrustumsWithImage(features{f}, params.frustum, img, disp_info, [4]);
-    plotSkeletonOnImage(hfig, img, features{f}(:,[1,5:20]), [clue_id]);
+    feat_pixel = features{f}(:, [1, 5:20]);
+    feat_real = features{f}(:, [21, 25:40]);
+    plotSkeletonOnImage(ax1, img, feat_pixel, [1,2,3,4], false);
+    plotSkeletonOnImage(ax2, img, feat_real, [1,2,3,4], true);
     % disp(GTgroups{idxFrame});
 
     % Plot each person
-    data = used_data.(feat_name){f};
+    data = feat_real;
     for i = 1:size(data, 1)
         x = data(i, 2) * 0.5;
         y = data(i, 3) * 0.5;
@@ -64,7 +70,8 @@ for f=1:height(used_data)
         len = 20;
         u = len * cos(theta);
         v_arrow = len * sin(theta);
-        quiver(x, y, u, v_arrow, 0, 'Color', 'b', 'LineWidth', 1.5, 'MaxHeadSize', 2);
+        hold(ax2, "on");
+        quiver(ax2, x, y, u, v_arrow, 0, 'Color', 'b', 'LineWidth', 1.5, 'MaxHeadSize', 2);
     end
 
     % Plot groups
@@ -82,26 +89,26 @@ for f=1:height(used_data)
                 continue;
             end
 
-            plot(group_data(k,1), group_data(k,2), 'g-', 'LineWidth', 2);
+            plot(ax2, group_data(k,1), group_data(k,2), 'g-', 'LineWidth', 2);
         elseif size(group_data,1) == 2
             % Plot line
-            plot(group_data(:,1), group_data(:,2), 'g-', 'LineWidth', 2);
+            plot(ax2, group_data(:,1), group_data(:,2), 'g-', 'LineWidth', 2);
         elseif size(group_data,1) == 1
             % Plot a small circle around it
-            viscircles(group_data, 15, 'Color', 'g', 'LineWidth', 1);
+            viscircles(ax2, group_data, 15, 'Color', 'g', 'LineWidth', 1);
         end
     end
-    
+
     % Text GT groups
-    text(0.5, -0.1, ['GT: ', formatCellArray(GTgroups)], 'Units', 'normalized', ...
+    text(ax2, 0.5, -0.1, ['GT: ', formatCellArray(GTgroups)], 'Units', 'normalized', ...
         'HorizontalAlignment', 'center', 'FontSize', 18);
 
     % Write frame
-    frame = getframe(hfig);
-    imwrite(frame.cdata, folder_path + "frame" + num2str(f) + ".png");
+    % frame = getframe(hfig);
+    % imwrite(frame.cdata, folder_path + "frame" + num2str(f) + ".png");
     % writeVideo(v, frame);
 
-    hold off;
+    hold(ax2, "off");
     c = 9;
 end
 % close(v);

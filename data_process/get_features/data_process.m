@@ -5,15 +5,17 @@ disp("**identify files**")
 pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
     'annotations/pose/coco/'];
 Files=dir([pose_data_path, '*.json']); % edit your own path to the pose data!!!
+addpath('../../utils/');
+orient_choices = ["head", "shoulder", "hip", "foot"];
 
-orient_choice = "foot";
+for orient_choice = orient_choices
 save_path = "../../data/in_process/";
 mkdir(sprintf(save_path + orient_choice));
 mkdir(save_path + orient_choice + "/seg2/");
 mkdir(save_path + orient_choice + "/seg3/");
 
 imgSize = [1920, 1080];
-for k=1:length(Files)
+for k=22:length(Files)
     disp("***filenumber****")
     k
     FileName=Files(k).name;
@@ -30,15 +32,21 @@ for k=1:length(Files)
         continue;
     end
 
-    timestamps = uint64(1:1:length(data.annotations.skeletons));
-    L  = length(timestamps);
+    full_timestamps = uint64(1:1:length(data.annotations.skeletons));
+    L = length(full_timestamps);
+    timestamps = full_timestamps(1:59.96:end);
+
     colNames = fieldnames(data.annotations.skeletons);
     total_people_no = length(colNames);
 
     disp("enter time loop")
-    for t = 1:length(timestamps)
+    features = cell(1, length(timestamps));
+    for ti = 1:length(timestamps)
+        t = timestamps(ti);
         frame_data = zeros(total_people_no, 20);
+        bp_data = zeros(total_people_no, 20);
         for p = 1:total_people_no
+            % Read keypoints
             headX = data.annotations.skeletons(t).(colNames{p}).keypoints(1);
             headY = data.annotations.skeletons(t).(colNames{p}).keypoints(2);
             noseX = data.annotations.skeletons(t).(colNames{p}).keypoints(3);
@@ -59,58 +67,7 @@ for k=1:length(Files)
             rightFootX = data.annotations.skeletons(t).(colNames{p}).keypoints(31);
             rightFootY = data.annotations.skeletons(t).(colNames{p}).keypoints(32);
 
-            head_vector = [(noseX-headX),(noseY-headY)].* imgSize;
-            shoulder_vector = [(leftShoulderX-rightShoulderX),(leftShoulderY-rightShoulderY)].* imgSize;
-            hip_vector = [(leftHipX-rightHipX),(leftHipY-rightHipY)].* imgSize;
-            foot_vector = [(leftFootX-rightFootX),(leftFootY-rightFootY)].* imgSize;
-
-            shoulder_orient = [-shoulder_vector(:,2),(shoulder_vector(:,1))]; 
-            hip_orient = [-hip_vector(:,2),(hip_vector(:,1))];
-            foot_orient = [-foot_vector(:,2),(foot_vector(:,1))];
-
-            vector_check = [head_vector; shoulder_orient; hip_orient; foot_orient];
-            vector_check = reverse_incorrect_vectors(vector_check);
-
-            head_vector = vector_check(1, :);
-            shoulder_orient = vector_check(2, :);
-            hip_orient = vector_check(3, :);
-            foot_orient = vector_check(4, :);
-            % Head vector is special. Head -> Nose is the same direction as
-            % body orientation
-            if orient_choice == "head"
-                body_vector = head_vector;
-                body_pos = [headX, headY];
-            % Otherwise, body vector is perpendicular to the R->L (counterclockwise 90 degrees)
-            % MODIFIED: If R->L is (x,y), then orientation should be
-            % (-y,x)! The y-axis in images is from top to bottom, which is
-            % different from usual right-hand coordinate system.
-            elseif orient_choice == "shoulder"
-                body_vector = shoulder_orient; 
-                body_pos = [leftShoulderX + rightShoulderX, leftShoulderY + rightShoulderY] / 2;
-            elseif orient_choice == "hip"
-                body_vector = hip_orient;
-                body_pos = [leftHipX + rightHipX, leftHipY + rightHipY] / 2;
-            elseif orient_choice == "foot"
-                body_vector = foot_orient;
-                body_pos = [leftFootX + rightFootX, leftFootY + rightFootY] / 2;
-            end
-
-            % dotProduct = dot(head_vector(:),body_vector(:));
-            % if (dotProduct<0)
-            %     body_vector(:) = [-body_vector(1),-body_vector(2)];
-            % elseif(dotProduct==0)
-            %     disp('warning: head and body exactly perpendicular')
-            % end
-
-            head_orientation = FixRangeOfAngles(get_angle(head_vector));
-            body_orientation = FixRangeOfAngles(get_angle(body_vector));
-
-            % person id, position X, position Y, orientation
-            frame_data(p,1) = data.annotations.skeletons(t).(colNames{p}).id;
-            frame_data(p,2) = body_pos(1)*1920;
-            frame_data(p,3) = body_pos(2)*1080;
-            frame_data(p,4) = body_orientation;
-
+            % Store keypoints
             frame_data(p,5) = headX;
             frame_data(p,6) = headY;
             frame_data(p,7) = noseX;
@@ -130,18 +87,30 @@ for k=1:length(Files)
             frame_data(p,18) = leftFootY;
             frame_data(p,19) = rightFootX;
             frame_data(p,20) = rightFootY;
+
+            % Back Projection
+            cam = str2double(FileName(4));
+            cp = loadCamParams(cam);
+            feat = backProject(frame_data, cp.K, cp.R, cp.t, cp.distCoeff, ...
+                cp.bodyHeight, cp.img_size, cp.height_ratios_map, cp.part_column_map);
+            bp_data(:, 5:end) = reshape(feat, [], 16);
+
+            person_id = data.annotations.skeletons(t).(colNames{p}).id;
+            frame_data = process_kp(frame_data, p, person_id, orient_choice, imgSize, false);
+            bp_data = process_kp(bp_data, p, person_id, orient_choice, [1,1], true);
+
             % frame_data.size = # of people * 4
             % head orientation is not recorded. Instead, use headX and
             % headY.
             c = 9;
 
         end
-    features{1,t} = frame_data;
+        features{1,ti} = [frame_data, bp_data];
 
     end
     % subsample
-    timestamps = timestamps(1:59.96:end);
-    features = features(1:59.96:end);
+    % timestamps = timestamps(1:59.96:end);
+    % features = features(1:59.96:end);
 
     % saving
     fn = FileName(1:end-10);
@@ -150,7 +119,9 @@ for k=1:length(Files)
     % mkdir(sprintf(fn))
     segn = "seg" + get_seg_num(fn);
     save_name = orient_choice + "/" + segn + "/" + mat_name;
-    save(save_path + save_name, 'features', 'timestamps')
+    assert(length(features) == length(timestamps));
+    % save(save_path + save_name, 'features', 'timestamps')
+end
 end
 
 %% Extract frames
@@ -168,6 +139,87 @@ end
 % save("frames_seg" +seg_file + ".mat", "allFrames", '-v7.3');
 
 %%
+
+function kps = process_kp(kps, p, person_id, orient_choice, imgSize, rh_axis)
+headX = kps(p,5);
+headY = kps(p,6);
+noseX = kps(p,7);
+noseY = kps(p,8);
+
+leftShoulderX = kps(p,9);
+leftShoulderY = kps(p,10);
+rightShoulderX = kps(p,11);
+rightShoulderY = kps(p,12);
+
+leftHipX = kps(p,13);
+leftHipY = kps(p,14);
+rightHipX = kps(p,15);
+rightHipY = kps(p,16);
+
+leftFootX = kps(p,17);
+leftFootY = kps(p,18);
+rightFootX = kps(p,19);
+rightFootY = kps(p,20);
+
+% Process from keypoints
+head_vector = [(noseX-headX),(noseY-headY)].* imgSize;
+shoulder_vector = [(leftShoulderX-rightShoulderX),(leftShoulderY-rightShoulderY)].* imgSize;
+hip_vector = [(leftHipX-rightHipX),(leftHipY-rightHipY)].* imgSize;
+foot_vector = [(leftFootX-rightFootX),(leftFootY-rightFootY)].* imgSize;
+
+if rh_axis
+    axis_mod = -1;
+else
+    axis_mod = 1;
+end
+
+shoulder_orient = [-shoulder_vector(:,2),(shoulder_vector(:,1))] * axis_mod;
+hip_orient = [-hip_vector(:,2),(hip_vector(:,1))] * axis_mod;
+foot_orient = [-foot_vector(:,2),(foot_vector(:,1))] * axis_mod;
+
+vector_check = [head_vector; shoulder_orient; hip_orient; foot_orient];
+vector_check = reverse_incorrect_vectors(vector_check);
+
+head_vector = vector_check(1, :);
+shoulder_orient = vector_check(2, :);
+hip_orient = vector_check(3, :);
+foot_orient = vector_check(4, :);
+% Head vector is special. Head -> Nose is the same direction as
+% body orientation
+if orient_choice == "head"
+    body_vector = head_vector;
+    body_pos = [headX, headY];
+    % Otherwise, body vector is perpendicular to the R->L (counterclockwise 90 degrees)
+    % MODIFIED: If R->L is (x,y), then orientation should be
+    % (-y,x)! The y-axis in images is from top to bottom, which is
+    % different from usual right-hand coordinate system.
+elseif orient_choice == "shoulder"
+    body_vector = shoulder_orient;
+    body_pos = [leftShoulderX + rightShoulderX, leftShoulderY + rightShoulderY] / 2;
+elseif orient_choice == "hip"
+    body_vector = hip_orient;
+    body_pos = [leftHipX + rightHipX, leftHipY + rightHipY] / 2;
+elseif orient_choice == "foot"
+    body_vector = foot_orient;
+    body_pos = [leftFootX + rightFootX, leftFootY + rightFootY] / 2;
+end
+
+% dotProduct = dot(head_vector(:),body_vector(:));
+% if (dotProduct<0)
+%     body_vector(:) = [-body_vector(1),-body_vector(2)];
+% elseif(dotProduct==0)
+%     disp('warning: head and body exactly perpendicular')
+% end
+
+head_orientation = FixRangeOfAngles(get_angle(head_vector));
+body_orientation = FixRangeOfAngles(get_angle(body_vector));
+
+% person id, position X, position Y, orientation
+kps(p,1) = person_id;
+kps(p,2) = body_pos(1)*imgSize(1);
+kps(p,3) = body_pos(2)*imgSize(2);
+kps(p,4) = body_orientation;
+end
 
 function [x, y, z] = extractVideoNum(nameString)
     tokens = regexp(nameString, 'cam(\d+)_vid(\d+)_seg(\d+)', 'tokens');

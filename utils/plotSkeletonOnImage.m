@@ -1,4 +1,4 @@
-function plotSkeletonOnImage(figHandle, img, keypoints, kp_set)
+function plotSkeletonOnImage(ax, img, keypoints, kp_set, use_real)
 % PLOTSKELETONONIMAGE Plots multiple sets of skeleton keypoints on an image, using different colors for each person.
 % Draws lines between each pair of keypoints (e.g., left & right hand, foot, etc.), and adds perpendicular segments with labels.
 %
@@ -14,10 +14,14 @@ function plotSkeletonOnImage(figHandle, img, keypoints, kp_set)
 %   plotSkeletonOnImage(fig, img, keypoints);
 
     % Activate the given figure handle
-    figure(figHandle); % Keep previous contents
-    
+    % fig = figure(figHandle); % Keep previous contents
+    % ax = axes(fig);
+
     % Display the image
-    imshow(img); hold on;
+    if ~use_real
+        imshow(img, 'Parent', ax); 
+        hold(ax, "on");
+    end
     
     % Get image dimensions
     [imgHeight, imgWidth, ~] = size(img);
@@ -46,29 +50,38 @@ function plotSkeletonOnImage(figHandle, img, keypoints, kp_set)
                 kp_filter = [kp_filter, 2*kpi-1:2*kpi];
             end
             % Convert keypoints from ratio to pixel coordinates
-            pixelCoordsX = kp(kp_filter,1) * imgWidth; % Scale x-coordinates
-            pixelCoordsY = kp(kp_filter,2) * imgHeight; % Scale y-coordinates
+            if use_real
+                pixelCoordsX = kp(kp_filter,1); % Do not scale, real world coordinates in cm
+                pixelCoordsY = kp(kp_filter,2);
+            else
+                pixelCoordsX = kp(kp_filter,1) * imgWidth; % Scale x-coordinates
+                pixelCoordsY = kp(kp_filter,2) * imgHeight; % Scale y-coordinates
+            end
+
             
             % Plot keypoints with a unique color
-            scatter(pixelCoordsX, pixelCoordsY, 50, colors(k, :), 'filled');
+            scatter(ax, pixelCoordsX, pixelCoordsY, 50, colors(k, :), 'filled');
+            hold(ax, "on");
             
             % Draw lines between each pair of keypoints
             text_id_done = false;
-            for i = 1:size(kp_set)
+            for i = 1:length(kp_set)
                 labelIdx = kp_set(i);
+                plot_i = 2*i - 1;
                 if ~ismember(labelIdx, kp_set)
                     continue;
                 end
                 
-                x1 = pixelCoordsX(i); x2 = pixelCoordsX(i+1);
-                y1 = pixelCoordsY(i); y2 = pixelCoordsY(i+1);
+                x1 = pixelCoordsX(plot_i); x2 = pixelCoordsX(plot_i+1);
+                y1 = pixelCoordsY(plot_i); y2 = pixelCoordsY(plot_i+1);
                 
                 % Skip if points are invalid (NaN or too close)
                 all_valid = ~(isnan(x1) || isnan(y1) || isnan(x2) || isnan(y2) || (x1 == x2 && y1 == y2));
                 
                 % Draw main segment
                 if all_valid
-                    plot([x1, x2], [y1, y2], '-', 'Color', colors(k, :), 'LineWidth', 2);
+                    plot(ax, [x1, x2], [y1, y2], '-', 'Color', colors(k, :), 'LineWidth', 2); 
+                    hold(ax, "on");
                 end
                 
                 % Compute middle point
@@ -83,25 +96,25 @@ function plotSkeletonOnImage(figHandle, img, keypoints, kp_set)
                 % Special case for head (first two rows)
                 if labelIdx == 1
                     % Label Head and Nose
-                    text(x1, y1, 'H', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
-                    text(x2, y2, 'N', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
+                    text(ax, x1, y1, 'H', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+                    text(ax, x2, y2, 'N', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
                     if ~text_id_done
-                        text(x1 - 10, y1 - 10, person_id, 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+                        text(ax, x1 - 10, y1 - 10, person_id, 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
                         text_id_done = true;
                     end
                     if (dx ~= 0 || dy ~= 0) && all_valid
                         x_diff = lengthScale * (dx / sqrt(dx^2 + dy^2));
                         y_diff = lengthScale * (dy / sqrt(dx^2 + dy^2));
                         % Draw arrow in the same direction as L->R
-                        quiver(midX, midY, x_diff, y_diff, 0, 'Color', colors(k, :), 'LineWidth', 1.5, 'MaxHeadSize', 1);
+                        quiver(ax, midX, midY, x_diff, y_diff, 0, 'Color', colors(k, :), 'LineWidth', 1.5, 'MaxHeadSize', 1);
                         
                     end
                 else
                     % Compute half perpendicular segment (counterclockwise 90 degrees from L->R)
-                    text(x1, y1, 'L', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
-                    text(x2, y2, 'R', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
+                    text(ax, x1, y1, 'L', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+                    text(ax, x2, y2, 'R', 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'left');
                     if ~text_id_done
-                        text(x1 - 10, y1 - 10, person_id, 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+                        text(ax, x1 - 10, y1 - 10, person_id, 'Color', colors(k, :), 'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
                         text_id_done = true;
                     end
                     if (dx ~= 0 || dy ~= 0) && all_valid
@@ -109,17 +122,18 @@ function plotSkeletonOnImage(figHandle, img, keypoints, kp_set)
                         x_diff = lengthScale * (dy / sqrt(dx^2 + dy^2));
                         y_diff = -lengthScale * (dx / sqrt(dx^2 + dy^2));
                         % Draw perpendicular segment with arrows
-                        quiver(midX, midY, x_diff, y_diff, 0, 'Color', colors(k, :), 'LineWidth', 1.5, 'MaxHeadSize', 1);
+                        quiver(ax, midX, midY, x_diff, y_diff, 0, 'Color', colors(k, :), 'LineWidth', 1.5, 'MaxHeadSize', 1);
                     end
                 end
                 % Add labels if within predefined body parts (1-2: Head, 3-4: Shoulder, etc.)
                 
                 if labelIdx <= length(labels)
-                    text(midX, midY, labels{labelIdx}, 'Color', colors(k, :), 'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+                    text(ax, midX, midY, labels{labelIdx}, 'Color', colors(k, :), 'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
                 end
             end
         end
+        axis equal;
     end
     
-    % hold off;
+    hold(ax, "off");
 end

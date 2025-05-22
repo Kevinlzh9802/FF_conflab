@@ -8,8 +8,8 @@
 
 function camParams = loadCamParams(cam)
 camParams = struct;
-intrinsic_path = "../data/camera_params/intrinsic_" + cam + ".json";
-extrinsic_path = "../data/camera_params/extrinsic_zh_" + cam + ".json";
+intrinsic_path = "../../data/camera_params/intrinsic_" + cam + ".json";
+extrinsic_path = "../../data/camera_params/extrinsic_zh_" + cam + ".json";
 intrinsics = jsondecode(fileread(intrinsic_path));
 extrinsics = jsondecode(fileread(extrinsic_path));
 
