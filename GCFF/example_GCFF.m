@@ -109,7 +109,14 @@ group_sizes = [];
 
 for idxFrame = 1:length(timestamp)
     % gg represents group_id
-    gg = gc( features{idxFrame}, stride, mdl ) ;
+    cam = data.Cam(idxFrame);
+    cp = loadCamParams(cam);
+    feat = backProject(features{idxFrame}, cp.K, cp.R, cp.t, cp.distCoeff, ...
+        cp.bodyHeight, cp.img_size, cp.height_ratios_map, cp.part_column_map);
+    feat = reshape(feat, 8, []);
+    
+    gg = gc(features{idxFrame}, stride, mdl);
+
     groups{idxFrame} = [] ;
     for ii = 1:max(gg)+1
         groups{idxFrame}{ii} = features{idxFrame}(gg==ii-1,1) ;
