@@ -50,7 +50,7 @@ load('../data/speaking_status.mat', 'speaking_status');
 %% params
 params.frustum.length = 275;
 params.frustum.aperture = 160;
-use_real = true;
+use_real = false;
 if use_real
     params.stride = 40;
     params.mdl = 6000;
@@ -104,7 +104,7 @@ GTgroups = (data.GT)';
 timestamp = data.Timestamp; 
 stride = params.stride;
 mdl = params.mdl;
-use_real = true;
+use_real = false;
 
 % Initialize evaluation variables
 TP = zeros(1,length(timestamp));
@@ -202,12 +202,6 @@ for idxFrame = 1:length(timestamp)
         plotFrustumsWithImage(feat, params.frustum, img, disp_info);
         disp(GTgroups{idxFrame});
     end
-
-    % hfig = figure;
-    % plotSkeletonOnImage(hfig, img, )
-    
-    
-
 end
 
 pr = mean(precision) ;
