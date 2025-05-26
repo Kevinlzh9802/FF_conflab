@@ -1,7 +1,7 @@
 close all;
 
 clues = ["head", "shoulder", "hip", "foot"];
-for clue_id=[1,3,4]
+for clue_id=[1,2,3,4]
 % clue_id = 1;
 clue = clues(clue_id);
 f_name = clue + "Res";
@@ -69,7 +69,7 @@ for f=1:height(used_data)
         interval = 1:4;
         feat_plot = features{f}(:, [1, 5:20]);
     end
-    plotSkeletonOnImage(ax, img, feat_plot, [clue_id], use_real);
+    plotSkeletonOnImage(ax, img, feat_plot, [1,2,3,4], use_real);
     plotGroupPolygon(ax, features{f}(:, interval), groups, GTgroups, scale);
 
     % Write frame

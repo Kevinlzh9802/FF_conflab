@@ -59,9 +59,9 @@ else
     params.mdl = 60000;
 end
 
-params.cams = [4];
-params.vids = [2];
-params.segs = [9];
+params.cams = [6];
+params.vids = [3];
+params.segs = [1];
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
