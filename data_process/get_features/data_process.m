@@ -131,7 +131,7 @@ for k=1:length(Files)
     segn = "seg" + get_seg_num(fn);
     save_name = orient_choice + "/" + segn + "/" + mat_name;
     assert(length(features) == length(timestamps));
-    % save(save_path + save_name, 'features', 'timestamps')
+    save(save_path + save_name, 'features', 'timestamps')
 end
 end
 

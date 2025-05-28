@@ -13,10 +13,6 @@ function plotSkeletonOnImage(ax, img, keypoints, kp_set, use_real)
 %   keypoints.person1 = [0.5 0.6; 0.7 0.8; 0.2 0.3; 0.4 0.5; 0.3 0.4; 0.5 0.6; 0.2 0.5; 0.6 0.7];
 %   plotSkeletonOnImage(fig, img, keypoints);
 
-    % Activate the given figure handle
-    % fig = figure(figHandle); % Keep previous contents
-    % ax = axes(fig);
-
     % Display the image
     if ~use_real
         imshow(img, 'Parent', ax); 
