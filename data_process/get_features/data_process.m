@@ -15,7 +15,8 @@ mkdir(save_path + orient_choice + "/seg2/");
 mkdir(save_path + orient_choice + "/seg3/");
 
 imgSize = [1920, 1080];
-for k=22:length(Files)
+num_kps = 20;
+for k=1:length(Files)
     disp("***filenumber****")
     k
     FileName=Files(k).name;
@@ -43,8 +44,8 @@ for k=22:length(Files)
     features = cell(1, length(timestamps));
     for ti = 1:length(timestamps)
         t = timestamps(ti);
-        frame_data = zeros(total_people_no, 20);
-        bp_data = zeros(total_people_no, 20);
+        frame_data = zeros(total_people_no, 4+num_kps);
+        bp_data = zeros(total_people_no, 4+num_kps);
         for p = 1:total_people_no
             % Read keypoints
             headX = data.annotations.skeletons(t).(colNames{p}).keypoints(1);
@@ -67,6 +68,11 @@ for k=22:length(Files)
             rightFootX = data.annotations.skeletons(t).(colNames{p}).keypoints(31);
             rightFootY = data.annotations.skeletons(t).(colNames{p}).keypoints(32);
 
+            leftAnkleX = data.annotations.skeletons(t).(colNames{p}).keypoints(29);
+            leftAnkleY = data.annotations.skeletons(t).(colNames{p}).keypoints(30);
+            rightAnkleX = data.annotations.skeletons(t).(colNames{p}).keypoints(23);
+            rightAnkleY = data.annotations.skeletons(t).(colNames{p}).keypoints(24);
+
             % Store keypoints
             frame_data(p,5) = headX;
             frame_data(p,6) = headY;
@@ -83,17 +89,22 @@ for k=22:length(Files)
             frame_data(p,15) = rightHipX;
             frame_data(p,16) = rightHipY;
 
-            frame_data(p,17) = leftFootX;
-            frame_data(p,18) = leftFootY;
-            frame_data(p,19) = rightFootX;
-            frame_data(p,20) = rightFootY;
+            frame_data(p,17) = leftAnkleX;
+            frame_data(p,18) = leftAnkleY;
+            frame_data(p,19) = rightAnkleX;
+            frame_data(p,20) = rightAnkleY;
+
+            frame_data(p,21) = leftFootX;
+            frame_data(p,22) = leftFootY;
+            frame_data(p,23) = rightFootX;
+            frame_data(p,24) = rightFootY;
 
             % Back Projection
             cam = str2double(FileName(4));
             cp = loadCamParams(cam);
             feat = backProject(frame_data, cp.K, cp.R, cp.t, cp.distCoeff, ...
                 cp.bodyHeight, cp.img_size, cp.height_ratios_map, cp.part_column_map);
-            bp_data(:, 5:end) = reshape(feat, [], 16);
+            bp_data(:, 5:end) = reshape(feat, [], num_kps);
 
             person_id = data.annotations.skeletons(t).(colNames{p}).id;
             frame_data = process_kp(frame_data, p, person_id, orient_choice, imgSize, false);
@@ -156,10 +167,15 @@ leftHipY = kps(p,14);
 rightHipX = kps(p,15);
 rightHipY = kps(p,16);
 
-leftFootX = kps(p,17);
-leftFootY = kps(p,18);
-rightFootX = kps(p,19);
-rightFootY = kps(p,20);
+leftAnkleX = kps(p,17);
+leftAnkleY = kps(p,18);
+rightAnkleX = kps(p,19);
+rightAnkleT = kps(p,20);
+
+leftFootX = kps(p,21);
+leftFootY = kps(p,22);
+rightFootX = kps(p,23);
+rightFootY = kps(p,24);
 
 % Process from keypoints
 head_vector = [(noseX-headX),(noseY-headY)].* imgSize;
