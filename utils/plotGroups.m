@@ -1,7 +1,7 @@
 close all;
 
 clues = ["head", "shoulder", "hip", "foot"];
-for clue_id=2:2
+for clue_id=[1,2,3,4]
 % clue_id = 1;
 clue = clues(clue_id);
 f_name = clue + "Res";
@@ -9,7 +9,11 @@ feat_name = clue + "Feat";
 
 seg_folder_name = "cam" + params.cams + "_vid" + params.vids +...
     "_seg" + params.segs + "_" + clue;
-folder_path = "../data/results/" + seg_folder_name + "_real/";
+if use_real
+    folder_path = "../data/results/" + seg_folder_name + "_real/";
+else
+    folder_path = "../data/results/" + seg_folder_name + "/";
+end
 mkdir(folder_path);
 
 % load('../data/frames.mat', 'frames');
@@ -21,10 +25,10 @@ frame_rate = 10;
 % open(v);
 used_data = results.(clue).original_data;
 features = used_data.(feat_name);
-hfig1 = figure('Units','pixels','Position',[100 100 960 540]); % Fixed size
-hfig2 = figure('Units','pixels','Position',[100 100 960 540]); % Fixed size
-ax1 = axes(hfig1);
-ax2 = axes(hfig2);
+hfig = figure('Units','pixels','Position',[100 100 960 540]); % Fixed size
+% hfig2 = figure('Units','pixels','Position',[100 100 960 540]); % Fixed size
+ax = axes(hfig);
+% ax2 = axes(hfig2);
 for f=1:height(used_data)
 
     img = findMatchingFrame(used_data, frames, f);
@@ -49,19 +53,28 @@ for f=1:height(used_data)
     % disp_info.kp = readPoseInfo(f_info, features{f}(:,1));
 
     % plotFrustumsWithImage(features{f}, params.frustum, img, disp_info, [4]);
-    feat_pixel = features{f}(:, [1, 5:20]);
-    feat_real = features{f}(:, [21, 25:40]);
-    % plotSkeletonOnImage(ax1, img, feat_pixel, [1,2,3,4], false);
-    plotSkeletonOnImage(ax2, img, feat_real, [1,2,3,4], true);
-    % disp(GTgroups{idxFrame});
+    % feat_pixel = features{f}(:, [1, 5:20]);
+    % feat_real = features{f}(:, [21, 25:40]);
 
+    % plotSkeletonOnImage(ax1, img, feat_pixel, [1,2,3,4], false);
+    
     groups = used_data.(f_name){f};
-    plotGroupPolygon(ax2, features{f}(:, 21:24), groups, GTgroups, 1);
+
+    if use_real
+        scale=1;
+        interval = 21:24;
+        feat_plot = features{f}(:, [21, 25:40]);
+    else
+        scale=0.5;
+        interval = 1:4;
+        feat_plot = features{f}(:, [1, 5:20]);
+    end
+    plotSkeletonOnImage(ax, img, feat_plot, [1,2,3,4], use_real);
+    plotGroupPolygon(ax, features{f}(:, interval), groups, GTgroups, scale);
 
     % Write frame
-    frame = getframe(hfig2);
+    frame = getframe(hfig);
     imwrite(frame.cdata, folder_path + "frame" + num2str(f) + ".png");
-    % writeVideo(v, frame);
     % c = 9;
 % close(v);
 % disp('Video saved.');
@@ -89,8 +102,8 @@ end
 function plotGroupPolygon(ax, data, groups, GTgroups, scale)
 % Plot each person
 for i = 1:size(data, 1)
-    x = data(i, 2);
-    y = data(i, 3);
+    x = data(i, 2) * scale;
+    y = data(i, 3) * scale;
     theta = data(i, 4);
 
     % Plot position
