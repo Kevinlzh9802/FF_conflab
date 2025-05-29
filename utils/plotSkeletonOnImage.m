@@ -30,14 +30,14 @@ function plotSkeletonOnImage(ax, img, keypoints, kp_set, use_real)
     colors = lines(sz_kp); % Generates distinguishable colors
     
     % Labels for body parts
-    labels = {"Head", "Shoulder", "Hip", "Foot"};
+    labels = {"Head", "Shoulder", "Hip", "Ankle", "Foot"};
 
     lengthScale = 0.03 * imgWidth; % Scale perpendicular length
     
     % Loop through each person's keypoints
     for k = 1:sz_kp
         % kp = keypoints.(colNames{k});
-        kp = reshape(keypoints(k, 2:end), [2,8])';
+        kp = reshape(keypoints(k, 2:end), [2, 2*length(labels)])';
         person_id = num2str(keypoints(k,1));
         if ~isempty(kp)
             % plot certain kps

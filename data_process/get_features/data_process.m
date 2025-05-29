@@ -170,7 +170,7 @@ rightHipY = kps(p,16);
 leftAnkleX = kps(p,17);
 leftAnkleY = kps(p,18);
 rightAnkleX = kps(p,19);
-rightAnkleT = kps(p,20);
+rightAnkleY = kps(p,20);
 
 leftFootX = kps(p,21);
 leftFootY = kps(p,22);

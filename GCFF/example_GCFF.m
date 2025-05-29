@@ -45,30 +45,30 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-load('../data/frames.mat', 'frames');
+% load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;
 params.frustum.aperture = 160;
-use_real = false;
+use_real = true;
 if use_real
-    params.stride = 40;
-    params.mdl = 6000;
+    params.stride = 70;
+    params.mdl = 90000;
 else
     params.stride = 130;
     params.mdl = 60000;
 end
 
-params.cams = [6];
-params.vids = [3];
-params.segs = [1];
+params.cams = 'all';
+params.vids = 'all';
+params.segs = 'all';
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
 data_results = all_data;
 data_results.Properties.VariableNames{1} = 'headFeat';
 
-for clue = ["shoulder", "hip", "foot"]
+for clue = ["head", "shoulder", "hip", "foot"]
     f_name = clue + "Feat";
     file_name = "../data/" + clue + ".mat";
     load(file_name, 'all_data');
@@ -76,9 +76,13 @@ for clue = ["shoulder", "hip", "foot"]
 end
 data_results = data_results(:, [1 7 8 9 2 3 4 5 6]);
 
+% In image pixels, use_real is false, and isLeftHanded is true.
+% Vice versa.
+data_results = processFootData(data_results, ~use_real);
+
 results = struct;
-for clue = ["head", "shoulder", "hip", "foot"]
-    used_data = filterTable(data_results, params.cams, params.vids, params.segs);
+for clue = ["hip"]
+    used_data = filterTable(data_results, params.cams, params.vids, params.segs);    
     results.(clue) = GCFF_main(used_data, params, clue, speaking_status, frames);
 
     f_name = clue + "Res";
@@ -88,11 +92,11 @@ for clue = ["head", "shoulder", "hip", "foot"]
     % results.(clue).g_count = countGroupsContainingIDs(used_data.(f_name), {[13,21],[35,12,19]});
 end
 
-run plotGroups.m;
+% run plotGroups.m;
 % run plotGroupsInfo.m;
 
 %% Computing
-function results = GCFF_main(data, params, clue, speaking_status, frames)
+function [results, data] = GCFF_main(data, params, clue, speaking_status, frames)
 % If only some frames are annotated, delete all the others from features.
 % [~,indFeat] = intersect(timestamp,GTtimestamp) ;
 % timestamp = timestamp(indFeat) ;
@@ -117,7 +121,7 @@ group_sizes = [];
 
 for idxFrame = 1:length(timestamp)
     % gg represents group_id
-    feat = features{idxFrame}(:, [1:20] + 20 * use_real);
+    feat = features{idxFrame}(:, [1:24] + 24 * use_real);
     gg = gc(feat(:, 1:4), stride, mdl);
 
     groups{idxFrame} = [] ;

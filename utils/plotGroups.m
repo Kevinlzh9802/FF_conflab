@@ -1,6 +1,6 @@
 close all;
 
-clues = ["head", "shoulder", "hip", "foot"];
+clues = ["foot"];
 for clue_id=[1,2,3,4]
 % clue_id = 1;
 clue = clues(clue_id);
@@ -45,39 +45,24 @@ for f=1:height(used_data)
     GTgroups = used_data.GT{f};
     % groups = used_data.(f_name){f};
     
-    % disp_info = struct();
-    % disp_info.GT = GTgroups;
-    % disp_info.detection = groups;
-    % disp_info.speaking = getStatusForGroup(sp_ids, speaking, GTgroups);
-    % disp_info.confidence = getStatusForGroup(cf_ids, confidence, GTgroups);
-    % disp_info.kp = readPoseInfo(f_info, features{f}(:,1));
-
-    % plotFrustumsWithImage(features{f}, params.frustum, img, disp_info, [4]);
-    % feat_pixel = features{f}(:, [1, 5:20]);
-    % feat_real = features{f}(:, [21, 25:40]);
-
-    % plotSkeletonOnImage(ax1, img, feat_pixel, [1,2,3,4], false);
-    
     groups = used_data.(f_name){f};
 
     if use_real
         scale=1;
-        interval = 21:24;
-        feat_plot = features{f}(:, [21, 25:40]);
+        interval = 25:28;
+        feat_plot = features{f}(:, [25, 29:48]);
     else
         scale=0.5;
         interval = 1:4;
-        feat_plot = features{f}(:, [1, 5:20]);
+        feat_plot = features{f}(:, [1, 5:24]);
     end
-    plotSkeletonOnImage(ax, img, feat_plot, [1,2,3,4], use_real);
+    plotSkeletonOnImage(ax, img, feat_plot, [1,2,3,4,5], use_real);
     plotGroupPolygon(ax, features{f}(:, interval), groups, GTgroups, scale);
 
     % Write frame
     frame = getframe(hfig);
     imwrite(frame.cdata, folder_path + "frame" + num2str(f) + ".png");
     % c = 9;
-% close(v);
-% disp('Video saved.');
 end
 end
 
