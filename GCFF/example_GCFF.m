@@ -59,9 +59,9 @@ else
     params.mdl = 60000;
 end
 
-params.cams = 'all';
-params.vids = 'all';
-params.segs = 'all';
+params.cams = [4];
+params.vids = [3];
+params.segs = [3];
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
@@ -81,9 +81,10 @@ data_results = data_results(:, [1 7 8 9 2 3 4 5 6]);
 data_results = processFootData(data_results, ~use_real);
 
 results = struct;
-for clue = ["hip"]
+clues = ["hip"];
+for clue = clues
     used_data = filterTable(data_results, params.cams, params.vids, params.segs);    
-    results.(clue) = GCFF_main(used_data, params, clue, speaking_status, frames);
+    results.(clue) = GCFF_main(used_data, params, clue, speaking_status);
 
     f_name = clue + "Res";
     used_data.(f_name) = results.(clue).groups;
@@ -92,11 +93,13 @@ for clue = ["hip"]
     % results.(clue).g_count = countGroupsContainingIDs(used_data.(f_name), {[13,21],[35,12,19]});
 end
 
-% run plotGroups.m;
+formations = recordUniqueGroups(used_data, "GT");
+% run detectSubFloor.m;
+run plotGroups.m;
 % run plotGroupsInfo.m;
 
 %% Computing
-function [results, data] = GCFF_main(data, params, clue, speaking_status, frames)
+function [results, data] = GCFF_main(data, params, clue, speaking_status)
 % If only some frames are annotated, delete all the others from features.
 % [~,indFeat] = intersect(timestamp,GTtimestamp) ;
 % timestamp = timestamp(indFeat) ;

@@ -1,9 +1,7 @@
 close all;
 
-clues = ["foot"];
-for clue_id=[1,2,3,4]
+for clue = clues
 % clue_id = 1;
-clue = clues(clue_id);
 f_name = clue + "Res";
 feat_name = clue + "Feat";
 
