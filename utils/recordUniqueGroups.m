@@ -3,10 +3,9 @@ function result = recordUniqueGroups(T, g_name)
 % Initialize map to collect unique groups and timestamps
 group_map = containers.Map('KeyType', 'char', 'ValueType', 'any');
 
-
 for k = 1:height(T)
     current_groups = T.(g_name){k};        % a 1×n cell array of vectors
-    current_time = T.Timestamp(k);       % timestamp corresponding to this row
+    current_time = T.concat_ts(k);       % timestamp corresponding to this row
 
     for g = 1:length(current_groups)
         group_vec = sort(current_groups{g});        % sort to ensure consistent key

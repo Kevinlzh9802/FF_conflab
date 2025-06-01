@@ -59,9 +59,9 @@ else
     params.mdl = 60000;
 end
 
-params.cams = [4];
-params.vids = [3];
-params.segs = [3];
+params.cams = 'all';
+params.vids = 'all';
+params.segs = 'all';
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
@@ -79,9 +79,11 @@ data_results = data_results(:, [1 7 8 9 2 3 4 5 6]);
 % In image pixels, use_real is false, and isLeftHanded is true.
 % Vice versa.
 data_results = processFootData(data_results, ~use_real);
+run concatSegs.m;
+data_results.id = (1:height(data_results))';
 
 results = struct;
-clues = ["hip"];
+clues = ["head", "shoulder", "hip", "foot"];
 for clue = clues
     used_data = filterTable(data_results, params.cams, params.vids, params.segs);    
     results.(clue) = GCFF_main(used_data, params, clue, speaking_status);
@@ -89,13 +91,27 @@ for clue = clues
     f_name = clue + "Res";
     used_data.(f_name) = results.(clue).groups;
     results.(clue).original_data = used_data;
+    data_results(used_data.id, f_name) = used_data.(f_name);
     % data_results.(f_name) = used_data.(f_name);
     % results.(clue).g_count = countGroupsContainingIDs(used_data.(f_name), {[13,21],[35,12,19]});
 end
 
-formations = recordUniqueGroups(used_data, "GT");
-% run detectSubFloor.m;
-run plotGroups.m;
+% analysis = data_results(~cellfun(@isempty, data_results.headRes) & data_results.concat_id, :);
+
+% unique_segs = unique(data_results.Vid);
+% formations = table;
+% for u_ind=1:length(unique_segs)
+%     u = unique_segs(u_ind);
+%     ana = data_results(data_results.Vid == u, :);
+%     unique_groups = recordUniqueGroups(ana, "headRes");
+%     unique_groups.Vid = zeros(height(unique_groups), 1) + u;
+%     formations = [formations; unique_groups];
+% end
+
+run detectSubFloor.m;
+
+% run plotFloorsCustom.m;
+% run plotGroups.m;
 % run plotGroupsInfo.m;
 
 %% Computing
