@@ -81,7 +81,8 @@ for k = 1:4
     [unique_x, ~, ic] = unique(x);
     a_counts = accumarray(ic,1);
     count_normalized = (a_counts / length(x))';
-    diffs(k, :) = pad_with_zeros(count_normalized, sizes_num) - diffs(5, :);
+    diffs(k, :) = pad_with_zeros(count_normalized, sizes_num);
+    % diffs(k, :) = pad_with_zeros(count_normalized, sizes_num) - diffs(5, :);
     c = 9;
 end
 bar((diffs(1:end-1,:))');        % Transpose to group by column

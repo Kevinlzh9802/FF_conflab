@@ -20,7 +20,7 @@ formations = table;
 for u_ind=1:length(unique_segs)
     u = unique_segs(u_ind);
     ana = data_results(data_results.Vid == u, :);
-    unique_groups = recordUniqueGroups(ana, "GT");
+    unique_groups = recordUniqueGroups(ana, "hipRes");
     unique_groups.Vid = zeros(height(unique_groups), 1) + u;
     formations = [formations; unique_groups];
 end
@@ -57,7 +57,8 @@ end
 % Filter out rows with missing data and with fewer than 4 participants
 formations = formations(~formations.missing, :);
 formations = formations(formations.cardinality >= 4, :);
-
+formations = formations(cellfun(@length, formations.timestamps_all) > 0, :);
+formations.Cam = cell2mat(formations.Cam);
 % Create output directory if it doesn’t exist
 % if ~exist(outdir, 'dir')
 %     mkdir(outdir);
@@ -94,8 +95,15 @@ for w = window_bounds(1):step:window_bounds(2)
     %     card = 
     % end
 end
+for k=1:height(formations)
+formations.headSplit{k} = collectMatchingGroups(formations.participants{k}, ...
+    formations.longest_ts{k}, formations.Vid(k), ...
+    formations.Cam(k), data_results, "head", sp_merged, 61);
+% a
+end
 
-run plotFloorsCustom.m;
+
+% run plotFloorsCustom.m;
 
 
 % Equivalent of _annotation_slice_for_formation
