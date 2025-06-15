@@ -1,4 +1,9 @@
-M = cell2mat(max_speaker{7});
+close all;
+figure;
+for k=1:4
+sp_num = k+3;
+
+M = cell2mat(max_speaker{sp_num});
 
 % Define bin values: assuming M(:,1) is count of 0s, M(:,2) = count of 1s, etc.
 bins = 0:(size(M,2)-1);
@@ -24,12 +29,15 @@ for i = 1:size(M,1)
 end
 
 % Plotting
+subplot(2, 2, k);
 x = 1:size(M,1);
-figure;
+
 bar(x, row_means, 'FaceColor', [0.2 0.6 0.8]);
 hold on;
 errorbar(x, row_means, row_stds, 'k.', 'LineWidth', 1.5);
-xlabel('Row index');
-ylabel('Expected Value ± Std Dev');
-title('Distribution-based Mean and Std per Row');
+xlabel('Duration (s)');
+ylabel('Simultaneous speaker');
+title("Group Cardinality" + num2str(sp_num));
 grid on;
+
+end

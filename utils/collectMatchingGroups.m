@@ -48,16 +48,21 @@ function combinedGroups = collectMatchingGroups(vector, ts, vid, cam, ...
 
             % Step 3: split speaking status (average over window, columns in each matched group)
             split_status = cell(1, length(matched));
+            simu_sp = zeros(1, length(matched));
             for g = 1:length(matched)
                 ids = matched{g};
                 [~, group_cols] = ismember(ids, id_list);
                 split_status{g} = mean(speaking_data(t_start:t_end, group_cols), 1);
+                simu_sp(g) = sum(mean(speaking_data(t_start:t_end, group_cols), 1));
             end
+
+            % Step 4: sum of simultaneous speakers
 
             % Store into combinedGroups
             combinedGroups{1, end+1} = matched;
             combinedGroups{2, end}   = orig_status;
             combinedGroups{3, end}   = split_status;
+            combinedGroups{4, end}   = simu_sp;
         end
     end
 end

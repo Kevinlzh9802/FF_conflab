@@ -27,38 +27,95 @@ function result = setCoverage(A, B)
     a_count = 0;
     for i = 1:numel(A)
         target = A{i};
-        found = findGroupCovers(target, B);
-        if ~isempty(found)
-            a_count = a_count + 1;
-        end
+        found = findGroupCoverScore(target, B);
+        a_count = a_count + found;
+        % if ~isempty(found)
+        % 
+        % end
     end
 
     % Step 4: Check how many groups in B are exactly covered by >1 groups in A
     b_count = 0;
     for i = 1:numel(B)
         target = B{i};
-        found = findGroupCovers(target, A);
-        if ~isempty(found)
-            b_count = b_count + 1;
-        end
+        found = findGroupCoverScore(target, A);
+        b_count = b_count + found;
+        % if ~isempty(found)
+        % 
+        % end
     end
 
     result = [a_count, b_count];
 end
 
-function covers = findGroupCovers(target, groupSet)
-% Find all combinations of >1 groups from groupSet whose union == target
+function score = findGroupCoverScore(target, groupSet)
+% Given a target vector and a cell array of group vectors (disjoint),
+%   - Returns 0 if target is equal to or a subset of any group in groupSet
+%   - Returns 1 if some combination's union == target
+%   - Else, finds S1 (maximal subset), S2 (minimal superset), and returns e^(s-1)
+%     where s = min(|S2|/|target|, |target|/|S1|)
 
     n = numel(groupSet);
-    covers = {};
+    target = sort(target);
+    targetSet = unique(target);
 
-    for k = 2:n  % combinations of 2 or more groups
+    % New rule: Early exit if target is equal to or subset of any group
+    for j = 1:n
+        group_j = unique(groupSet{j});
+        if isequal(targetSet, group_j) || all(ismember(targetSet, group_j))
+            score = 0;
+            return;
+        end
+    end
+
+    % Early exit for exact cover (multiple groups)
+    for k = 2:n
         combos = nchoosek(1:n, k);
         for i = 1:size(combos,1)
-            union_set = unique([groupSet{combos(i,:)}]);
-            if isequal(sort(union_set), sort(target))
-                covers{end+1} = combos(i,:);
+            unionSet = sort([groupSet{combos(i,:)}]);
+            if isequal(unionSet, targetSet)
+                score = 1;
+                return;
             end
         end
     end
+
+    % If not found, look for closest S1 (subset) and S2 (superset)
+    bestSubset = [];
+    bestSubsetLen = 0;
+    bestSuperset = [];
+    bestSupersetLen = inf;
+
+    for k = 1:n
+        combos = nchoosek(1:n, k);
+        for i = 1:size(combos,1)
+            unionSet = unique([groupSet{combos(i,:)}]);
+            if all(ismember(unionSet, targetSet)) % subset
+                if numel(unionSet) > bestSubsetLen
+                    bestSubset = unionSet;
+                    bestSubsetLen = numel(unionSet);
+                end
+            end
+            if all(ismember(targetSet, unionSet)) % superset
+                if numel(unionSet) < bestSupersetLen
+                    bestSuperset = unionSet;
+                    bestSupersetLen = numel(unionSet);
+                end
+            end
+        end
+    end
+
+    % Calculate s and score
+    if isempty(bestSubset), S1 = 0; else, S1 = numel(bestSubset); end
+    if isinf(bestSupersetLen), S2 = inf; else, S2 = bestSupersetLen; end
+    tlen = numel(targetSet);
+
+    if S1 == 0 || isinf(S2)
+        score = 0; % No valid subset or superset found
+    else
+        s = min(S2/tlen, tlen/S1);
+        score = exp(s-1);
+    end
 end
+
+

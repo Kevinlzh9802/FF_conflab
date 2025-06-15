@@ -15,12 +15,13 @@ outdir = 'output_directory';
 window_bounds = [1, 20] * 60;  % [min, max] window size
 step = 60;
 
+base_clue = "hip";
 unique_segs = unique(data_results.Vid);
 formations = table;
 for u_ind=1:length(unique_segs)
     u = unique_segs(u_ind);
     ana = data_results(data_results.Vid == u, :);
-    unique_groups = recordUniqueGroups(ana, "hipRes");
+    unique_groups = recordUniqueGroups(ana, base_clue + "Res");
     unique_groups.Vid = zeros(height(unique_groups), 1) + u;
     formations = [formations; unique_groups];
 end
@@ -95,12 +96,35 @@ for w = window_bounds(1):step:window_bounds(2)
     %     card = 
     % end
 end
-for k=1:height(formations)
-formations.headSplit{k} = collectMatchingGroups(formations.participants{k}, ...
-    formations.longest_ts{k}, formations.Vid(k), ...
-    formations.Cam(k), data_results, "head", sp_merged, 61);
-% a
+
+
+for sp_name = clues
+    if sp_name ~= base_clue
+        col_name = sp_name + "Split";
+        for k=1:height(formations)
+            formations.(col_name){k} = collectMatchingGroups(formations.participants{k}, ...
+                formations.longest_ts{k}, formations.Vid(k), ...
+                formations.Cam(k), data_results, sp_name, sp_merged, 61);
+            % a
+        end
+
+        sp_dp = [];
+        all_dp = [];
+        for k=1:height(formations)
+            a = formations.(col_name){k};
+            [~, ls] = size(a);
+            for k2=k1:ls
+                sp_dp = [sp_dp, a{4,k2}];
+                all_dp = [all_dp, sum(a{4,k2})];
+            end
+            % a
+        end
+        sp_name
+        [mean(sp_dp), std(sp_dp)]
+        [mean(all_dp), std(all_dp)]
+    end
 end
+
 
 
 % run plotFloorsCustom.m;
