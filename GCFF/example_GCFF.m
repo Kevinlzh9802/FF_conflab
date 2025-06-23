@@ -45,7 +45,7 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-load('../data/frames.mat', 'frames');
+% load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;
@@ -59,9 +59,15 @@ else
     params.mdl = 60000;
 end
 
-params.cams = 'all';
-params.vids = 'all';
-params.segs = 'all';
+params.used_parts = ["228", "229", "428", "429", "828", "829", ...
+    "232", "233", "234", "235", "236", ...
+    "431", "433", "434", ...
+    "631", "632", "633", "634", "635", "636", ...
+    "831", "832", "833", "834", "835"];
+
+% params.cams = [4];
+% params.vids = [3];
+% params.segs = [5,6];
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
@@ -85,7 +91,7 @@ data_results.id = (1:height(data_results))';
 results = struct;
 clues = ["head", "shoulder", "hip", "foot"];
 for clue = clues
-    used_data = filterTable(data_results, params.cams, params.vids, params.segs);    
+    used_data = filterAndConcatTable(data_results, params.used_parts);    
     results.(clue) = GCFF_main(used_data, params, clue, speaking_status);
 
     f_name = clue + "Res";

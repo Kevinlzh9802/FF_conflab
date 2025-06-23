@@ -46,7 +46,7 @@ formations.id = (1:height(formations))';
 
 % Check for missing participants (any -1 entries in "Speaking")
 formations.missing = false(height(formations),1);
-f_name = "vid" + params.vids + "_seg" + params.segs;
+% f_name = "vid" + params.vids + "_seg" + params.segs;
 % actions = speaking_status.speaking.(f_name);
 
 for i = 1:height(formations)
@@ -97,6 +97,35 @@ for w = window_bounds(1):step:window_bounds(2)
     % end
 end
 
+%% Homogeneity and split score
+hm = zeros(4);
+for k1=1:4
+    for k2=1:4
+        g1 = 0;
+        g2 = 0;
+        for i=1:height(data_results)
+            r1 = clues(k1) + "Res";
+            r2 = clues(k2) + "Res";
+            s1 = data_results.(r1){i};
+            s2 = data_results.(r2){i};
+            if ~isempty(s1) & ~isempty(s2)
+                data_results.homogeneity{i} = compute_homogeneity(s1, s2);
+                data_results.split_score{i} = compute_split_score(s1, s2);
+                g1 = g1 + 1;
+                g2 = g2 + 1;
+            else
+                data_results.homogeneity{i} = [];
+                data_results.split_score{i} = [];
+            end
+            
+        end
+        % r1,r2
+        scores = sum(cell2mat(data_results.split_score)) / g1;
+        hm(k1, k2) = scores;
+    end
+end
+heatmap(hm);
+
 
 for sp_name = clues
     if sp_name ~= base_clue
@@ -108,20 +137,20 @@ for sp_name = clues
             % a
         end
 
-        sp_dp = [];
-        all_dp = [];
-        for k=1:height(formations)
-            a = formations.(col_name){k};
-            [~, ls] = size(a);
-            for k2=k1:ls
-                sp_dp = [sp_dp, a{4,k2}];
-                all_dp = [all_dp, sum(a{4,k2})];
-            end
-            % a
-        end
-        sp_name
-        [mean(sp_dp), std(sp_dp)]
-        [mean(all_dp), std(all_dp)]
+        % sp_dp = [];
+        % all_dp = [];
+        % for k1=1:height(formations)
+        %     a = formations.(col_name){k1};
+        %     [~, ls] = size(a);
+        %     for k2=k1:ls
+        %         sp_dp = [sp_dp, a{4,k2}];
+        %         all_dp = [all_dp, sum(a{4,k2})];
+        %     end
+        %     % a
+        % end
+        % sp_name
+        % [mean(sp_dp), std(sp_dp)]
+        % [mean(all_dp), std(all_dp)]
     end
 end
 
