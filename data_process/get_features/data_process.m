@@ -4,27 +4,27 @@ disp("**identify files**")
 
 pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
     'annotations/pose/coco/'];
-Files=dir([pose_data_path, '*.json']); % edit your own path to the pose data!!!
+Files = dir([pose_data_path, '*.json']); % edit your own path to the pose data!!!
 addpath('../../utils/');
 orient_choices = ["head", "shoulder", "hip", "foot"];
 
-for orient_choice = orient_choices
 save_path = "../../data/in_process/";
-mkdir(sprintf(save_path + orient_choice));
-mkdir(save_path + orient_choice + "/seg2/");
-mkdir(save_path + orient_choice + "/seg3/");
+for d = 1:length(orient_choices)
+    orient_choice = orient_choices(d);
+    mkdir(sprintf(save_path + orient_choice));
+    mkdir(save_path + orient_choice + "/seg2/");
+    mkdir(save_path + orient_choice + "/seg3/");
+end
 
 imgSize = [1920, 1080];
 num_kps = 20;
-for k=1:length(Files)
+
+for k = 1:length(Files)
     disp("***filenumber****")
     k
-    FileName=Files(k).name;
-    path = strcat(pose_data_path,FileName); % edit your own path to the pose data!!!
-    
-    % if k<21
-    %     continue;
-    % end
+    FileName = Files(k).name;
+    path = strcat(pose_data_path, FileName); % edit your own path to the pose data!!!
+
     data = jsondecode(fileread(path));
     annotations = data.annotations;
     disp("loaded annotations")
@@ -35,17 +35,22 @@ for k=1:length(Files)
 
     full_timestamps = uint64(1:1:length(data.annotations.skeletons));
     L = length(full_timestamps);
-    % timestamps = full_timestamps(1:59.96:end);
     timestamps = full_timestamps;
     colNames = fieldnames(data.annotations.skeletons);
     total_people_no = length(colNames);
 
     disp("enter time loop")
-    features = cell(1, length(timestamps));
+    orient_features = containers.Map();
+
+    for d = 1:length(orient_choices)
+        orient_features(orient_choices(d)) = cell(1, length(timestamps));
+    end
+
     for ti = 1:length(timestamps)
         t = timestamps(ti);
-        frame_data = zeros(total_people_no, 4+num_kps);
-        bp_data = zeros(total_people_no, 4+num_kps);
+        frame_data = zeros(total_people_no, 4 + num_kps);
+        bp_data = zeros(total_people_no, 4 + num_kps);
+
         for p = 1:total_people_no
             % Read keypoints
             headX = data.annotations.skeletons(t).(colNames{p}).keypoints(1);
@@ -99,7 +104,6 @@ for k=1:length(Files)
             frame_data(p,23) = rightFootX;
             frame_data(p,24) = rightFootY;
 
-            % Back Projection
             cam = str2double(FileName(4));
             cp = loadCamParams(cam);
             feat = backProject(frame_data, cp.K, cp.R, cp.t, cp.distCoeff, ...
@@ -107,32 +111,29 @@ for k=1:length(Files)
             bp_data(:, 5:end) = reshape(feat, [], num_kps);
 
             person_id = data.annotations.skeletons(t).(colNames{p}).id;
-            frame_data = process_kp(frame_data, p, person_id, orient_choice, imgSize, false);
-            bp_data = process_kp(bp_data, p, person_id, orient_choice, [1,1], true);
 
-            % frame_data.size = # of people * 4
-            % head orientation is not recorded. Instead, use headX and
-            % headY.
-            c = 9;
-
+            for d = 1:length(orient_choices)
+                orient = orient_choices(d);
+                fd = process_kp(frame_data, p, person_id, orient, imgSize, false);
+                bd = process_kp(bp_data, p, person_id, orient, [1,1], true);
+                features = orient_features(orient);
+                features{1,ti} = [fd, bd];
+                orient_features(orient) = features;
+            end
         end
-        features{1,ti} = [frame_data, bp_data];
-
     end
-    % subsample
-    % timestamps = timestamps(1:59.96:end);
-    % features = features(1:59.96:end);
 
     % saving
     fn = FileName(1:end-10);
-    mat_name = fn + "_" + orient_choice + ".mat";
-    % ts_name = fn + "_" + orient_choice + ".mat";
-    % mkdir(sprintf(fn))
     segn = "seg" + get_seg_num(fn);
-    save_name = orient_choice + "/" + segn + "/" + mat_name;
-    assert(length(features) == length(timestamps));
-    save(save_path + save_name, 'features', 'timestamps')
-end
+    for d = 1:length(orient_choices)
+        orient_choice = orient_choices(d);
+        features = orient_features(orient_choice);
+        mat_name = fn + "_" + orient_choice + ".mat";
+        save_name = orient_choice + "/" + segn + "/" + mat_name;
+        assert(length(features) == length(timestamps));
+        save(save_path + save_name, 'features', 'timestamps');
+    end
 end
 
 %% Extract frames
