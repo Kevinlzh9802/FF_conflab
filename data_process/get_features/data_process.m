@@ -35,8 +35,8 @@ for k=1:length(Files)
 
     full_timestamps = uint64(1:1:length(data.annotations.skeletons));
     L = length(full_timestamps);
-    timestamps = full_timestamps(1:59.96:end);
-
+    % timestamps = full_timestamps(1:59.96:end);
+    timestamps = full_timestamps;
     colNames = fieldnames(data.annotations.skeletons);
     total_people_no = length(colNames);
 
