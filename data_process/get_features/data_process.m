@@ -2,8 +2,9 @@ clear variables; close all
 
 disp("**identify files**")
 
-pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
-    'annotations/pose/coco/'];
+% pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
+%     'annotations/pose/coco/'];
+pose_data_path = ['C:\Users\zongh\Desktop\FF_conflab\data\coco\'];
 Files = dir([pose_data_path, '*.json']); % edit your own path to the pose data!!!
 addpath('../../utils/');
 orient_choices = ["head", "shoulder", "hip", "foot"];
@@ -50,7 +51,8 @@ for k = 1:length(Files)
         t = timestamps(ti);
         frame_data = zeros(total_people_no, 4 + num_kps);
         bp_data = zeros(total_people_no, 4 + num_kps);
-
+        
+        person_ids = [];
         for p = 1:total_people_no
             % Read keypoints
             headX = data.annotations.skeletons(t).(colNames{p}).keypoints(1);
@@ -110,16 +112,16 @@ for k = 1:length(Files)
                 cp.bodyHeight, cp.img_size, cp.height_ratios_map, cp.part_column_map);
             bp_data(:, 5:end) = reshape(feat, [], num_kps);
 
-            person_id = data.annotations.skeletons(t).(colNames{p}).id;
+            person_ids = [person_ids, data.annotations.skeletons(t).(colNames{p}).id];       
+        end
 
-            for d = 1:length(orient_choices)
-                orient = orient_choices(d);
-                fd = process_kp(frame_data, p, person_id, orient, imgSize, false);
-                bd = process_kp(bp_data, p, person_id, orient, [1,1], true);
-                features = orient_features(orient);
-                features{1,ti} = [fd, bd];
-                orient_features(orient) = features;
-            end
+        for d = 1:length(orient_choices)
+            orient = orient_choices(d);
+            fd = process_kp(frame_data, person_ids, orient, imgSize, false);
+            bd = process_kp(bp_data, person_ids, orient, [1,1], true);
+            features = orient_features(orient);
+            features{1,ti} = [fd, bd];
+            orient_features(orient) = features;
         end
     end
 
@@ -152,91 +154,94 @@ end
 
 %%
 
-function kps = process_kp(kps, p, person_id, orient_choice, imgSize, rh_axis)
-headX = kps(p,5);
-headY = kps(p,6);
-noseX = kps(p,7);
-noseY = kps(p,8);
+function kps = process_kp(kps, person_ids, orient_choice, imgSize, rh_axis)
+% PROCESS_KP Processes all keypoints in kps matrix and assigns orientation and position
+%
+% Inputs:
+%   - kps: Nx24 matrix of keypoints
+%   - person_ids: vector of length N with person IDs
+%   - orient_choice: string ('head', 'shoulder', 'hip', or 'foot')
+%   - imgSize: [height, width] of the image
+%   - rh_axis: boolean indicating right-hand system (false = left-hand)
 
-leftShoulderX = kps(p,9);
-leftShoulderY = kps(p,10);
-rightShoulderX = kps(p,11);
-rightShoulderY = kps(p,12);
+    for p = 1:size(kps, 1)
+        person_id = person_ids(p);
 
-leftHipX = kps(p,13);
-leftHipY = kps(p,14);
-rightHipX = kps(p,15);
-rightHipY = kps(p,16);
+        headX = kps(p,5);
+        headY = kps(p,6);
+        noseX = kps(p,7);
+        noseY = kps(p,8);
 
-leftAnkleX = kps(p,17);
-leftAnkleY = kps(p,18);
-rightAnkleX = kps(p,19);
-rightAnkleY = kps(p,20);
+        leftShoulderX = kps(p,9);
+        leftShoulderY = kps(p,10);
+        rightShoulderX = kps(p,11);
+        rightShoulderY = kps(p,12);
 
-leftFootX = kps(p,21);
-leftFootY = kps(p,22);
-rightFootX = kps(p,23);
-rightFootY = kps(p,24);
+        leftHipX = kps(p,13);
+        leftHipY = kps(p,14);
+        rightHipX = kps(p,15);
+        rightHipY = kps(p,16);
 
-% Process from keypoints
-head_vector = [(noseX-headX),(noseY-headY)].* imgSize;
-shoulder_vector = [(leftShoulderX-rightShoulderX),(leftShoulderY-rightShoulderY)].* imgSize;
-hip_vector = [(leftHipX-rightHipX),(leftHipY-rightHipY)].* imgSize;
-foot_vector = [(leftFootX-rightFootX),(leftFootY-rightFootY)].* imgSize;
+        leftAnkleX = kps(p,17);
+        leftAnkleY = kps(p,18);
+        rightAnkleX = kps(p,19);
+        rightAnkleY = kps(p,20);
 
-if rh_axis
-    axis_mod = -1;
-else
-    axis_mod = 1;
+        leftFootX = kps(p,21);
+        leftFootY = kps(p,22);
+        rightFootX = kps(p,23);
+        rightFootY = kps(p,24);
+
+        % Process from keypoints
+        head_vector = [(noseX-headX),(noseY-headY)].* imgSize;
+        shoulder_vector = [(leftShoulderX-rightShoulderX),(leftShoulderY-rightShoulderY)].* imgSize;
+        hip_vector = [(leftHipX-rightHipX),(leftHipY-rightHipY)].* imgSize;
+        foot_vector = [(leftFootX-rightFootX),(leftFootY-rightFootY)].* imgSize;
+
+        if rh_axis
+            axis_mod = -1;
+        else
+            axis_mod = 1;
+        end
+
+        shoulder_orient = [-shoulder_vector(:,2),(shoulder_vector(:,1))] * axis_mod;
+        hip_orient = [-hip_vector(:,2),(hip_vector(:,1))] * axis_mod;
+        foot_orient = [-foot_vector(:,2),(foot_vector(:,1))] * axis_mod;
+
+        vector_check = [head_vector; shoulder_orient; hip_orient; foot_orient];
+        vector_check = reverse_incorrect_vectors(vector_check);
+
+        head_vector = vector_check(1, :);
+        shoulder_orient = vector_check(2, :);
+        hip_orient = vector_check(3, :);
+        foot_orient = vector_check(4, :);
+
+        % Orientation choice
+        if orient_choice == "head"
+            body_vector = head_vector;
+            body_pos = [headX, headY];
+        elseif orient_choice == "shoulder"
+            body_vector = shoulder_orient;
+            body_pos = [leftShoulderX + rightShoulderX, leftShoulderY + rightShoulderY] / 2;
+        elseif orient_choice == "hip"
+            body_vector = hip_orient;
+            body_pos = [leftHipX + rightHipX, leftHipY + rightHipY] / 2;
+        elseif orient_choice == "foot"
+            body_vector = foot_orient;
+            body_pos = [leftFootX + rightFootX, leftFootY + rightFootY] / 2;
+        end
+
+        head_orientation = FixRangeOfAngles(get_angle(head_vector));
+        body_orientation = FixRangeOfAngles(get_angle(body_vector));
+
+        % person id, position X, position Y, orientation
+        kps(p,1) = person_id;
+        kps(p,2) = body_pos(1)*imgSize(1);
+        kps(p,3) = body_pos(2)*imgSize(2);
+        kps(p,4) = body_orientation;
+    end
 end
 
-shoulder_orient = [-shoulder_vector(:,2),(shoulder_vector(:,1))] * axis_mod;
-hip_orient = [-hip_vector(:,2),(hip_vector(:,1))] * axis_mod;
-foot_orient = [-foot_vector(:,2),(foot_vector(:,1))] * axis_mod;
-
-vector_check = [head_vector; shoulder_orient; hip_orient; foot_orient];
-vector_check = reverse_incorrect_vectors(vector_check);
-
-head_vector = vector_check(1, :);
-shoulder_orient = vector_check(2, :);
-hip_orient = vector_check(3, :);
-foot_orient = vector_check(4, :);
-% Head vector is special. Head -> Nose is the same direction as
-% body orientation
-if orient_choice == "head"
-    body_vector = head_vector;
-    body_pos = [headX, headY];
-    % Otherwise, body vector is perpendicular to the R->L (counterclockwise 90 degrees)
-    % MODIFIED: If R->L is (x,y), then orientation should be
-    % (-y,x)! The y-axis in images is from top to bottom, which is
-    % different from usual right-hand coordinate system.
-elseif orient_choice == "shoulder"
-    body_vector = shoulder_orient;
-    body_pos = [leftShoulderX + rightShoulderX, leftShoulderY + rightShoulderY] / 2;
-elseif orient_choice == "hip"
-    body_vector = hip_orient;
-    body_pos = [leftHipX + rightHipX, leftHipY + rightHipY] / 2;
-elseif orient_choice == "foot"
-    body_vector = foot_orient;
-    body_pos = [leftFootX + rightFootX, leftFootY + rightFootY] / 2;
-end
-
-% dotProduct = dot(head_vector(:),body_vector(:));
-% if (dotProduct<0)
-%     body_vector(:) = [-body_vector(1),-body_vector(2)];
-% elseif(dotProduct==0)
-%     disp('warning: head and body exactly perpendicular')
-% end
-
-head_orientation = FixRangeOfAngles(get_angle(head_vector));
-body_orientation = FixRangeOfAngles(get_angle(body_vector));
-
-% person id, position X, position Y, orientation
-kps(p,1) = person_id;
-kps(p,2) = body_pos(1)*imgSize(1);
-kps(p,3) = body_pos(2)*imgSize(2);
-kps(p,4) = body_orientation;
-end
 
 function [x, y, z] = extractVideoNum(nameString)
     tokens = regexp(nameString, 'cam(\d+)_vid(\d+)_seg(\d+)', 'tokens');

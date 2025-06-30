@@ -14,12 +14,16 @@ for orient_choice = ["head", "shoulder", "hip", "foot"]
         
         for c=2:2:8
             camField = sprintf('cam%d', c);
-            featureGroups = features.(camField);
-            GTgroups = (GT.cameraData.(camField))';
-            [featureGroups, GTgroups] = get_intersects(featureGroups, GTgroups);
-        
-            timestamp = 1:length(GTgroups);
-            features.(camField) = clear_people(featureGroups, GTgroups, timestamp);
+            % featureGroups = features.(camField);
+% 
+            % GTgroups = (GT.cameraData.(camField))';
+            % [featureGroups, GTgroups] = get_intersects(featureGroups, GTgroups);
+            % 
+            % timestamp = 1:length(GTgroups);
+            % features.(camField) = clear_people(featureGroups, GTgroups, timestamp);
+
+            % features.(camField) = featureGroups;
+            GTgroups = cell(height(features.(camField)), 1);
             all_data = [all_data; features.(camField), GTgroups];
         end
     end

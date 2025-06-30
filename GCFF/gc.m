@@ -15,33 +15,33 @@ numiter = 1 ;
 
 % close all,
 while ~isequal(seg,segold) && numiter <= MAX_ITER
-    % %%%%% TEMP
-    % figure(numiter),
-    % ff_plot_person_tv(f,'b',50),
-    % hold on,
-    % plot(locs(:,1),locs(:,2),'b*')
-    % for ii = 1:size(locs,1)
-    %     text(locs(ii,1),locs(ii,2),['C_{',num2str(ii),'}'], ...
-    %         'Color','b','FontWeight','bold','HorizontalAlignment','center') ;
-    % end
-    % labs = seg ;
-    % ulabs = unique(labs) ;
-    % clear plocs;
-    % for ii = 1:length(ulabs)
-    %     plocs(ii,:) = mean(locs(labs==ulabs(ii),:), 1) ;
-    % end
-    % plot(plocs(:,1),plocs(:,2),'r*')
-    % for ii = 1:size(plocs,1)
-    %     text(plocs(ii,1),plocs(ii,2),['O_{',num2str(ii),'}'], ...
-    %         'Color','r','FontWeight','bold','HorizontalAlignment','center') ;
-    % end
-    % axis equal
-    % % ylim([-400,250])
-    % % xlim([-300,300])
-    % if numiter>2
-    %     keyboard
-    % end
-    % %%%%% END TEMP
+    %%%%% TEMP
+    figure(numiter),
+    ff_plot_person_tv(f,'b',50),
+    hold on,
+    plot(locs(:,1),locs(:,2),'b*')
+    for ii = 1:size(locs,1)
+        text(locs(ii,1),locs(ii,2),['C_{',num2str(ii),'}'], ...
+            'Color','b','FontWeight','bold','HorizontalAlignment','center') ;
+    end
+    labs = seg ;
+    ulabs = unique(labs) ;
+    clear plocs;
+    for ii = 1:length(ulabs)
+        plocs(ii,:) = mean(locs(labs==ulabs(ii),:), 1) ;
+    end
+    plot(plocs(:,1),plocs(:,2),'r*')
+    for ii = 1:size(plocs,1)
+        text(plocs(ii,1),plocs(ii,2),['O_{',num2str(ii),'}'], ...
+            'Color','r','FontWeight','bold','HorizontalAlignment','center') ;
+    end
+    axis equal
+    % ylim([-400,250])
+    % xlim([-300,300])
+    if numiter>2
+        keyboard
+    end
+    %%%%% END TEMP
 
     segold = seg ;
     mdl = ones(size(unary,2),1) * MDL_in ;

@@ -16,26 +16,6 @@ clearvars -except frames;
 addpath(genpath('../GCFF')) % add your own path
 addpath(genpath('../utils'));
 
-%% Zonghuan exp
-% % Set data folder
-% seqpath = 'data/zh_exp';
-% % NB: edit here your own path to data!!!
-% cam = 6;
-% seg = 3;
-%
-% % Load features
-% featureFile = load(fullfile(seqpath, "seg" + seg + ".mat"));
-% % Load groundtruth
-% GTFile = load(fullfile(seqpath,"seg" + seg + "_gt.mat"));
-% %Load settings
-% load(fullfile(seqpath,'settings_gc.mat'));
-%
-% camField = sprintf('cam%d', cam);
-% features = featureFile.features.(camField);
-% GTgroups = GTFile.cameraData.(camField);
-% timestamp = 1:length(features);
-% GTtimestamp = 1:length(GTgroups);
-
 %% original loading
 % seqpath = 'data/sample_data';
 % load(fullfile(seqpath, "filtered_features.mat"));
@@ -59,7 +39,7 @@ else
     params.mdl = 60000;
 end
 
-params.used_parts = ["228", "229", "428", "429", "828", "829", ...
+params.used_parts = ["229", "428", "429", "828", "829", ...
     "232", "233", "234", "235", "236", ...
     "431", "433", "434", ...
     "631", "632", "633", "634", "635", "636", ...
@@ -97,7 +77,7 @@ for clue = clues
     f_name = clue + "Res";
     used_data.(f_name) = results.(clue).groups;
     results.(clue).original_data = used_data;
-    data_results(used_data.id, f_name) = used_data.(f_name);
+    % data_results(used_data.id, f_name) = used_data.(f_name);
     % data_results.(f_name) = used_data.(f_name);
     % results.(clue).g_count = countGroupsContainingIDs(used_data.(f_name), {[13,21],[35,12,19]});
 end
