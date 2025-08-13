@@ -77,7 +77,7 @@ for clue = clues
     f_name = clue + "Res";
     used_data.(f_name) = results.(clue).groups;
     results.(clue).original_data = used_data;
-    % data_results(used_data.id, f_name) = used_data.(f_name);
+    data_results(used_data.id, f_name) = used_data.(f_name);
     % data_results.(f_name) = used_data.(f_name);
     % results.(clue).g_count = countGroupsContainingIDs(used_data.(f_name), {[13,21],[35,12,19]});
 end

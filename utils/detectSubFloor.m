@@ -99,6 +99,7 @@ end
 
 %% Homogeneity and split score
 hm = zeros(4);
+sp = zeros(4);
 for k1=1:4
     for k2=1:4
         g1 = 0;
@@ -120,12 +121,13 @@ for k1=1:4
             
         end
         % r1,r2
-        scores = sum(cell2mat(data_results.split_score)) / g1;
-        hm(k1, k2) = scores;
+        hm(k1, k2) = sum(cell2mat(data_results.homogeneity)) / g1;
+        sp(k1, k2) = sum(cell2mat(data_results.split_score)) / g1;
     end
 end
 heatmap(hm);
-
+figure;
+heatmap(sp);
 
 for sp_name = clues
     if sp_name ~= base_clue
