@@ -158,7 +158,7 @@ end
 
 
 
-% run plotFloorsCustom.m;
+run plotFloorsCustom.m;
 
 
 % Equivalent of _annotation_slice_for_formation
