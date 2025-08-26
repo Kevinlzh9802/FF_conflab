@@ -1,162 +1,55 @@
-% Equivalent MATLAB script for the Python `main` function
-
-% Define the input arguments as global variables or manually set them here
-% Replace the following with your actual paths and values
-% social_actions_file = 'social_actions.pkl';
-% f_formations_file = 'f_formations.pkl';
-% 
-% % Load the social actions and f-formations data (assuming .pkl files converted to .mat)
-% load(social_actions_file, 'actions');  % variable 'actions' loaded
-% load(f_formations_file, 'formations');  % variable 'formations' loaded
-
-load('../data/speaking_status.mat', 'speaking_status');
-
-outdir = 'output_directory';
-window_bounds = [1, 20] * 60;  % [min, max] window size
-step = 60;
-
-base_clue = "foot";
-unique_segs = unique(data_results.Vid);
-formations = table;
-for u_ind=1:length(unique_segs)
-    u = unique_segs(u_ind);
-    ana = data_results(data_results.Vid == u, :);
-    unique_groups = recordUniqueGroups(ana, base_clue + "Res");
-    unique_groups.Vid = zeros(height(unique_groups), 1) + u;
-    formations = [formations; unique_groups];
-end
-
-% merge speaking status first
-sp_merged{2} = mergeSpeakingStatus(speaking_status.speaking.vid2_seg8, ...
-    speaking_status.speaking.vid2_seg9);
-
-sp_merged{3} = mergeSpeakingStatus(speaking_status.speaking.vid3_seg1, ...
-    speaking_status.speaking.vid3_seg2);
-for k=3:6
-    seg_name = "vid3_seg" + k;
-    sp_merged{3} = mergeSpeakingStatus(sp_merged{3}, ...
-        speaking_status.speaking.(seg_name));
-end
-
-% Add cardinality column to formations (count number of participants per row)
-formations.cardinality = cellfun(@(x) numel(x), formations.participants);
-
-% Add ID column (1-based indexing)
-formations.id = (1:height(formations))';
-
-% Check for missing participants (any -1 entries in "Speaking")
-formations.missing = false(height(formations),1);
-% f_name = "vid" + params.vids + "_seg" + params.segs;
-% actions = speaking_status.speaking.(f_name);
-
-for i = 1:height(formations)
-    formations.longest_ts{i} = longest_connected_subseq(formations.timestamps{i}, 61);
-    formations.timestamps_all{i} = generate_continuous_sequence(formations.longest_ts{i}, 61);
-    formations.missing(i) = check_if_lost(formations(i,:), sp_merged{formations.Vid(i)});
-end
-
-% Filter out rows with missing data and with fewer than 4 participants
-formations = formations(~formations.missing, :);
-formations = formations(formations.cardinality >= 4, :);
-formations = formations(cellfun(@length, formations.timestamps_all) > 0, :);
-formations.Cam = cell2mat(formations.Cam);
-% Create output directory if it doesn’t exist
-% if ~exist(outdir, 'dir')
-%     mkdir(outdir);
-% end
-
-% Detect concurrent speakers over sliding window
+%% Detect concurrent speakers over sliding window
 w_ind = 1;
 for n=1:30
     max_speaker{n} = repmat({0}, 20, 15);  % Creates a 3x4 cell array with 0 in each cell
 end
-for w = window_bounds(1):step:window_bounds(2)
-    filtered_fs = formations(cellfun(@length,formations.timestamps_all) >= w, :);
-    
-    floors = cell(height(filtered_fs), 1);
-    max_floors = cell(height(filtered_fs), 1);
-    for i = 1:height(filtered_fs)
-        actions = sp_merged{filtered_fs.Vid(i)};
-        floors{i} = concurrent_speakers(filtered_fs(i,:), actions, w, step);
-        max_floors{i} = max(floors{i}, [], "all");
 
-        card = filtered_fs.cardinality(i);
-        max_speaker{card}{w_ind, max_floors{i}+1} = ...
-            max_speaker{card}{w_ind, max_floors{i}+1} + 1;
+for w = window_bounds(1):step:window_bounds(2)
+    % Process all formations, not just those meeting window size requirement
+    floors = cell(height(formations), 1);
+    max_floors = cell(height(formations), 1);
+    valid_indices = [];
+    
+    for i = 1:height(formations)
+        if cellfun(@length, formations.timestamps_all(i)) >= w
+            % Formation meets window size requirement - process normally
+            actions = sp_merged{formations.Vid(i)};
+            floors{i} = concurrent_speakers(formations(i,:), actions, w, step);
+            max_floors{i} = max(floors{i}, [], "all");
+            valid_indices = [valid_indices; i];
+            
+            card = formations.cardinality(i);
+            max_speaker{card}{w_ind, max_floors{i}+1} = ...
+                max_speaker{card}{w_ind, max_floors{i}+1} + 1;
+        else
+            % Formation doesn't meet window size requirement - count as max_speaker=0
+            floors{i} = [];
+            max_floors{i} = 0;
+            
+            card = formations.cardinality(i);
+            max_speaker{card}{w_ind, 1} = ...
+                max_speaker{card}{w_ind, 1} + 1;
+        end
     end
 
-    % Create table with id, cardinality, and floor data
-    out_table{w_ind, 1} = table(filtered_fs.id, filtered_fs.cardinality, ...
-        floors, max_floors);
+    % Create table with id, cardinality, and floor data (only for valid formations)
+    if ~isempty(valid_indices)
+        filtered_fs = formations(valid_indices, :);
+        filtered_floors = floors(valid_indices);
+        filtered_max_floors = max_floors(valid_indices);
+        out_table{w_ind, 1} = table(filtered_fs.id, filtered_fs.cardinality, ...
+            filtered_floors, filtered_max_floors);
+    else
+        out_table{w_ind, 1} = table();
+    end
     out_table{w_ind, 2} = w;
     % save(fullfile(outdir, sprintf('%d.mat', w)), 'out_table');
     w_ind = w_ind + 1;
     % x = out_table{w_ind,1};
-    % for n=1:height(x)
-    %     card = 
-    % end
 end
-
-%% Homogeneity and split score
-% hm = zeros(4);
-% sp = zeros(4);
-% for k1=1:4
-%     for k2=1:4
-%         g1 = 0;
-%         g2 = 0;
-%         for i=1:height(data_results)
-%             r1 = clues(k1) + "Res";
-%             r2 = clues(k2) + "Res";
-%             s1 = data_results.(r1){i};
-%             s2 = data_results.(r2){i};
-%             if ~isempty(s1) & ~isempty(s2)
-%                 data_results.homogeneity{i} = compute_homogeneity(s1, s2);
-%                 data_results.split_score{i} = compute_split_score(s1, s2);
-%                 g1 = g1 + 1;
-%                 g2 = g2 + 1;
-%             else
-%                 data_results.homogeneity{i} = [];
-%                 data_results.split_score{i} = [];
-%             end
-% 
-%         end
-%         % r1,r2
-%         hm(k1, k2) = sum(cell2mat(data_results.homogeneity)) / g1;
-%         sp(k1, k2) = sum(cell2mat(data_results.split_score)) / g1;
-%     end
-% end
-% heatmap(hm);
-% figure;
-% heatmap(sp);
-% 
-% for sp_name = clues
-%     if sp_name ~= base_clue
-%         col_name = sp_name + "Split";
-%         for k=1:height(formations)
-%             formations.(col_name){k} = collectMatchingGroups(formations.participants{k}, ...
-%                 formations.longest_ts{k}, formations.Vid(k), ...
-%                 formations.Cam(k), data_results, sp_name, sp_merged, 61);
-%         end
-%     end
-% end
-
-
 run plotFloorsCustom.m;
 
-
-% Equivalent of _annotation_slice_for_formation
-function data = annotation_slice_for_formation(row, actions)
-    participants = row.participants{1}; % converts space-separated string to numeric array
-    time_inds = row.timestamps_all{1};
-    all_participants = actions(1, :);
-    
-    cols = ismember(all_participants, participants);
-    % start_idx = row.sample_start;
-    % end_idx = row.sample_end;
-
-    % Extract relevant data slice
-    data = actions([1, time_inds+1], cols);
-end
+%% Functions
 
 % Equivalent of _roll
 function rolled = roll_df(df, window, step)
@@ -182,58 +75,17 @@ function concurrent = concurrent_speakers(row, actions, window_size, step_size)
     end
 end
 
-% Equivalent of check_if_lost
-function lost = check_if_lost(row, actions)
-    data = annotation_slice_for_formation(row, actions);
-    lost = any(data(2:end, :) == -1, 'all');
+% Equivalent of _annotation_slice_for_formation
+function data = annotation_slice_for_formation(row, actions)
+    participants = row.participants{1}; % converts space-separated string to numeric array
+    time_inds = row.timestamps_all{1};
+    all_participants = actions(1, :);
+    
+    cols = ismember(all_participants, participants);
+    % start_idx = row.sample_start;
+    % end_idx = row.sample_end;
+
+    % Extract relevant data slice
+    data = actions([1, time_inds+1], cols);
 end
 
-function output = generate_continuous_sequence(sequence, k)
-% Generates a continuous sequence from an increasing vector
-% If the difference between adjacent elements >= k, it breaks the sequence
-
-    output = [];
-    n = length(sequence);
-
-    for i = 1:n-1
-        if sequence(i+1) - sequence(i) < k
-            output = [output, sequence(i):sequence(i+1)];  % append the range
-        end
-    end
-
-    output = unique(output);  % remove duplicates if ranges overlap
-end
-
-function subseq = longest_connected_subseq(seq, n)
-% Finds the longest contiguous subsequence in `seq`
-% such that the difference between adjacent elements ≤ n
-
-    max_len = 0;
-    start_idx = 1;
-    best_start = 1;
-
-    for i = 2:length(seq)
-        if seq(i) - seq(i-1) <= n
-            % Continue the current subsequence
-            continue;
-        else
-            % End of a valid segment
-            len = i - start_idx;
-            if len > max_len
-                max_len = len;
-                best_start = start_idx;
-            end
-            start_idx = i;  % reset
-        end
-    end
-
-    % Check the final subsequence
-    len = length(seq) - start_idx + 1;
-    if len > max_len
-        max_len = len;
-        best_start = start_idx;
-    end
-
-    % Extract the best subsequence
-    subseq = seq(best_start : best_start + max_len - 1);
-end

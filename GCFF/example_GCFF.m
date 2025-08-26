@@ -94,9 +94,10 @@ end
 %     formations = [formations; unique_groups];
 % end
 
+run constructFormations.m;
 run detectSubFloor.m;
+% run spatialScores.m;
 
-% run plotFloorsCustom.m;
 % run plotGroups.m;
 % run plotGroupsInfo.m;
 
