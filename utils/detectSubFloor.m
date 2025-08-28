@@ -1,4 +1,6 @@
 %% Detect concurrent speakers over sliding window
+window_bounds = [1, 20] * 60;  % [min, max] window size
+step = 60;
 w_ind = 1;
 for n=1:30
     max_speaker{n} = repmat({0}, 20, 15);  % Creates a 3x4 cell array with 0 in each cell

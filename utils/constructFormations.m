@@ -12,8 +12,7 @@
 load('../data/speaking_status.mat', 'speaking_status');
 
 outdir = 'output_directory';
-window_bounds = [1, 20] * 60;  % [min, max] window size
-step = 60;
+
 
 base_clue = "hip";
 unique_segs = unique(data_results.Vid);
