@@ -1,57 +1,57 @@
-%% Detect how many groups simultaneous speakers belong to
-% This script analyzes the entire speaking status for all people
-% and determines how many groups simultaneous speakers belong to
-
-% Parameters
-window_bounds = [1, 20] * 60;  % [min, max] window size
-step = 60;
-
-% Initialize results storage
-group_num_results = cell(length(window_bounds(1):step:window_bounds(2)), 1);
-w_ind = 1;
-
-% Process each video separately
-% Analyze each window and create table
-window_table = table();
-for vid = 2:3  % Assuming videos 2 and 3 as in the original code
-    fprintf('Processing video %d...\n', vid);
-
-    % Process each window size
-    for w = window_bounds(1):step:window_bounds(2)
-        fprintf('  Window size: %d frames\n', w);
-
-        % Roll over the entire speaking status for all people
-        rolled_data = roll_df_all_people(sp_merged{vid}, w, step);
-
-        for i = 1:length(rolled_data)
-            window_data = rolled_data{i};
-
-            % Store speaking status for each person at each time position in this window
-            speaking_status_window = store_speaking_status_per_window(window_data, i, step);
-
-            % Create row for table
-            row = table();
-            row.id = i;
-            row.Vid = vid;
-            row.time = {[speaking_status_window.start_time, speaking_status_window.end_time]};
-            row.length = speaking_status_window.window_length;
-            row.speaking_all_time = {speaking_status_window.speaking_all_time};
-
-            % Append to table
-            window_table = [window_table; row];
-        end
-
-        % Store results for this window size
-        group_num_results{w_ind} = struct('video', vid, ...
-                                        'window_size', w, ...
-                                        'window_table', window_table);
-        w_ind = w_ind + 1;
-    end
-end
+% %% Detect how many groups simultaneous speakers belong to
+% % This script analyzes the entire speaking status for all people
+% % and determines how many groups simultaneous speakers belong to
+% 
+% % Parameters
+% window_bounds = [1, 20] * 60;  % [min, max] window size
+% step = 60;
+% 
+% % Initialize results storage
+% group_num_results = cell(length(window_bounds(1):step:window_bounds(2)), 1);
+% w_ind = 1;
+% 
+% % Process each video separately
+% % Analyze each window and create table
+% window_table = table();
+% for vid = 2:3  % Assuming videos 2 and 3 as in the original code
+%     fprintf('Processing video %d...\n', vid);
+% 
+%     % Process each window size
+%     for w = window_bounds(1):step:window_bounds(2)
+%         fprintf('  Window size: %d frames\n', w);
+% 
+%         % Roll over the entire speaking status for all people
+%         rolled_data = roll_df_all_people(sp_merged{vid}, w, step);
+% 
+%         for i = 1:length(rolled_data)
+%             window_data = rolled_data{i};
+% 
+%             % Store speaking status for each person at each time position in this window
+%             speaking_status_window = store_speaking_status_per_window(window_data, i, step);
+% 
+%             % Create row for table
+%             row = table();
+%             row.id = i;
+%             row.Vid = vid;
+%             row.time = {[speaking_status_window.start_time, speaking_status_window.end_time]};
+%             row.length = speaking_status_window.window_length;
+%             row.speaking_all_time = {speaking_status_window.speaking_all_time};
+% 
+%             % Append to table
+%             window_table = [window_table; row];
+%         end
+% 
+%         % Store results for this window size
+%         group_num_results{w_ind} = struct('video', vid, ...
+%                                         'window_size', w, ...
+%                                         'window_table', window_table);
+%         w_ind = w_ind + 1;
+%     end
+% end
 
 % display_group_num_summary(group_num_results);
 window_table = countSpeakerGroups(window_table, data_results, ...
-    'headRes', 'closest_to_start');
+    'shoulderRes', 'majority');
 
 %% Functions
 
