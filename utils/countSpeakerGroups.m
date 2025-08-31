@@ -4,71 +4,129 @@ function window_table = countSpeakerGroups(window_table, group_detection_table, 
 %
 % Inputs:
 %   window_table - Table with columns: id, Vid, time, length, speaking_all_time
-%   group_detection_table - Table with columns: concat_ts, and various group detection columns
-%   groups_column - String specifying which column contains the group detection results
-%                  (e.g., 'headRes', 'shoulderRes', 'hipRes', 'footRes')
+%   group_detection_table - Table with columns: concat_ts, Cam, and various group detection columns
+%   groups_column - String or cell array of strings specifying which columns contain the group detection results
+%                  (e.g., 'headRes' or {'headRes', 'hipRes', 'footRes'})
 %   aggregation_method - String specifying how to aggregate group detections:
 %                       'closest_to_start' (default), 'majority', 'union', etc.
 %
 % Output:
-%   window_table - Updated table with total_groups column added
+%   window_table - Updated table with total_groups column added and expanded for multiple cameras
 
 if nargin < 4
     aggregation_method = 'closest_to_start';
 end
 
-% Add new columns to window_table
-window_table.detection = cell(height(window_table), 1);
-window_table.filtered_speakers = cell(height(window_table), 1);
-window_table.num_filtered_speakers = zeros(height(window_table), 1);
-window_table.total_groups = zeros(height(window_table), 1);
+% Convert groups_column to cell array if it's a string
+if ischar(groups_column)
+    groups_column = {groups_column};
+end
 
-% Process each window
-for i = 1:height(window_table)
-    window_row = window_table(i, :);
-    window_start = window_row.time{1}(1);
-    window_end = window_row.time{1}(2);
-    speaking_vector = window_row.speaking_all_time{1};
-    vid = window_row.Vid;
+k = length(groups_column); % Number of group detection columns
+cameras = [2, 4, 6, 8]; % Define cameras to process
+
+% Pre-filter group_detection_table by cameras for efficiency
+fprintf('Pre-filtering group detection data by cameras...\n');
+filtered_group_tables = cell(length(cameras), 1);
+for cam_idx = 1:length(cameras)
+    cam = cameras(cam_idx);
+    cam_filter = group_detection_table.Cam == cam;
+    filtered_group_tables{cam_idx} = group_detection_table(cam_filter, :);
+    fprintf('Camera %d: %d detections\n', cam, height(filtered_group_tables{cam_idx}));
+end
+
+% Process each camera separately
+all_camera_tables = cell(length(cameras), 1);
+
+for cam_idx = 1:length(cameras)
+    cam = cameras(cam_idx);
+    fprintf('Processing camera %d...\n', cam);
     
-    % Get continuous speakers (person IDs who spoke for all time)
-    continuous_speakers = speaking_vector;
+    % Create a copy of window_table for this camera
+    cam_window_table = window_table;
     
-    if isempty(continuous_speakers)
-        window_table.detection{i} = {};
-        window_table.filtered_speakers{i} = [];
-        window_table.total_groups(i) = 0; % No continuous speakers, so 0 groups
-        window_table.num_filtered_speakers(i) = 0; % No filtered speakers
-        continue;
+    % Add new columns to cam_window_table
+    cam_window_table.detection = cell(height(cam_window_table), 1);
+    cam_window_table.filtered_speakers = cell(height(cam_window_table), 1);
+    cam_window_table.num_filtered_speakers = cell(height(cam_window_table), 1);
+    cam_window_table.total_groups = cell(height(cam_window_table), 1);
+    cam_window_table.Cam = cam * ones(height(cam_window_table), 1); % Add camera column
+    
+    % Get filtered group detection table for this camera
+    cam_group_table = filtered_group_tables{cam_idx};
+    
+    % Process each window for this camera
+    for i = 1:height(cam_window_table)
+        window_row = cam_window_table(i, :);
+        window_start = window_row.time{1}(1);
+        window_end = window_row.time{1}(2);
+        speaking_vector = window_row.speaking_all_time{1};
+        vid = window_row.Vid;
+        
+        % Get continuous speakers (person IDs who spoke for all time)
+        continuous_speakers = speaking_vector;
+        
+        if isempty(continuous_speakers)
+            cam_window_table.detection{i} = cell(1, k);
+            cam_window_table.filtered_speakers{i} = cell(1, k);
+            cam_window_table.total_groups{i} = zeros(1, k);
+            cam_window_table.num_filtered_speakers{i} = zeros(1, k);
+            continue;
+        end
+        
+        % Initialize results for this window
+        window_detections = cell(1, k);
+        window_filtered_speakers = cell(1, k);
+        window_total_groups = zeros(1, k);
+        window_num_filtered_speakers = zeros(1, k);
+        
+        % Process each group detection column
+        for col_idx = 1:k
+            current_column = groups_column{col_idx};
+            
+            % Get group detection results for this window period and column (single camera)
+            window_groups = getGroupsForWindow(cam_group_table, current_column, window_start, window_end, vid, aggregation_method);
+            
+            % Step 1: Filter speakers to only those who appear in any of the detected groups
+            filtered_speakers = filterSpeakersByGroups(continuous_speakers, window_groups);
+            
+            % Step 2: Count total groups that filtered speakers belong to
+            total_groups = countTotalGroups(filtered_speakers, window_groups);
+            
+            % Store results for this column
+            window_detections{col_idx} = window_groups;
+            window_filtered_speakers{col_idx} = filtered_speakers;
+            window_total_groups(col_idx) = total_groups;
+            window_num_filtered_speakers(col_idx) = length(filtered_speakers);
+        end
+        
+        % Store results in the cam_window_table
+        cam_window_table.detection{i} = window_detections;
+        cam_window_table.filtered_speakers{i} = window_filtered_speakers;
+        cam_window_table.num_filtered_speakers{i} = window_num_filtered_speakers;
+        cam_window_table.total_groups{i} = window_total_groups;
     end
     
-    % Get group detection results for this window period
-    window_groups = getGroupsForWindow(group_detection_table, groups_column, window_start, window_end, vid, aggregation_method);
-    
-    % Step 1: Filter speakers to only those who appear in any of the detected groups
-    filtered_speakers = filterSpeakersByGroups(continuous_speakers, window_groups);
-    
-    % Step 2: Count total groups that filtered speakers belong to
-    total_groups = countTotalGroups(filtered_speakers, window_groups);
-    
-    % Store results in the window_table
-    window_table.detection{i} = window_groups;
-    window_table.filtered_speakers{i} = filtered_speakers;
-    window_table.num_filtered_speakers(i) = length(filtered_speakers);
-    window_table.total_groups(i) = total_groups;
+    all_camera_tables{cam_idx} = cam_window_table;
 end
+
+% Concatenate all camera tables
+fprintf('Concatenating results from all cameras...\n');
+window_table = vertcat(all_camera_tables{:});
 
 % Reorder columns to match requested order
 window_table = window_table(:, {'id', 'Vid', 'time', 'length', 'speaking_all_time', ...
-    'detection', 'filtered_speakers', 'num_filtered_speakers', 'total_groups'});
+    'detection', 'filtered_speakers', 'num_filtered_speakers', 'total_groups', 'Cam'});
+
+fprintf('Processing complete. Final table has %d rows.\n', height(window_table));
 
 end
 
 function window_groups = getGroupsForWindow(group_detection_table, groups_column, window_start, window_end, vid, method)
-% Get aggregated group information for a specific window period
+% Get aggregated group information for a specific window period (single camera)
 %
 % Inputs:
-%   group_detection_table - Table with concat_ts, Vid, and various group detection columns
+%   group_detection_table - Table with concat_ts, Vid, and various group detection columns (pre-filtered for single camera)
 %   groups_column - String specifying which column contains the group detection results
 %   window_start, window_end - Window boundaries
 %   vid - Video ID to match
