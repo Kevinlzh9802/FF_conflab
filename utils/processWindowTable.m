@@ -17,6 +17,8 @@ function [filtered_table, pairwise_diffs, analysis_results] = processWindowTable
 %                      - column_names: names of the group detection columns
 %                      - homogeneity_matrix: k×k matrix of average homogeneity scores between detection methods
 %                      - split_score_matrix: k×k matrix of average split scores between detection methods
+%                      - window_sizes: array of window sizes for non-identical rows
+%                      - camera_ids: array of camera IDs for non-identical rows
 
 % Step 1: Filter rows where num_filtered_speakers is identical across all k values and >= 1
 valid_rows = [];
@@ -82,6 +84,48 @@ end
 fprintf('- Rows with non-identical total_groups: %d out of %d (%.1f%%)\n', ...
     length(non_identical_rows), height(filtered_table), ...
     100 * length(non_identical_rows) / height(filtered_table));
+
+% Analyze window distribution in non-identical rows
+fprintf('- Window distribution analysis for non-identical rows:\n');
+
+% Get window sizes and cameras for non-identical rows
+window_sizes = [];
+camera_ids = [];
+for row_idx = non_identical_rows
+    window_sizes = [window_sizes, filtered_table.length(row_idx)];
+    camera_ids = [camera_ids, filtered_table.Cam(row_idx)];
+end
+
+% Window size distribution
+unique_sizes = unique(window_sizes);
+fprintf('  Window sizes:\n');
+for size_val = unique_sizes
+    count = sum(window_sizes == size_val);
+    fprintf('    - Size %d: %d windows (%.1f%%)\n', size_val, count, ...
+        100 * count / length(non_identical_rows));
+end
+
+% Camera distribution
+unique_cameras = unique(camera_ids);
+fprintf('  Camera distribution:\n');
+for cam = unique_cameras
+    count = sum(camera_ids == cam);
+    fprintf('    - Camera %d: %d windows (%.1f%%)\n', cam, count, ...
+        100 * count / length(non_identical_rows));
+end
+
+% Cross-tabulation of window sizes and cameras
+fprintf('  Cross-tabulation (Window Size × Camera):\n');
+for size_val = unique_sizes
+    fprintf('    Size %d: ', size_val);
+    for cam = unique_cameras
+        count = sum(window_sizes == size_val & camera_ids == cam);
+        if count > 0
+            fprintf('Cam%d(%d) ', cam, count);
+        end
+    end
+    fprintf('\n');
+end
 
 if ~isempty(non_identical_rows)
     % Step 2: Calculate distribution of (num_filtered_speakers - total_groups) for each column
@@ -186,6 +230,8 @@ if ~isempty(non_identical_rows)
     analysis_results.column_names = column_names;
     analysis_results.homogeneity_matrix = hm;
     analysis_results.split_score_matrix = sp;
+    analysis_results.window_sizes = window_sizes;
+    analysis_results.camera_ids = camera_ids;
     
 else
     fprintf('- No rows found with non-identical total_groups.\n');
@@ -194,5 +240,7 @@ else
     analysis_results.column_names = {};
     analysis_results.homogeneity_matrix = [];
     analysis_results.split_score_matrix = [];
+    analysis_results.window_sizes = [];
+    analysis_results.camera_ids = [];
 end
 end
