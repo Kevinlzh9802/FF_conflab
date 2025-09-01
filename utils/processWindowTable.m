@@ -136,6 +136,10 @@ if ~isempty(non_identical_rows)
     % Adjust based on your actual column names
     column_names = {'headRes', 'shoulderRes', 'hipRes', 'footRes'}; 
     
+    % Collect all differences and unique values first
+    all_differences = cell(k, 1);
+    all_unique_diffs = [];
+    
     for col_idx = 1:k
         differences = [];
         for row_idx = non_identical_rows
@@ -146,6 +150,8 @@ if ~isempty(non_identical_rows)
         end
         
         diff_distributions{col_idx} = differences;
+        all_differences{col_idx} = differences;
+        all_unique_diffs = [all_unique_diffs, differences];
         
         % Display statistics for this column
         if ~isempty(differences)
@@ -164,6 +170,46 @@ if ~isempty(non_identical_rows)
             end
             fprintf('\n');
         end
+    end
+    
+    % Create combined bar plot with all columns
+    if ~isempty(all_unique_diffs)
+        all_unique_diffs = unique(all_unique_diffs);
+        
+        % Create matrix for grouped bar plot
+        bar_data = zeros(length(all_unique_diffs), k);
+        for col_idx = 1:k
+            for diff_idx = 1:length(all_unique_diffs)
+                bar_data(diff_idx, col_idx) = sum(all_differences{col_idx} == all_unique_diffs(diff_idx));
+            end
+        end
+        
+        % Create grouped bar plot
+        figure('Name', 'Distribution Comparison Across All Columns');
+        bar(all_unique_diffs, bar_data);
+        
+        % Customize the plot
+        xlabel('Difference Values (|S_w| - n_\alpha^w)');
+        ylabel('Window instance number');
+        title('Distribution Comparison Across All Detection Methods');
+        legend(column_names(1:k), 'Location', 'best');
+        grid on;
+        
+        % % Add value labels on top of bars
+        % for diff_idx = 1:length(all_unique_diffs)
+        %     for col_idx = 1:k
+        %         if bar_data(diff_idx, col_idx) > 0
+        %             text(all_unique_diffs(diff_idx) + (col_idx-1)*0.2, ...
+        %                  bar_data(diff_idx, col_idx) + 0.1*max(bar_data(:)), ...
+        %                  num2str(bar_data(diff_idx, col_idx)), ...
+        %                  'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+        %                  'FontSize', 8);
+        %         end
+        %     end
+        % end
+        
+        % Adjust x-axis to accommodate grouped bars
+        xlim([min(all_unique_diffs)-0.5, max(all_unique_diffs)+0.5]);
     end
     
     % Step 3: Calculate spatial scores (homogeneity and split score) for non-identical rows
