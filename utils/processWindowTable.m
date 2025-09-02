@@ -195,67 +195,17 @@ if ~isempty(non_identical_rows)
         legend(column_names(1:k), 'Location', 'best');
         grid on;
         
-        % % Add value labels on top of bars
-        % for diff_idx = 1:length(all_unique_diffs)
-        %     for col_idx = 1:k
-        %         if bar_data(diff_idx, col_idx) > 0
-        %             text(all_unique_diffs(diff_idx) + (col_idx-1)*0.2, ...
-        %                  bar_data(diff_idx, col_idx) + 0.1*max(bar_data(:)), ...
-        %                  num2str(bar_data(diff_idx, col_idx)), ...
-        %                  'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
-        %                  'FontSize', 8);
-        %         end
-        %     end
-        % end
-        
         % Adjust x-axis to accommodate grouped bars
         xlim([min(all_unique_diffs)-0.5, max(all_unique_diffs)+0.5]);
     end
     
-    % Step 3: Calculate spatial scores (homogeneity and split score) for non-identical rows
+    % Step 3: Create bubble plot for group size vs filtered speakers
+    fprintf('- Creating bubble plot for group size vs filtered speakers:\n');
+    create_bubble_plot(filtered_table, non_identical_rows, column_names, k);
+    
+    % Step 4: Calculate spatial scores (homogeneity and split score) for non-identical rows
     fprintf('- Calculating spatial scores for non-identical rows:\n');
-    
-    % Initialize spatial scores matrices
-    hm = zeros(k, k);  % homogeneity matrix
-    sp = zeros(k, k);  % split score matrix
-    
-    % Calculate pairwise spatial scores between all k detection methods
-    for k1 = 1:k
-        for k2 = 1:k
-            g1 = 0;  % counter for valid comparisons
-            g2 = 0;  % counter for valid comparisons
-            
-            homogeneity_scores = [];
-            split_scores = [];
-            
-            for row_idx = non_identical_rows
-                % Get detection results for the two methods being compared
-                s1 = filtered_table.detection{row_idx}{k1};  % Method k1
-                s2 = filtered_table.detection{row_idx}{k2};  % Method k2
-                
-                if ~isempty(s1) && ~isempty(s2)
-                    % Calculate spatial scores
-                    homogeneity = compute_homogeneity(s1, s2);
-                    split_score = compute_split_score(s1, s2);
-                    
-                    homogeneity_scores = [homogeneity_scores, homogeneity];
-                    split_scores = [split_scores, split_score];
-                    
-                    g1 = g1 + 1;
-                    g2 = g2 + 1;
-                end
-            end
-            
-            % Calculate average scores
-            if g1 > 0
-                hm(k1, k2) = mean(homogeneity_scores);
-                sp(k1, k2) = mean(split_scores);
-            else
-                hm(k1, k2) = NaN;
-                sp(k1, k2) = NaN;
-            end
-        end
-    end
+    [hm, sp] = calculate_spatial_scores(filtered_table, non_identical_rows, k);
     
     % Display spatial scores
     fprintf('  Homogeneity Matrix:\n');
@@ -266,7 +216,7 @@ if ~isempty(non_identical_rows)
     % Create heatmaps
     figure;
     heatmap(column_names, column_names, hm, 'Title', 'Homogeneity Scores');
-    
+
     figure;
     heatmap(column_names, column_names, sp, 'Title', 'Split Scores');
     
@@ -289,4 +239,132 @@ else
     analysis_results.window_sizes = [];
     analysis_results.camera_ids = [];
 end
+end
+
+%% Helper Functions
+
+function create_bubble_plot(filtered_table, non_identical_rows, column_names, k)
+    % CREATE_BUBBLE_PLOT - Creates a bubble plot showing group size vs filtered speakers
+    % for each detection method
+    
+    figure('Name', 'Group Size vs Filtered Speakers Bubble Plot');
+    
+    % Define colors for different methods
+    colors = lines(k);
+    
+    hold on;
+    legend_entries = {};
+    
+    for col_idx = 1:k
+        % Collect data for this method and count occurrences
+        data_points = [];
+        
+        for row_idx = non_identical_rows
+            % Get detection results for this method
+            detection_result = filtered_table.detection{row_idx}{col_idx};
+            if ~isempty(detection_result)
+                % For each group g, create a data point
+                for g = 1:length(detection_result)
+                    group = detection_result{g};
+                    
+                    % X: Size of this specific group
+                    group_size = length(group);
+                    
+                    % Y: How many filtered speakers this specific group contains
+                    filtered_speakers_in_group = filtered_table.filtered_speakers{row_idx};
+                    filtered_count = sum(ismember(group, filtered_speakers_in_group{col_idx}));
+                    
+                    % Store this data point (each group is a separate point)
+                    data_points = [data_points; group_size, filtered_count];
+                end
+            end
+        end
+        
+        if ~isempty(data_points)
+            % Count occurrences of each (group_size, filtered_speaker_count) combination
+            unique_combinations = unique(data_points, 'rows');
+            bubble_sizes = [];
+            
+            for i = 1:size(unique_combinations, 1)
+                group_size = unique_combinations(i, 1);
+                filtered_count = unique_combinations(i, 2);
+                
+                % Count how many times this combination appears
+                count = sum(all(data_points == [group_size, filtered_count], 2));
+                bubble_sizes = [bubble_sizes, count];
+            end
+            
+            % Arrange bubbles horizontally by column index to avoid overlap
+            x_offset = (col_idx - 1) * 0.3; % Horizontal spacing between columns
+            
+            % Create scatter plot with adjusted x-positions and vertical oval markers
+            scatter(unique_combinations(:, 1) + x_offset, unique_combinations(:, 2), ...
+                bubble_sizes * 15, colors(col_idx, :), 'filled', 'MarkerFaceAlpha', 0.6, ...
+                'Marker', 'o', 'LineWidth', 1);
+            
+            legend_entries{end+1} = column_names{col_idx};
+        end
+    end
+    
+    % Customize the plot
+    xlabel('Group Size (n_α^w)');
+    ylabel('Number of Filtered Speakers in Group');
+    title('Group Size vs Filtered Speakers Distribution (Horizontally Arranged by Method)');
+    legend(legend_entries, 'Location', 'best');
+    grid on;
+    
+    % Add some padding to axes and accommodate horizontal arrangement
+    if ~isempty(data_points)
+        max_group_size = max(data_points(:, 1));
+        max_filtered_count = max(data_points(:, 2));
+        xlim([0, max_group_size + 1 + (k-1)*0.3]); % Account for horizontal spacing
+        ylim([0, max_filtered_count + 1]);
+    end
+    
+    % Add vertical grid lines to help distinguish columns
+    ax = gca;
+    ax.GridAlpha = 0.3;
+    ax.MinorGridAlpha = 0.1;
+    
+    hold off;
+end
+
+function [hm, sp] = calculate_spatial_scores(filtered_table, non_identical_rows, k)
+    % CALCULATE_SPATIAL_SCORES - Calculates homogeneity and split score matrices
+    
+    % Initialize spatial scores matrices
+    hm = zeros(k, k);  % homogeneity matrix
+    sp = zeros(k, k);  % split score matrix
+    
+    % Calculate pairwise spatial scores between all k detection methods
+    for k1 = 1:k
+        for k2 = 1:k
+            homogeneity_scores = [];
+            split_scores = [];
+            
+            for row_idx = non_identical_rows
+                % Get detection results for the two methods being compared
+                s1 = filtered_table.detection{row_idx}{k1};  % Method k1
+                s2 = filtered_table.detection{row_idx}{k2};  % Method k2
+                
+                if ~isempty(s1) && ~isempty(s2)
+                    % Calculate spatial scores
+                    homogeneity = compute_homogeneity(s1, s2);
+                    split_score = compute_split_score(s1, s2);
+                    
+                    homogeneity_scores = [homogeneity_scores, homogeneity];
+                    split_scores = [split_scores, split_score];
+                end
+            end
+            
+            % Calculate average scores
+            if ~isempty(homogeneity_scores)
+                hm(k1, k2) = mean(homogeneity_scores);
+                sp(k1, k2) = mean(split_scores);
+            else
+                hm(k1, k2) = NaN;
+                sp(k1, k2) = NaN;
+            end
+        end
+    end
 end
