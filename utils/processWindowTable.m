@@ -295,21 +295,21 @@ function create_bubble_plot(filtered_table, non_identical_rows, column_names, k)
             end
             
             % Arrange bubbles horizontally by column index to avoid overlap
-            x_offset = (col_idx - 1) * 0.3; % Horizontal spacing between columns
+            x_offset = (col_idx - 2.5) * 0.1; % Horizontal spacing between columns
             
             % Create scatter plot with adjusted x-positions and vertical oval markers
             scatter(unique_combinations(:, 1) + x_offset, unique_combinations(:, 2), ...
-                bubble_sizes * 15, colors(col_idx, :), 'filled', 'MarkerFaceAlpha', 0.6, ...
-                'Marker', 'o', 'LineWidth', 1);
+                bubble_sizes * 15, colors(col_idx, :), ...
+                'Marker', 'o', 'LineWidth', 3);
             
             legend_entries{end+1} = column_names{col_idx};
         end
     end
     
     % Customize the plot
-    xlabel('Group Size (n_α^w)');
-    ylabel('Number of Filtered Speakers in Group');
-    title('Group Size vs Filtered Speakers Distribution (Horizontally Arranged by Method)');
+    xlabel('Detected Group Size');
+    ylabel('Number of Simultaneous Speakers in Group');
+    % title('Group Size vs Filtered Speakers Distribution');
     legend(legend_entries, 'Location', 'best');
     grid on;
     
@@ -317,8 +317,8 @@ function create_bubble_plot(filtered_table, non_identical_rows, column_names, k)
     if ~isempty(data_points)
         max_group_size = max(data_points(:, 1));
         max_filtered_count = max(data_points(:, 2));
-        xlim([0, max_group_size + 1 + (k-1)*0.3]); % Account for horizontal spacing
-        ylim([0, max_filtered_count + 1]);
+        xlim([1, max_group_size + (k-1)*0.3]); % Account for horizontal spacing
+        ylim([-1, max_filtered_count + 1]);
     end
     
     % Add vertical grid lines to help distinguish columns
