@@ -327,8 +327,8 @@ classdef DSF
                             % if node is not into the DS evaluate the 
                             % weight to see the consistency of the DS of being 
                             % dominant
-                            %w=obj.CalcNodeWeight([ids i],i,w);
-                            w=CalcWeight(obj.W,[ids i],i); %using MEX FILE
+                            w=obj.CalcNodeWeight([ids i],i,w);
+                            % w=CalcNodeWeightMatlab(obj.W,[ids i],i); %using MATLAB equivalent
                             %fprintf(['\n' 'w([' num2str(ids) '],' num2str(i) ')=' num2str(w)]);
                             if w>=0
                                 StillGC=0;
@@ -434,5 +434,69 @@ classdef DSF
 
     end
 
+end
+
+%% MATLAB equivalent of CalcNodeWeight C++ function
+function w = CalcNodeWeightMatlab(matrix, S, id)
+% CALCNODEWEIGHTMATLAB - MATLAB equivalent of the C++ CalcNodeWeight function
+%
+% Inputs:
+%   matrix - n×m matrix representing relationships between nodes
+%   S      - vector of node indices (1-based, will be converted to 0-based internally)
+%   id     - target node index (1-based, will be converted to 0-based internally)
+%
+% Output:
+%   w      - calculated weight value
+%
+% This function implements the same recursive algorithm as the C++ version
+% for game-theoretic group detection
+
+    % Convert MATLAB 1-based indices to 0-based (like C++ version)
+    S_0based = S - 1;
+    id_0based = id - 1;
+    
+    % Call the recursive function
+    w = CalcNodeWeightRecursive(matrix, S_0based, id_0based);
+end
+
+function w = CalcNodeWeightRecursive(matrix, S, id)
+% CALCNODEWEIGHTRECURSIVE - Recursive implementation of the weight calculation
+%
+% This is the core recursive algorithm that matches the C++ implementation
+
+    w = 0.0;
+    
+    if isscalar(S)
+        % Base case: single element in set
+        w = 1.0;
+    else
+        % Find position of id in S
+        pos = find(S == id);
+        
+        if isempty(pos)
+            % Element not found - this shouldn't happen in normal operation
+            w = 0.0;
+            return;
+        else
+            % Remove id from S (like C++ S.erase)
+            S = S([1:pos-1, pos+1:end]);
+        end
+        
+        % Get the first element as 'h' (head)
+        h = S(1);
+        
+        % Iterate through remaining elements in S
+        for c = 1:length(S)
+            j = S(c);
+            
+            % Calculate weight contribution
+            % matrix(id+1, j+1) because we need to convert back to 1-based for MATLAB indexing
+            % matrix(h+1, j+1) for the same reason
+            weight_contribution = (matrix(id+1, j+1) - matrix(h+1, j+1)) * ...
+                                 CalcNodeWeightRecursive(matrix, S, j);
+            
+            w = w + weight_contribution;
+        end
+    end
 end
 

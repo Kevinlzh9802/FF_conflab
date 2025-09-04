@@ -117,102 +117,102 @@ IDs=unique(IDs);    %find the unique ID
 IDs=sort(IDs);      %sort the IDs for later use
 
 
-if isfield(param, 'FillMissDetection') &&  param.FillMissDetection>0
-    %in case of miss detection it fill the person using the mean of the
-    %other frames
-    mds={};
-    for f=1:numel(frames)
-        %find the miss detection
-        mds{f}=find(ismember(IDs,frames{f}(:,1))==0);
-    end
-
-    for f=1:numel(mds)
-
-        %search for the frames that do not have the missdetection of frame
-        %f
-
-        md=IDs(mds{f});
-        if ~isempty(md)
-            for j=1:numel(md)
-                nmds={};
-                for m=1:numel(mds)
-                    if f~=m
-                       nmds{m}=find(ismember(frames{m}(:,1),md(j))==1);
-                    else
-                       nmds{m}=[];
-                    end
-                end
-
-                %in nmds there are the pointer to the data in the other frames,
-                %now we make an average and substitute the miss detection
-                tData=zeros(1,size(frames{f},2));
-                counter=0;
-                for i=1:numel(nmds)
-                    if ~isempty(nmds{i})
-                        tData=tData+frames{i}(nmds{i},:);
-                        counter=counter+1;
-                    end
-                end
-                tData=tData./counter;
-                frames{f}=[frames{f} ; tData];
-                frame=sortrows(frames{f},1);
-                frames{f}=frame;
-            end
-        end
-    end
-    %{
-    for f=1:numel(frames)
-        tFrame=[];
-        for p=1:numel(IDs)
-            for i=1:size(frames{f},1)
-                if frames{f}(i,1)==IDs(p)
-                    tFrame=[tFrame ; frames{f}(i,:)];
-                else
-                    %copy the average informations from the other frames
-
-                    tFrame=[tFrame ; t];
-                end
-            end
-        end
-        frames{f}=tFrame;
-        [IDs]=[IDs ; frame(:,1)];
-        frame=sortrows(frame,1); %sort the ID the ensure consistency when zero
-                                 %pad is added to the final matrix
-        frames{f}=frame;
-    end
-
-    r={};
-    for i=1:numel(As)
-        r{i}=find(sum(As{i},2)==0);
-    end
-
-    %evaluate average filling for each empty row from the other matrices
-    for i=1:numel(As)
-        if ~isempty(r{i}) %if there are some row to fill in the matrix As{i}
-            for j=1:numel(r{i}) %for each empty row
-                rF=zeros(1,size(As{1},1));
-                cF=zeros(size(As{1},1),1);
-                counter=0;
-                rId=r{i}(j);
-                for k=1:numel(As) %for all matrices except the i-th and the one that has the same empty row
-                    if k~=i && ~ismember(rId,r{k})
-                        rF=rF+As{k}(rId,:);
-                        cF=cF+As{k}(:,rId);
-                        counter=counter+1;
-                    end
-                end
-                if counter==0
-                    fprintf('Err');
-                end
-                rF=rF./counter;
-                cF=cF./counter;
-                As{i}(rId,:)=rF;
-                As{i}(:,rId)=cF;
-            end
-        end
-    end
-    %}
-end
+% if isfield(param, 'FillMissDetection') &&  param.FillMissDetection>0
+%     %in case of miss detection it fill the person using the mean of the
+%     %other frames
+%     mds={};
+%     for f=1:numel(frames)
+%         %find the miss detection
+%         mds{f}=find(ismember(IDs,frames{f}(:,1))==0);
+%     end
+% 
+%     for f=1:numel(mds)
+% 
+%         %search for the frames that do not have the missdetection of frame
+%         %f
+% 
+%         md=IDs(mds{f});
+%         if ~isempty(md)
+%             for j=1:numel(md)
+%                 nmds={};
+%                 for m=1:numel(mds)
+%                     if f~=m
+%                        nmds{m}=find(ismember(frames{m}(:,1),md(j))==1);
+%                     else
+%                        nmds{m}=[];
+%                     end
+%                 end
+% 
+%                 %in nmds there are the pointer to the data in the other frames,
+%                 %now we make an average and substitute the miss detection
+%                 tData=zeros(1,size(frames{f},2));
+%                 counter=0;
+%                 for i=1:numel(nmds)
+%                     if ~isempty(nmds{i})
+%                         tData=tData+frames{i}(nmds{i},:);
+%                         counter=counter+1;
+%                     end
+%                 end
+%                 tData=tData./counter;
+%                 frames{f}=[frames{f} ; tData];
+%                 frame=sortrows(frames{f},1);
+%                 frames{f}=frame;
+%             end
+%         end
+%     end
+%     %{
+%     for f=1:numel(frames)
+%         tFrame=[];
+%         for p=1:numel(IDs)
+%             for i=1:size(frames{f},1)
+%                 if frames{f}(i,1)==IDs(p)
+%                     tFrame=[tFrame ; frames{f}(i,:)];
+%                 else
+%                     %copy the average informations from the other frames
+% 
+%                     tFrame=[tFrame ; t];
+%                 end
+%             end
+%         end
+%         frames{f}=tFrame;
+%         [IDs]=[IDs ; frame(:,1)];
+%         frame=sortrows(frame,1); %sort the ID the ensure consistency when zero
+%                                  %pad is added to the final matrix
+%         frames{f}=frame;
+%     end
+% 
+%     r={};
+%     for i=1:numel(As)
+%         r{i}=find(sum(As{i},2)==0);
+%     end
+% 
+%     %evaluate average filling for each empty row from the other matrices
+%     for i=1:numel(As)
+%         if ~isempty(r{i}) %if there are some row to fill in the matrix As{i}
+%             for j=1:numel(r{i}) %for each empty row
+%                 rF=zeros(1,size(As{1},1));
+%                 cF=zeros(size(As{1},1),1);
+%                 counter=0;
+%                 rId=r{i}(j);
+%                 for k=1:numel(As) %for all matrices except the i-th and the one that has the same empty row
+%                     if k~=i && ~ismember(rId,r{k})
+%                         rF=rF+As{k}(rId,:);
+%                         cF=cF+As{k}(:,rId);
+%                         counter=counter+1;
+%                     end
+%                 end
+%                 if counter==0
+%                     fprintf('Err');
+%                 end
+%                 rF=rF./counter;
+%                 cF=cF./counter;
+%                 As{i}(rId,:)=rF;
+%                 As{i}(:,rId)=cF;
+%             end
+%         end
+%     end
+%     %}
+% end
 
 
 %generate a similarity matrix for each frame leaving the space for the
@@ -306,42 +306,42 @@ end
 EnsembleWeights=[];
 
 if numel(As)>1
-    %if the number of frames is greater than one we are working in a
-    %multiframe setting and thus we have to compute the weight to mix
-    %the affinity matrices
-
-    %find the weights using MCLP
-    weights=[];
-    if isfield(param,'weight') && isfield(param.weight,'mode')
-        if strcmp(param.weight.mode,'EQUAL')
-            weights=ones(numel(As),1)./numel(As);
-        elseif strcmp(param.weight.mode,'MAXENTROPY')
-            [~,weights] =calculateMCLPWeights(As);
-
-            ALLWeights=weights;
-
-            %calculate entropy for each set of weights
-            Hs=zeros(1,size(weights,2));
-            for wi=1:size(weights,2)
-                Hs(wi)=weights_entropy(weights(:,wi));
-            end
-
-            [v,indH]=max(Hs);
-
-            weights=weights(:,indH);
-
-            fprintf(['Maximal entropy ' num2str(v) ' correspondes to weights: ' num2str(weights') '\n']);
-        elseif strcmp(param.weight.mode,'ENSEMBLE')
-            [weights,EnsembleWeights] =calculateMCLPWeights(As);
-            ALLWeights=EnsembleWeights;
-
-        else
-            [weights,EnsembleWeights] =calculateMCLPWeights(As);
-            ALLWeights=EnsembleWeights;
-        end
-    else
-        [weights,ALLWeights]=calculateMCLPWeights(As);
-    end
+    % %if the number of frames is greater than one we are working in a
+    % %multiframe setting and thus we have to compute the weight to mix
+    % %the affinity matrices
+    % 
+    % %find the weights using MCLP
+    % weights=[];
+    % if isfield(param,'weight') && isfield(param.weight,'mode')
+    %     if strcmp(param.weight.mode,'EQUAL')
+    %         weights=ones(numel(As),1)./numel(As);
+    %     elseif strcmp(param.weight.mode,'MAXENTROPY')
+    %         [~,weights] =calculateMCLPWeights(As);
+    % 
+    %         ALLWeights=weights;
+    % 
+    %         %calculate entropy for each set of weights
+    %         Hs=zeros(1,size(weights,2));
+    %         for wi=1:size(weights,2)
+    %             Hs(wi)=weights_entropy(weights(:,wi));
+    %         end
+    % 
+    %         [v,indH]=max(Hs);
+    % 
+    %         weights=weights(:,indH);
+    % 
+    %         fprintf(['Maximal entropy ' num2str(v) ' correspondes to weights: ' num2str(weights') '\n']);
+    %     elseif strcmp(param.weight.mode,'ENSEMBLE')
+    %         [weights,EnsembleWeights] =calculateMCLPWeights(As);
+    %         ALLWeights=EnsembleWeights;
+    % 
+    %     else
+    %         [weights,EnsembleWeights] =calculateMCLPWeights(As);
+    %         ALLWeights=EnsembleWeights;
+    %     end
+    % else
+    %     [weights,ALLWeights]=calculateMCLPWeights(As);
+    % end
 else
     A=As{1};
     weights=1;
@@ -381,7 +381,7 @@ if ~isfield(param,'weight') || ~isfield(param.weight,'mode') || ~strcmp(param.we
         d.globalContext=param.globalcontext;
     end
 
-    theta=0.00001;
+    theta=0.001;
     %theta=0.0000001;
 
     d=d.setSimilarityMatrix(A);

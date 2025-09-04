@@ -26,12 +26,11 @@ addpath(genpath('../utils'));
 param = setParams();
 
 results = struct;
-for clue = ["hip", "head"]
+for clue = ["foot"]
     results.(clue) = GTCG_main(param, clue);
     f_name = clue + "Res";
     results.(clue).g_count = countGroupsContainingIDs(results.(clue).original_data.(f_name), {[13,21],[35,12,19]});
 end
-c = 9;
 % run plotGroups.m;
 
 function results = GTCG_main(param, clue)
@@ -54,7 +53,7 @@ load(file_name, 'all_data');
 load('../data/speaking_status.mat', 'speaking_status');
 % load('../data/frames.mat', 'frames');
 
-used_data = filterTable(all_data, [6], [2], [9]);
+used_data = filterTable(all_data, [6], [3], [2]);
 GTgroups = (used_data.GT)';
 features = (used_data.Features)';
 
@@ -74,7 +73,7 @@ group_sizes = [];
 %     parpool;
 % end
 
-for f=1:numel(features)
+for f=4:numel(features)
     if ~isempty(features{f})
         last_f = f+param.numFrames-1;
         feat=features(f:last_f);                   %copy the frames
