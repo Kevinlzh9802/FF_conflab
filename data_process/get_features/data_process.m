@@ -2,9 +2,9 @@ clear variables; close all
 
 disp("**identify files**")
 
-% pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
-%     'annotations/pose/coco/'];
-pose_data_path = ['C:\Users\zongh\Desktop\FF_conflab\data\coco\'];
+pose_data_path = ['/home/zonghuan/tudelft/projects/datasets/conflab/' ...
+    'annotations/pose/coco/'];
+% pose_data_path = ['C:\Users\zongh\Desktop\FF_conflab\data\coco\'];
 Files = dir([pose_data_path, '*.json']); % edit your own path to the pose data!!!
 addpath('../../utils/');
 orient_choices = ["head", "shoulder", "hip", "foot"];
@@ -20,7 +20,7 @@ end
 imgSize = [1920, 1080];
 num_kps = 20;
 
-for k = 1:length(Files)
+for k = 26:length(Files)
     disp("***filenumber****")
     k
     FileName = Files(k).name;
@@ -127,15 +127,15 @@ for k = 1:length(Files)
 
     % saving
     fn = FileName(1:end-10);
-    segn = "seg" + get_seg_num(fn);
-    for d = 1:length(orient_choices)
-        orient_choice = orient_choices(d);
-        features = orient_features(orient_choice);
-        mat_name = fn + "_" + orient_choice + ".mat";
-        save_name = orient_choice + "/" + segn + "/" + mat_name;
-        assert(length(features) == length(timestamps));
-        save(save_path + save_name, 'features', 'timestamps');
-    end
+    % segn = "seg" + get_seg_num(fn);
+    % for d = 1:length(orient_choices)
+    %     orient_choice = orient_choices(d);
+    %     features = orient_features(orient_choice);
+    %     mat_name = fn + "_" + orient_choice + ".mat";
+    %     save_name = orient_choice + "/" + segn + "/" + mat_name;
+    %     assert(length(features) == length(timestamps));
+    %     save(save_path + save_name, 'features', 'timestamps');
+    % end
 end
 
 %% Extract frames

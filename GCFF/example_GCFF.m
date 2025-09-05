@@ -200,7 +200,7 @@ for idxFrame = 1:length(timestamp)
     data.(result_name){idxFrame} = groups{idxFrame};
 
     %% Plot
-    plot_cond = false;
+    plot_cond = true;
     if plot_cond
         img = findMatchingFrame(data, frames, idxFrame);
         
