@@ -53,7 +53,7 @@ load(file_name, 'all_data');
 load('../data/speaking_status.mat', 'speaking_status');
 % load('../data/frames.mat', 'frames');
 
-used_data = filterTable(all_data, [6], [3], [2]);
+used_data = filterTable(all_data, [4], [2], [8]);
 GTgroups = (used_data.GT)';
 features = (used_data.Features)';
 
@@ -79,7 +79,7 @@ for f=4:numel(features)
         feat=features(f:last_f);                   %copy the frames
         
         fprintf(['******* Frames ' num2str(f:last_f) ' *******\n']);
-        if plot_debug
+        if true
             fig = figure;
             plotFrustums(feat{1}, param.frustum, fig);
         end

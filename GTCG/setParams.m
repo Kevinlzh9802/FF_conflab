@@ -28,7 +28,7 @@ param.weight.mode='MOLP';                   %the multiframe mode is activated on
 
 
 %frustum
-param.frustum.length=280; %accoutning to interpersonal distance
+param.frustum.length=250; %accoutning to interpersonal distance
 param.frustum.aperture=160;
 param.frustum.samples=2000;
 
