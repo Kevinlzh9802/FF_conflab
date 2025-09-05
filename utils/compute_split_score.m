@@ -1,11 +1,23 @@
 function score = compute_split_score(G1, G2)
+    % Ensure all groups within G1 and G2 are column vectors
+    for i = 1:length(G1)
+        if isrow(G1{i})
+            G1{i} = G1{i}';
+        end
+    end
+    for i = 1:length(G2)
+        if isrow(G2{i})
+            G2{i} = G2{i}';
+        end
+    end
+    
     % Step 1: union of all elements
-    all_elems = unique([vertcat(G1{:}); vertcat(G1{:})]);
+    all_elems = unique([vertcat(G1{:}); vertcat(G2{:})]);
     N = numel(all_elems);
 
     % Pad missing elements in G1 and G2 with singleton groups
     G1_elems = vertcat(G1{:});
-    G2_elems = vertcat(G1{:});
+    G2_elems = vertcat(G2{:});
     missing_G1 = setdiff(all_elems, G1_elems);
     missing_G2 = setdiff(all_elems, G2_elems);
     for i = 1:numel(missing_G1)

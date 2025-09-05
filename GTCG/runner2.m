@@ -56,13 +56,13 @@ else
     params.mdl = 60000;
 end
 
-% params.used_parts = ["229", "428", "429", "828", "829", ...
-%     "232", "233", "234", "235", "236", ...
-%     "431", "433", "434", ...
-%     "631", "632", "633", "634", "635", "636", ...
-%     "831", "832", "833", "834", "835"];
+params.used_parts = ["229", "428", "429", "828", "829", ...
+    "232", "233", "234", "235", "236", ...
+    "431", "433", "434", ...
+    "631", "632", "633", "634", "635", "636", ...
+    "831", "832", "833", "834", "835"];
 
-params.used_parts = ["629"];
+% params.used_parts = ["629"];
 
 % params.cams = [4];
 % params.vids = [3];
@@ -164,7 +164,12 @@ for f = 1:numel(features)
             plotFrustums(feat{1}, param.frustum, fig);
         end
         
-        [frame_groups, ~, ~] = detectGroups(feat, param);
+        try
+            [frame_groups, ~, ~] = detectGroups(feat, param);
+        catch
+            frame_groups = [];
+            warning("empty group detected!");
+        end
         
         % Store groups for this frame
         groups{f} = frame_groups;
@@ -218,7 +223,7 @@ for f = 1:numel(features)
 
         end
         result_name = clue + "Res";
-        used_data.(result_name){f} = groups{f};
+        used_data.(result_name){f} = groups{f}';
 
         showResults(precisions, recalls);
     end

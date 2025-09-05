@@ -258,6 +258,10 @@ end
 all_group_members = [];
 for i = 1:length(window_groups)
     group = window_groups{i};
+    a = size(group);
+    if a(2) > 1
+        group = group';
+    end
     all_group_members = [all_group_members; group];
 end
 

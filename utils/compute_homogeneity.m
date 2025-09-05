@@ -1,4 +1,16 @@
 function h = compute_homogeneity(G1, G2)
+    % Ensure all groups within G1 and G2 are column vectors
+    for i = 1:length(G1)
+        if isrow(G1{i})
+            G1{i} = G1{i}';
+        end
+    end
+    for i = 1:length(G2)
+        if isrow(G2{i})
+            G2{i} = G2{i}';
+        end
+    end
+    
     % Combine all unique elements across both groupings
     all_elems = unique([vertcat(G1{:}); vertcat(G2{:})]);
     N = numel(all_elems);
