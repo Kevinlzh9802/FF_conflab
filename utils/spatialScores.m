@@ -11,8 +11,10 @@ for k1=1:4
             s1 = data_results.(r1){i};
             s2 = data_results.(r2){i};
             if ~isempty(s1) & ~isempty(s2)
-                data_results.homogeneity{i} = compute_homogeneity(s1, s2);
-                data_results.split_score{i} = compute_split_score(s1, s2);
+                % Remove singletons from s1 before computing scores
+                s1_filtered = removeSingletons(s1);
+                data_results.homogeneity{i} = compute_homogeneity(s1_filtered, s2);
+                data_results.split_score{i} = compute_split_score(s1_filtered, s2);
                 g1 = g1 + 1;
                 g2 = g2 + 1;
             else
@@ -37,6 +39,30 @@ for sp_name = clues
             formations.(col_name){k} = collectMatchingGroups(formations.participants{k}, ...
                 formations.longest_ts{k}, formations.Vid(k), ...
                 formations.Cam(k), data_results, sp_name, sp_merged, 61);
+        end
+    end
+end
+
+%% Helper Functions
+
+function filtered_groups = removeSingletons(groups)
+% REMOVESINGLETONS - Remove singleton groups (groups with only one person) from the input
+%
+% Input:
+%   groups - Cell array where each cell contains a vector of person IDs
+%
+% Output:
+%   filtered_groups - Cell array with singleton groups removed
+
+    if isempty(groups)
+        filtered_groups = {};
+        return;
+    end
+    
+    filtered_groups = {};
+    for i = 1:length(groups)
+        if length(groups{i}) > 1  % Keep only groups with more than one person
+            filtered_groups{end+1} = groups{i};
         end
     end
 end

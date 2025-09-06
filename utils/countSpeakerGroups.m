@@ -177,26 +177,26 @@ switch method
             else
                 % Convert each group to a sorted string representation
                 group_str_parts = cell(length(group_struct), 1);
-                                 for k = 1:length(group_struct)
-                     group = group_struct{k};
-                     if isempty(group)
-                         group_str_parts{k} = '[]';
-                     else
-                         % Convert column vector to row vector for sorting and string conversion
-                         group_row = group(:)';  % Ensure it's a row vector
-                         group_str_parts{k} = ['[', num2str(sort(group_row)), ']'];
-                     end
-                 end
+                for k = 1:length(group_struct)
+                    group = group_struct{k};
+                    if isempty(group)
+                        group_str_parts{k} = '[]';
+                    else
+                        % Convert column vector to row vector for sorting and string conversion
+                        group_row = group(:)';  % Ensure it's a row vector
+                        group_str_parts{k} = ['[', num2str(sort(group_row)), ']'];
+                    end
+                end
                 % Sort the groups and join them
                 group_strings{j} = strjoin(sort(group_str_parts), ',');
             end
         end
-        
+
         % Find the most common group structure
         unique_structures = unique(group_strings);
         max_count = 0;
         majority_idx = 1; % Default to first if no clear majority
-        
+
         for j = 1:length(unique_structures)
             count = sum(strcmp(group_strings, unique_structures{j}));
             if count > max_count

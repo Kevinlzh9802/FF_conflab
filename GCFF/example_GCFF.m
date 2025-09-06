@@ -39,13 +39,13 @@ else
     params.mdl = 60000;
 end
 
-% params.used_parts = ["229", "428", "429", "828", "829", ...
-%     "232", "233", "234", "235", "236", ...
-%     "431", "433", "434", ...
-%     "631", "632", "633", "634", "635", "636", ...
-%     "831", "832", "833", "834", "835"];
+params.used_parts = ["229", "428", "429", "828", "829", ...
+    "232", "233", "234", "235", "236", ...
+    "431", "433", "434", ...
+    "631", "632", "633", "634", "635", "636", ...
+    "831", "832", "833", "834", "835"];
 
-params.used_parts = ["633"];
+% params.used_parts = ["633"];
 
 % params.cams = [4];
 % params.vids = [3];
@@ -74,7 +74,7 @@ results = struct;
 clues = ["head", "shoulder", "hip", "foot"];
 for clue = clues
     used_data = filterAndConcatTable(data_results, params.used_parts);    
-    results.(clue) = GCFF_main(used_data, frames, params, clue, speaking_status);
+    results.(clue) = GCFF_main(used_data, params, clue, speaking_status);
 
     f_name = clue + "Res";
     used_data.(f_name) = results.(clue).groups;
@@ -104,7 +104,7 @@ run detectSubFloor.m;
 % run plotGroupsInfo.m;
 
 %% Computing
-function [results, data] = GCFF_main(data, frames, params, clue, speaking_status)
+function [results, data] = GCFF_main(data, params, clue, speaking_status)
 % If only some frames are annotated, delete all the others from features.
 % [~,indFeat] = intersect(timestamp,GTtimestamp) ;
 % timestamp = timestamp(indFeat) ;
@@ -138,7 +138,10 @@ for idxFrame = 1:length(timestamp)
     end
 
     if ~isempty(groups{idxFrame})
-        groups{idxFrame} = ff_deletesingletons(groups{idxFrame}) ;
+        groups_temp = ff_deletesingletons(groups{idxFrame});
+        if isempty(groups_temp)
+            groups{idxFrame} = [];
+        end
     end
     if ~isempty(GTgroups{idxFrame})
         GTgroups{idxFrame} = ff_deletesingletons(GTgroups{idxFrame}) ;
@@ -200,7 +203,7 @@ for idxFrame = 1:length(timestamp)
     data.(result_name){idxFrame} = groups{idxFrame};
 
     %% Plot
-    plot_cond = true;
+    plot_cond = false;
     if plot_cond
         img = findMatchingFrame(data, frames, idxFrame);
         

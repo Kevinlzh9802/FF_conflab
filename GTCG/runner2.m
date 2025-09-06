@@ -171,6 +171,27 @@ for f = 1:numel(features)
             warning("empty group detected!");
         end
         
+        % Add singletons for person IDs not in any detected groups
+        if ~isempty(feat{1}) & ~isempty(frame_groups)
+            all_person_ids = feat{1}(:,1);  % Get all person IDs from the first frame
+            detected_ids = [];  % Collect all IDs that appear in detected groups
+            
+            % Extract all person IDs from detected groups
+            for g = 1:length(frame_groups)
+                if ~isempty(frame_groups{g})
+                    detected_ids = [detected_ids, frame_groups{g}];
+                end
+            end
+            
+            % Find person IDs that are not in any detected group
+            missing_ids = setdiff(all_person_ids, detected_ids);
+            
+            % Add missing IDs as singleton groups
+            for i = 1:length(missing_ids)
+                frame_groups{end+1} = [missing_ids(i)];  % Wrap in array to maintain consistent structure
+            end
+        end
+        
         % Store groups for this frame
         groups{f} = frame_groups;
 

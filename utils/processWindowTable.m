@@ -228,6 +228,8 @@ if ~isempty(non_identical_rows)
     analysis_results.split_score_matrix = sp;
     analysis_results.window_sizes = window_sizes;
     analysis_results.camera_ids = camera_ids;
+
+    filtered_table = filtered_table(non_identical_rows, :);
     
 else
     fprintf('- No rows found with non-identical total_groups.\n');
@@ -269,6 +271,9 @@ function create_bubble_plot(filtered_table, non_identical_rows, column_names, k)
                     
                     % X: Size of this specific group
                     group_size = length(group);
+                    if group_size == 1
+                        continue;
+                    end
                     
                     % Y: How many filtered speakers this specific group contains
                     filtered_speakers_in_group = filtered_table.filtered_speakers{row_idx};
@@ -368,3 +373,25 @@ function [hm, sp] = calculate_spatial_scores(filtered_table, non_identical_rows,
         end
     end
 end
+
+% function filtered_groups = removeSingletons(groups)
+% % REMOVESINGLETONS - Remove singleton groups (groups with only one person) from the input
+% %
+% % Input:
+% %   groups - Cell array where each cell contains a vector of person IDs
+% %
+% % Output:
+% %   filtered_groups - Cell array with singleton groups removed
+
+%     if isempty(groups)
+%         filtered_groups = {};
+%         return;
+%     end
+    
+%     filtered_groups = {};
+%     for i = 1:length(groups)
+%         if length(groups{i}) > 1  % Keep only groups with more than one person
+%             filtered_groups{end+1} = groups{i};
+%         end
+%     end
+% end
