@@ -107,7 +107,7 @@ for k=1:length(Files)
     features = features(1:59.96:end);
 
     % saving
-    fn = FileName(1:end-10);
+    qqfn = FileName(1:end-10);
     mat_name = fn + "_" + orient_choice + ".mat";
     % ts_name = fn + "_" + orient_choice + ".mat";
     % mkdir(sprintf(fn))
