@@ -13,7 +13,7 @@ mkdir(save_path + orient_choice + "/seg2/");
 mkdir(save_path + orient_choice + "/seg3/");
 
 imgSize = [1920, 1080];
-for k=27:length(Files)
+for k=1:length(Files)
     disp("***filenumber****")
     k
     FileName=Files(k).name;
