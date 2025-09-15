@@ -45,11 +45,7 @@ params.used_parts = ["229", "428", "429", "828", "829", ...
     "631", "632", "633", "634", "635", "636", ...
     "831", "832", "833", "834", "835"];
 
-% params.used_parts = ["633"];
-
-% params.cams = [4];
-% params.vids = [3];
-% params.segs = [5,6];
+% params.used_parts = ["229"];
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
@@ -150,30 +146,7 @@ for idxFrame = 1:length(timestamp)
     
 
     % DISPLAY RESULTS
-    % Frame:
-    fprintf('Frame: %d/%d\n', idxFrame, length(timestamp))
-    % Found:
-    fprintf('   FOUND:-- ')
-    if ~isempty(groups{idxFrame})
-        for ii=1:size(groups{idxFrame},2)
-            fprintf(' %i',groups{idxFrame}{ii})
-            fprintf(' |')
-        end
-    else
-        fprintf(' No Groups ')
-    end
-    fprintf('\n')
-    % GT:
-    fprintf('   GT   :-- ')
-    if ~isempty(GTgroups{idxFrame})
-        for ii=1: size(GTgroups{idxFrame},2)
-            fprintf(' %i',GTgroups{idxFrame}{ii})
-            fprintf(' |')
-        end
-    else
-        fprintf(' No Groups ')
-    end
-    fprintf('\n');
+    displayFrameResults(idxFrame, length(timestamp), groups{idxFrame}, GTgroups{idxFrame});
 
     %% record results
     f_info = table2struct(data(idxFrame, {'Cam', 'Vid', 'Seg', 'Timestamp'}));
@@ -253,3 +226,39 @@ end
 % for idxFrame = 1:length(timestamp)
 % end
 % end
+
+function displayFrameResults(idxFrame, totalFrames, groups, GTgroups)
+% DISPLAY RESULTS
+% Display frame information, found groups, and ground truth groups
+%
+% Inputs:
+%   idxFrame - current frame index
+%   totalFrames - total number of frames
+%   groups - detected groups for current frame
+%   GTgroups - ground truth groups for current frame
+
+% Frame:
+fprintf('Frame: %d/%d\n', idxFrame, totalFrames)
+% Found:
+fprintf('   FOUND:-- ')
+if ~isempty(groups)
+    for ii=1:size(groups,2)
+        fprintf(' %i',groups{ii})
+        fprintf(' |')
+    end
+else
+    fprintf(' No Groups ')
+end
+fprintf('\n')
+% GT:
+fprintf('   GT   :-- ')
+if ~isempty(GTgroups)
+    for ii=1: size(GTgroups,2)
+        fprintf(' %i',GTgroups{ii})
+        fprintf(' |')
+    end
+else
+    fprintf(' No Groups ')
+end
+fprintf('\n');
+end

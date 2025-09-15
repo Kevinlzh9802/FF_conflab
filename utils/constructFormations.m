@@ -14,13 +14,18 @@ load('../data/speaking_status.mat', 'speaking_status');
 outdir = 'output_directory';
 
 
-base_clue = "hip";
+base_clue = "GT";
+if base_clue == "GT"
+    col_name = "GT";
+else
+    col_name = base_clue + "Res";
+end
 unique_segs = unique(data_results.Vid);
 formations = table;
 for u_ind=1:length(unique_segs)
     u = unique_segs(u_ind);
     ana = data_results(data_results.Vid == u, :);
-    unique_groups = recordUniqueGroups(ana, base_clue + "Res");
+    unique_groups = recordUniqueGroups(ana, col_name);
     unique_groups.Vid = zeros(height(unique_groups), 1) + u;
     formations = [formations; unique_groups];
 end
@@ -91,12 +96,16 @@ formations.Cam = cell2mat(formations.Cam);
 for i = 1:height(formations)
     ts = formations.timestamps_all{i};
     participants = formations.participants{i};
+    % Ensure participants is always a row vector
+    if iscolumn(participants)
+        participants = participants';
+    end
     seg = formations.Vid(i);
     
     % Find column indices where first row matches participant IDs
     all_participants = sp_merged{seg}(1, :);
     participant_cols = [];
-    for p = participants'
+    for p = participants
         col_idx = find(all_participants == p);
         if ~isempty(col_idx)
             participant_cols = [participant_cols, col_idx];
@@ -131,6 +140,10 @@ end
 % Equivalent of _annotation_slice_for_formation
 function data = annotation_slice_for_formation(row, actions)
     participants = row.participants{1}; % converts space-separated string to numeric array
+    % Ensure participants is always a row vector
+    if iscolumn(participants)
+        participants = participants';
+    end
     time_inds = row.timestamps_all{1};
     all_participants = actions(1, :);
     
