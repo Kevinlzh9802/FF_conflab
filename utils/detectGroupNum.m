@@ -51,8 +51,8 @@ end
 
 % display_group_num_summary(group_num_results);
 window_table = countSpeakerGroups(window_table, data_results, ...
-    {'headRes', 'shoulderRes', 'hipRes', 'footRes'}, 'majority');
-[filtered_table, pairwise_diffs] = processWindowTable(window_table);
+    {'headRes', 'shoulderRes', 'hipRes', 'footRes'}, 'no_aggregation');
+[filtered_table, pairwise_diffs] = processWindowTable(window_table, 'no_aggregation');
 
 %% Functions
 

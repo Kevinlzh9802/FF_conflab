@@ -25,7 +25,7 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-load('../data/frames.mat', 'frames');
+% load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;
@@ -39,13 +39,13 @@ else
     params.mdl = 60000;
 end
 
-% params.used_parts = ["229", "428", "429", "828", "829", ...
-%     "232", "233", "234", "235", "236", ...
-%     "431", "433", "434", ...
-%     "631", "632", "633", "634", "635", "636", ...
-%     "831", "832", "833", "834", "835"];
+params.used_parts = ["229", "428", "429", "828", "829", ...
+    "232", "233", "234", "235", "236", ...
+    "431", "433", "434", ...
+    "631", "632", "633", "634", "635", "636", ...
+    "831", "832", "833", "834", "835"];
 
-params.used_parts = ["834"];
+% params.used_parts = ["834"];
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
@@ -96,8 +96,8 @@ run constructFormations.m;
 run detectSubFloor.m;
 % run spatialScores.m;
 
-run plotGroups.m;
-run plotGroupsInfo.m;
+% run plotGroups.m;
+% run plotGroupsInfo.m;
 
 %% Computing
 function [results, data] = GCFF_main(data, params, clue, speaking_status)

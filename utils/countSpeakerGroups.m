@@ -8,7 +8,7 @@ function window_table = countSpeakerGroups(window_table, group_detection_table, 
 %   groups_column - String or cell array of strings specifying which columns contain the group detection results
 %                  (e.g., 'headRes' or {'headRes', 'hipRes', 'footRes'})
 %   aggregation_method - String specifying how to aggregate group detections:
-%                       'closest_to_start' (default), 'majority', 'union', etc.
+%                       'closest_to_start' (default), 'majority', 'union', 'no_aggregation', etc.
 %
 % Output:
 %   window_table - Updated table with total_groups column added and expanded for multiple cameras
@@ -77,8 +77,8 @@ for cam_idx = 1:length(cameras)
         % Initialize results for this window
         window_detections = cell(1, k);
         window_filtered_speakers = cell(1, k);
-        window_total_groups = zeros(1, k);
-        window_num_filtered_speakers = zeros(1, k);
+        window_total_groups = cell(1, k);
+        window_num_filtered_speakers = cell(1, k);
         
         % Process each group detection column
         for col_idx = 1:k
@@ -88,16 +88,43 @@ for cam_idx = 1:length(cameras)
             window_groups = getGroupsForWindow(cam_group_table, current_column, window_start, window_end, vid, aggregation_method);
             
             % Step 1: Filter speakers to only those who appear in any of the detected groups
-            filtered_speakers = filterSpeakersByGroups(continuous_speakers, window_groups);
-            
-            % Step 2: Count total groups that filtered speakers belong to
-            total_groups = countTotalGroups(filtered_speakers, window_groups);
+            if strcmp(aggregation_method, 'no_aggregation')
+                % For no_aggregation, window_groups is a cell array of group structures
+                % We need to handle this as a distribution
+                [filtered_speakers, total_groups] = processDistributionGroups(continuous_speakers, window_groups);
+            else
+                % For other aggregation methods, window_groups is a single group structure
+                filtered_speakers = filterSpeakersByGroups(continuous_speakers, window_groups);
+                total_groups = countTotalGroups(filtered_speakers, window_groups);
+            end
             
             % Store results for this column
             window_detections{col_idx} = window_groups;
             window_filtered_speakers{col_idx} = filtered_speakers;
-            window_total_groups(col_idx) = total_groups;
-            window_num_filtered_speakers(col_idx) = length(filtered_speakers);
+            
+            % Store total_groups based on aggregation method
+            if strcmp(aggregation_method, 'no_aggregation')
+                % For no_aggregation, total_groups is an array of individual values
+                window_total_groups{col_idx} = total_groups;
+            else
+                % For other methods, total_groups is a single value
+                window_total_groups(col_idx) = total_groups;
+            end
+            
+            % Calculate num_filtered_speakers based on aggregation method
+            if strcmp(aggregation_method, 'no_aggregation')
+                % For no_aggregation, filtered_speakers is a cell array
+                % Preserve all individual speaker counts for each timestamp
+                if isempty(filtered_speakers)
+                    window_num_filtered_speakers{col_idx} = [];
+                else
+                    speaker_counts = cellfun(@length, filtered_speakers);
+                    window_num_filtered_speakers{col_idx} = speaker_counts;
+                end
+            else
+                % For other methods, filtered_speakers is a simple array
+                window_num_filtered_speakers(col_idx) = length(filtered_speakers);
+            end
         end
         
         % Store results in the cam_window_table
@@ -130,10 +157,12 @@ function window_groups = getGroupsForWindow(group_detection_table, groups_column
 %   groups_column - String specifying which column contains the group detection results
 %   window_start, window_end - Window boundaries
 %   vid - Video ID to match
-%   method - Aggregation method
+%   method - Aggregation method ('closest_to_start', 'closest_to_center', 'majority', 'union', 'no_aggregation')
 %
 % Output:
 %   window_groups - Cell array of group memberships for the window
+%                   For 'no_aggregation': returns all detection results as a cell array
+%                   For other methods: returns aggregated group structure
 
 % Find detections within the window period and matching video ID
 in_window = group_detection_table.concat_ts >= window_start & ...
@@ -229,6 +258,12 @@ switch method
             window_groups = {};
         end
         
+    case 'no_aggregation'
+        % Return all detection results within the window without aggregation
+        % This returns a cell array where each element contains the group structure
+        % from a single detection timestamp, preserving temporal information
+        window_groups = window_detections.(groups_column);
+        
     otherwise
         error('Unknown aggregation method: %s', method);
 end
@@ -302,5 +337,51 @@ end
 
 % Count unique groups
 total_groups = length(groups_with_speakers);
+
+end
+
+function [filtered_speakers, total_groups] = processDistributionGroups(continuous_speakers, window_groups_distribution)
+% PROCESSDISTRIBUTIONGROUPS - Process group detection results as a distribution
+%
+% Inputs:
+%   continuous_speakers - Array of person IDs who spoke continuously
+%   window_groups_distribution - Cell array where each element contains group structure from a single timestamp
+%
+% Outputs:
+%   filtered_speakers - Cell array where each element contains filtered speakers for a specific timestamp
+%   total_groups - Array of total groups values for each timestamp
+
+% Handle case where window_groups_distribution is empty
+if isempty(window_groups_distribution)
+    filtered_speakers = [];
+    total_groups = 0;
+    return;
+end
+
+% Process each timestamp's group structure
+all_filtered_speakers = {};
+all_total_groups = [];
+
+for t = 1:length(window_groups_distribution)
+    timestamp_groups = window_groups_distribution{t};
+    
+    % Filter speakers for this timestamp
+    timestamp_filtered_speakers = filterSpeakersByGroups(continuous_speakers, timestamp_groups);
+    
+    % Count total groups for this timestamp
+    timestamp_total_groups = countTotalGroups(timestamp_filtered_speakers, timestamp_groups);
+    
+    % Store results
+    all_filtered_speakers{t} = timestamp_filtered_speakers;
+    all_total_groups = [all_total_groups, timestamp_total_groups];
+end
+
+% For filtered_speakers, preserve individual results for each timestamp
+% This allows counting each instance individually in processWindowTable
+filtered_speakers = all_filtered_speakers;
+
+% For total_groups, preserve all individual values instead of taking average
+% This maintains the same data structure as filtered_speakers
+total_groups = all_total_groups;
 
 end
