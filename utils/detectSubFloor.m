@@ -25,12 +25,12 @@ for w = window_bounds(1):step:window_bounds(2)
                 max_speaker{card}{w_ind, max_floors{i}+1} + 1;
         else
             % Formation doesn't meet window size requirement - count as max_speaker=0
-            floors{i} = [];
-            max_floors{i} = 0;
-            
-            card = formations.cardinality(i);
-            max_speaker{card}{w_ind, 1} = ...
-                max_speaker{card}{w_ind, 1} + 1;
+            % floors{i} = [];
+            % max_floors{i} = 0;
+            % 
+            % card = formations.cardinality(i);
+            % max_speaker{card}{w_ind, 1} = ...
+            %     max_speaker{card}{w_ind, 1} + 1;
         end
     end
 
