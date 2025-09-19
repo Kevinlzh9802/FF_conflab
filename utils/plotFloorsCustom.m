@@ -1,5 +1,12 @@
-close all;
-figure;
+function plotFloorsCustom(max_speaker, base_clue, outdir)
+% Plot floor analysis results for a given base_clue
+% Inputs:
+%   max_speaker - cell array containing speaker count data
+%   base_clue - string indicating the clue type
+%   outdir - output directory path
+
+% Use the current figure (created in detectSubFloor)
+% Don't close all or create new figure
 for k=1:4
 sp_num = k+3;
 
@@ -29,7 +36,7 @@ for i = 1:size(M,1)
 end
 
 % Plotting
-subplot(2, 2, k);
+subplot(1, 4, k);
 x = 1:size(M,1);
 
 bar(x, row_means, 'FaceColor', [0.2 0.6 0.8]);
@@ -41,3 +48,10 @@ title("Group Cardinality" + num2str(sp_num));
 grid on;
 
 end
+
+% Save the figure
+if ~exist(outdir, 'dir')
+    mkdir(outdir);
+end
+saveas(gcf, fullfile(outdir, sprintf('floor_analysis_%s.png', base_clue)));
+fprintf('Floor analysis plot saved for %s\n', base_clue);

@@ -1,7 +1,15 @@
-%% Detect concurrent speakers over sliding window
+
+% Detect concurrent speakers over sliding window
+% Inputs:
+%   formations - table containing formation data
+%   sp_merged - cell array containing merged speaking status data
+%   base_clue - string indicating the clue type
+%   outdir - output directory path
+
 window_bounds = [1, 20] * 60;  % [min, max] window size
 step = 60;
 w_ind = 1;
+outdir = '../data/results/plots/';
 for n=1:30
     max_speaker{n} = repmat({0}, 20, 15);  % Creates a 3x4 cell array with 0 in each cell
 end
@@ -11,7 +19,7 @@ for w = window_bounds(1):step:window_bounds(2)
     floors = cell(height(formations), 1);
     max_floors = cell(height(formations), 1);
     valid_indices = [];
-    
+
     for i = 1:height(formations)
         if cellfun(@length, formations.timestamps_all(i)) >= w
             % Formation meets window size requirement - process normally
@@ -19,7 +27,7 @@ for w = window_bounds(1):step:window_bounds(2)
             floors{i} = concurrent_speakers(formations(i,:), actions, w, step);
             max_floors{i} = max(floors{i}, [], "all");
             valid_indices = [valid_indices; i];
-            
+
             card = formations.cardinality(i);
             max_speaker{card}{w_ind, max_floors{i}+1} = ...
                 max_speaker{card}{w_ind, max_floors{i}+1} + 1;
@@ -27,7 +35,7 @@ for w = window_bounds(1):step:window_bounds(2)
             % Formation doesn't meet window size requirement - count as max_speaker=0
             % floors{i} = [];
             % max_floors{i} = 0;
-            % 
+            %
             % card = formations.cardinality(i);
             % max_speaker{card}{w_ind, 1} = ...
             %     max_speaker{card}{w_ind, 1} + 1;
@@ -49,7 +57,11 @@ for w = window_bounds(1):step:window_bounds(2)
     w_ind = w_ind + 1;
     % x = out_table{w_ind,1};
 end
-run plotFloorsCustom.m;
+% Create figure for plotting with wider window for 1x4 subplots
+figure('Name', sprintf('Floor Analysis - %s', base_clue), 'Position', [100, 100, 1600, 300]);
+
+% Call plotFloorsCustom function with necessary variables
+plotFloorsCustom(max_speaker, base_clue, outdir);
 
 %% Functions
 

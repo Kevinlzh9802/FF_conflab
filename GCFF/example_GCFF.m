@@ -94,7 +94,7 @@ end
 
 run constructFormations.m;
 run detectSubFloor.m;
-% run spatialScores.m;
+run spatialScores.m;
 
 % run plotGroups.m;
 % run plotGroupsInfo.m;
