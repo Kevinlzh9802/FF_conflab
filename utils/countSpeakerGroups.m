@@ -77,8 +77,13 @@ for cam_idx = 1:length(cameras)
         % Initialize results for this window
         window_detections = cell(1, k);
         window_filtered_speakers = cell(1, k);
-        window_total_groups = cell(1, k);
-        window_num_filtered_speakers = cell(1, k);
+        if strcmp(aggregation_method, 'no_aggregation')
+            window_total_groups = cell(1, k);
+            window_num_filtered_speakers = cell(1, k);
+        else
+            window_total_groups = zeros(1, k);
+            window_num_filtered_speakers = zeros(1, k);
+        end
         
         % Process each group detection column
         for col_idx = 1:k
@@ -181,6 +186,7 @@ switch method
         % Use the detection closest to window start time
         [~, closest_idx] = min(abs(window_detections.concat_ts - window_start));
         window_groups = window_detections.(groups_column)(closest_idx);
+        window_groups = window_groups{1};
         
     case 'closest_to_center'
         % Use the detection closest to window center

@@ -93,8 +93,9 @@ end
 % end
 
 run constructFormations.m;
-run detectSubFloor.m;
-run spatialScores.m;
+run detectGroupNumBreakpoints.m;
+% run detectSubFloor.m;
+% run spatialScores.m;
 
 % run plotGroups.m;
 % run plotGroupsInfo.m;

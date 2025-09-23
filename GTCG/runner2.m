@@ -116,8 +116,9 @@ end
 
 %% Run the same analysis pipeline as GCFF
 run constructFormations.m;
-run detectSubFloor.m;
+% run detectSubFloor.m;
 % run spatialScores.m;
+run detectGroupNumBreakpoints.m;
 
 % run plotGroups.m;
 % run plotGroupsInfo.m;

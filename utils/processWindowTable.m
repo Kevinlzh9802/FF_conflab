@@ -306,7 +306,7 @@ if ~isempty(non_identical_rows)
         bar(all_unique_diffs, bar_data);
         
         % Customize the plot
-        xlabel('Difference Values (|S_w| - n_\alpha^w)');
+        xlabel('Difference Values d_\alpha^w');
         ylabel('Window instance number');
         if is_distribution
             title('Distribution Comparison Across All Detection Methods (Individual Instance Counting)');
