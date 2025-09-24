@@ -25,12 +25,13 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-% load('../data/frames.mat', 'frames');
+load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;
 params.frustum.aperture = 160;
 use_real = true;
+outdir = '../data/results/plots/';
 if use_real
     params.stride = 70;
     params.mdl = 90000;
@@ -93,6 +94,7 @@ end
 % end
 
 run constructFormations.m;
+run plotAllCluesComparison.m;
 run detectGroupNumBreakpoints.m;
 % run detectSubFloor.m;
 % run spatialScores.m;

@@ -9,7 +9,11 @@
 
 % Equivalent MATLAB script for the Python `main` function
 
-for base_clue = ["GT", "shoulder"]
+% Collect data for all clues first
+all_max_speaker_data = struct();
+clues_to_process = ["head", "shoulder", "hip", "foot"];
+
+for base_clue = clues_to_process
     if base_clue == "GT"
         col_name = "GT";
     else
@@ -123,10 +127,13 @@ for base_clue = ["GT", "shoulder"]
         end
     end
     fprintf('\n');
-    % Run detectSubFloor for this base_clue
-    run detectSubFloor.m;
-
+     % Run detectSubFloor for this base_clue and collect max_speaker data
+     % max_speaker = detectSubFloor(formations, sp_merged, base_clue, outdir);
+     
+     % Store max_speaker data for this clue
+     % all_max_speaker_data.(base_clue) = max_speaker;
 end
+
 
 %% Functions
 % Equivalent of check_if_lost
