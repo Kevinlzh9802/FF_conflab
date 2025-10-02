@@ -11,7 +11,7 @@
 
 % Collect data for all clues first
 all_max_speaker_data = struct();
-clues_to_process = ["head", "shoulder", "hip", "foot"];
+clues_to_process = ["GT"];
 
 for base_clue = clues_to_process
     if base_clue == "GT"

@@ -94,7 +94,7 @@ end
 % end
 
 run constructFormations.m;
-run plotAllCluesComparison.m;
+% run plotAllCluesComparison.m;
 run detectGroupNumBreakpoints.m;
 % run detectSubFloor.m;
 % run spatialScores.m;

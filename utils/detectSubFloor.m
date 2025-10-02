@@ -47,8 +47,14 @@ for w = window_bounds(1):step:window_bounds(2)
         filtered_fs = formations(valid_indices, :);
         filtered_floors = floors(valid_indices);
         filtered_max_floors = max_floors(valid_indices);
-        out_table{w_ind, 1} = table(filtered_fs.id, filtered_fs.cardinality, ...
-            filtered_floors, filtered_max_floors);
+        
+        % Create table for this window size
+        window_table = table(filtered_fs.id, filtered_fs.cardinality, ...
+            filtered_floors, filtered_max_floors, ...
+            repmat(w, height(filtered_fs), 1), ...
+            'VariableNames', {'id', 'cardinality', 'floors', 'max_floors', 'window_size'});
+        
+        out_table{w_ind, 1} = window_table;
     else
         out_table{w_ind, 1} = table();
     end
@@ -62,6 +68,39 @@ figure('Name', sprintf('Floor Analysis - %s', base_clue), 'Position', [100, 100,
 
 % Call plotFloorsCustom function with necessary variables
 plotFloorsCustom(max_speaker, base_clue, outdir);
+
+% Combine all window data for Python analysis (only for GT case)
+if strcmp(base_clue, 'GT')
+    % Combine all window tables into one
+    all_data = [];
+    for i = 1:length(out_table)
+        if ~isempty(out_table{i, 1})
+            all_data = [all_data; out_table{i, 1}];
+        end
+    end
+    
+    % Save data for Python analysis
+    if ~isempty(all_data)
+        % Remove id and floors columns for cleaner CSV output
+        data_for_python = all_data(:, {'cardinality', 'max_floors', 'window_size'});
+        
+        % Save as .mat file for MATLAB compatibility
+        save(fullfile(outdir, 'max_floors_data.mat'), 'all_data');
+        
+        % Save as CSV with only essential columns
+        writetable(data_for_python, fullfile(outdir, 'max_floors_data.csv'));
+        
+        fprintf('Saved data for Python analysis:\n');
+        fprintf('  - %s\n', fullfile(outdir, 'max_floors_data.mat'));
+        fprintf('  - %s\n', fullfile(outdir, 'max_floors_data.csv'));
+        fprintf('  - Total formations: %d\n', height(all_data));
+        fprintf('  - Window sizes: %d to %d\n', min(all_data.window_size), max(all_data.window_size));
+        fprintf('  - Cardinalities: %s\n', mat2str(unique(all_data.cardinality)'));
+        fprintf('  - CSV columns: cardinality, max_floors, window_size\n');
+    else
+        fprintf('Warning: No valid data found for GT case\n');
+    end
+end
 
 %% Functions
 
