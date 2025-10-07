@@ -1,5 +1,3 @@
-
-
 % Construct formations for a given base_clue
 % Inputs:
 %   base_clue - string indicating the clue type (e.g., "head", "foot", "hip", "shoulder", "GT")
@@ -132,8 +130,13 @@ for base_clue = clues_to_process
      
      % Store max_speaker data for this clue
      % all_max_speaker_data.(base_clue) = max_speaker;
+     
+     % Plot cumulative F-formation counts for GT case
+     if strcmp(base_clue, 'GT')
+         fprintf('Creating cumulative F-formation plot...\n');
+         plotSamplesPerWindowSize(formations);
+     end
 end
-
 
 %% Functions
 % Equivalent of check_if_lost
@@ -238,5 +241,61 @@ function all_subseqs = all_connected_subseqs(seq, n, min_length)
     if len >= min_length
         subseq = seq(start_idx : end);
         all_subseqs{end+1} = subseq;
+    end
+end
+
+function plotSamplesPerWindowSize(formations)
+    cardinalities = 4:7;
+    window_sizes = 1:20;
+    
+    % Calculate cumulative counts for each cardinality
+    cumulative_counts = zeros(length(window_sizes), length(cardinalities));
+    
+    for c_idx = 1:length(cardinalities)
+        cardinality = cardinalities(c_idx);
+        for w_idx = 1:length(window_sizes)
+            window_size = window_sizes(w_idx);
+            % Count formations with cardinality and window_size >= current window
+            % Apply length() to each row's timestamps
+            cardinality_mask = formations.cardinality == cardinality;
+            window_lengths = cellfun(@length, formations.timestamps);
+            count = sum(cardinality_mask & window_lengths >= window_size);
+            cumulative_counts(w_idx, c_idx) = count;
+        end
+    end
+    
+    % Create step plot similar to the paper's figure
+    figure('Position', [100, 100, 1200, 600]);
+    colors = [0, 0, 1; 1, 0.5, 0; 0, 0.8, 0; 1, 0, 0]; % Blue, Orange, Green, Red
+    
+    hold on;
+    for c_idx = 1:length(cardinalities)
+        cardinality = cardinalities(c_idx);
+        plot(window_sizes, cumulative_counts(:, c_idx), 'Color', colors(c_idx, :), ...
+            'LineWidth', 2, 'Marker', 'o', 'MarkerSize', 4, ...
+            'DisplayName', sprintf('Cardinality %d', cardinality));
+    end
+    
+    xlabel('Speaking Duration (seconds)', 'FontSize', 12);
+    ylabel('Number of F-formations', 'FontSize', 12);
+    title('Number of F-formation Samples at Varying Turn Durations', 'FontSize', 14, 'FontWeight', 'bold');
+    
+    % Set axis properties
+    xlim([0, 21]);
+    ylim([0, max(cumulative_counts(:)) + 1]);
+    xticks(0:1:20);
+    grid on;
+    grid minor;
+    
+    % Add legend
+    legend('Location', 'southwest', 'FontSize', 10);
+    
+    % Print summary statistics
+    fprintf('Cumulative F-formation counts by cardinality:\n');
+    fprintf('==========================================\n');
+    for c_idx = 1:length(cardinalities)
+        cardinality = cardinalities(c_idx);
+        total_formations = cumulative_counts(1, c_idx); % Count at window_size = 1
+        fprintf('Cardinality %d: %d total formations\n', cardinality, total_formations);
     end
 end
