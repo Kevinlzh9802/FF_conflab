@@ -25,7 +25,7 @@ addpath(genpath('../utils'));
 %% zonghuan loading
 % load('../data/data_results.mat');
 load('../data/speaking_status.mat', 'speaking_status');
-load('../data/frames.mat', 'frames');
+% load('../data/frames.mat', 'frames');
 
 %% params
 params.frustum.length = 275;
@@ -33,7 +33,7 @@ params.frustum.aperture = 160;
 use_real = true;
 outdir = '../data/results/plots/';
 if use_real
-    params.stride = 70;
+    params.stride = 30;
     params.mdl = 90000;
 else
     params.stride = 130;
@@ -71,27 +71,16 @@ results = struct;
 clues = ["head", "shoulder", "hip", "foot"];
 for clue = clues
     used_data = filterAndConcatTable(data_results, params.used_parts);    
-    results.(clue) = GCFF_main(used_data, params, clue, speaking_status);
+    results.(clue) = GCFF_main(used_data, params, clue, speaking_status, use_real);
 
     f_name = clue + "Res";
     used_data.(f_name) = results.(clue).groups;
     results.(clue).original_data = used_data;
     data_results(used_data.id, f_name) = used_data.(f_name);
     % data_results.(f_name) = used_data.(f_name);
-    % results.(clue).g_count = countGroupsContainingIDs(used_data.(f_name), {[13,21],[35,12,19]});
 end
 
 % analysis = data_results(~cellfun(@isempty, data_results.headRes) & data_results.concat_id, :);
-
-% unique_segs = unique(data_results.Vid);
-% formations = table;
-% for u_ind=1:length(unique_segs)
-%     u = unique_segs(u_ind);
-%     ana = data_results(data_results.Vid == u, :);
-%     unique_groups = recordUniqueGroups(ana, "headRes");
-%     unique_groups.Vid = zeros(height(unique_groups), 1) + u;
-%     formations = [formations; unique_groups];
-% end
 
 run constructFormations.m;
 % run plotAllCluesComparison.m;
@@ -103,7 +92,7 @@ run detectGroupNumBreakpoints.m;
 % run plotGroupsInfo.m;
 
 %% Computing
-function [results, data] = GCFF_main(data, params, clue, speaking_status)
+function [results, data] = GCFF_main(data, params, clue, speaking_status, use_real)
 % If only some frames are annotated, delete all the others from features.
 % [~,indFeat] = intersect(timestamp,GTtimestamp) ;
 % timestamp = timestamp(indFeat) ;
@@ -115,7 +104,6 @@ GTgroups = (data.GT)';
 timestamp = data.Timestamp; 
 stride = params.stride;
 mdl = params.mdl;
-use_real = false;
 
 % Initialize evaluation variables
 TP = zeros(1,length(timestamp));

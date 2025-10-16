@@ -105,7 +105,8 @@ for clue = clues
     used_data = filterAndConcatTable(data_results, params.used_parts);
     
     % Run GTCG detection
-    results.(clue) = GTCG_main(param, clue, used_data, speaking_status);
+    results.(clue) = GTCG_main(param, clue, used_data, ...
+        speaking_status, use_real);
     
     % Store groups in the same format as GCFF
     f_name = clue + "Res";
@@ -124,7 +125,7 @@ run detectGroupNumBreakpoints.m;
 % run plotGroupsInfo.m;
 
 %% GTCG Main Function
-function results = GTCG_main(param, clue, used_data, speaking_status)
+function results = GTCG_main(param, clue, used_data, speaking_status, use_real)
 % GTCG_MAIN - Main function for GTCG group detection
 % Modified to follow GCFF pipeline structure
 
@@ -158,11 +159,13 @@ for f = 1:numel(features)
     if ~isempty(features{f})
         last_f = f + param.numFrames - 1;
         feat = features(f:last_f);                   %copy the frames
-        
+        % feat{1} = feat{1}(:, [1:24] + 24 *0);
         fprintf(['******* Frames ' num2str(f:last_f) ' *******\n']);
-        if plot_debug
-            fig = figure;
-            plotFrustums(feat{1}, param.frustum, fig);
+        if true
+            fig1 = figure;
+            plotFrustums(feat{1}(:, [1:24] + 24 *0), param.frustum, fig1);
+            fig2 = figure;
+            plotFrustums(feat{1}(:, [1:24] + 24 *1), param.frustum, fig2);
         end
         
         try
