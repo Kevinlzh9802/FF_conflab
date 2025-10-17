@@ -28,25 +28,23 @@ load('../data/speaking_status.mat', 'speaking_status');
 % load('../data/frames.mat', 'frames');
 
 %% params
-params.frustum.length = 275;
-params.frustum.aperture = 160;
 use_real = true;
 outdir = '../data/results/plots/';
 if use_real
-    params.stride = 30;
-    params.mdl = 90000;
+    params.stride = 40;
+    params.mdl = 6000;
 else
     params.stride = 130;
     params.mdl = 60000;
 end
 
-params.used_parts = ["229", "428", "429", "828", "829", ...
-    "232", "233", "234", "235", "236", ...
-    "431", "433", "434", ...
-    "631", "632", "633", "634", "635", "636", ...
-    "831", "832", "833", "834", "835"];
+% params.used_parts = ["229", "429", "828", "829", ...
+%     "232", "233", "234", "235", "236", ...
+%     "431", "433", "434", ...
+%     "631", "632", "633", "634", "635", "636", ...
+%     "831", "832", "833", "834", "835"];
 
-% params.used_parts = ["834"];
+params.used_parts = ["233"];
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
@@ -68,16 +66,15 @@ run concatSegs.m;
 data_results.id = (1:height(data_results))';
 
 results = struct;
+used_data = filterAndConcatTable(data_results, params.used_parts);
 clues = ["head", "shoulder", "hip", "foot"];
 for clue = clues
-    used_data = filterAndConcatTable(data_results, params.used_parts);    
+    f_name = clue + "Res";
     results.(clue) = GCFF_main(used_data, params, clue, speaking_status, use_real);
 
-    f_name = clue + "Res";
     used_data.(f_name) = results.(clue).groups;
     results.(clue).original_data = used_data;
-    data_results(used_data.id, f_name) = used_data.(f_name);
-    % data_results.(f_name) = used_data.(f_name);
+    data_results(used_data.id, 'headRes') = results.(clue).groups;
 end
 
 % analysis = data_results(~cellfun(@isempty, data_results.headRes) & data_results.concat_id, :);
@@ -93,10 +90,6 @@ run detectGroupNumBreakpoints.m;
 
 %% Computing
 function [results, data] = GCFF_main(data, params, clue, speaking_status, use_real)
-% If only some frames are annotated, delete all the others from features.
-% [~,indFeat] = intersect(timestamp,GTtimestamp) ;
-% timestamp = timestamp(indFeat) ;
-% features  = features(indFeat) ;
 
 f_name = clue + "Feat";
 features = (data.(f_name))';

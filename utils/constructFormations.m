@@ -134,7 +134,7 @@ for base_clue = clues_to_process
      % Plot cumulative F-formation counts for GT case
      if strcmp(base_clue, 'GT')
          fprintf('Creating cumulative F-formation plot...\n');
-         plotSamplesPerWindowSize(formations);
+         % plotSamplesPerWindowSize(formations);
      end
 end
 
