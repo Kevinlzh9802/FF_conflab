@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
+import argparse
+import pickle
 
 from GCFF import ff_deletesingletons, ff_evalgroups, gc
 from utils.pose import process_foot_data
@@ -162,8 +164,6 @@ def run_gcff_sequence(data, params: Params, clue: str, speaking_status: Any, use
 
 
 if __name__ == '__main__':  # pragma: no cover
-    import argparse
-    import pickle
     parser = argparse.ArgumentParser(description='Run GCFF main pipeline.')
     parser.add_argument('--data-pkl', type=str, required=False, help='Path to pickled DataFrame with features and metadata')
     parser.add_argument('--clue', type=str, default='head', choices=['head', 'shoulder', 'hip', 'foot'])
