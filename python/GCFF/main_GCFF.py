@@ -25,10 +25,10 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 
 from GCFF import ff_deletesingletons, ff_evalgroups, gc
-from utils.python.pose import process_foot_data
-from utils.python.table import filter_and_concat_table
-from utils.python.speaking import read_speaking_status, get_status_for_group
-from utils.python.scripts import concatSegs, constructFormations, detectGroupNumBreakpoints
+from utils.pose import process_foot_data
+from utils.table import filter_and_concat_table
+from utils.speaking import read_speaking_status, get_status_for_group
+from utils.scripts import concatSegs, constructFormations, detectGroupNumBreakpoints
 
 
 @dataclass
