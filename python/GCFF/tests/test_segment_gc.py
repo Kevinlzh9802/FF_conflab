@@ -8,8 +8,8 @@ _REPO_ROOT = os.path.abspath(os.path.join(_HERE, "..", "..", ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from GCFF.graphopt.python.segment_gc import segment_gc
-from GCFF.graphopt.python import plotoverlap
+from graphopt.segment_gc import segment_gc
+from graphopt import plotoverlap
 
 
 def make_synthetic(width=20, height=20, nlabels=2):

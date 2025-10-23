@@ -2,7 +2,7 @@ from typing import Any
 
 import pandas as pd
 
-from utils.python.eval import compute_hic_matrix
+from utils.eval import compute_hic_matrix
 
 
 def getHIC(used_data: pd.DataFrame) -> pd.DataFrame:

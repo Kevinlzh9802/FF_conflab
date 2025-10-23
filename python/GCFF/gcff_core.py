@@ -3,7 +3,7 @@ from typing import List, Sequence, Tuple, Union
 
 import numpy as np
 
-from GCFF.graphopt.python.graphcut import expand as expand_mex
+from graphopt.graphcut import expand as expand_mex
 
 
 def ff_deletesingletons(groups: List[Sequence[int]]) -> List[List[int]]:

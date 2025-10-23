@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from GCFF.python.gcff_core import gc, ff_deletesingletons, ff_evalgroups
+from gcff_core import gc, ff_deletesingletons, ff_evalgroups
 
 
 @dataclass
