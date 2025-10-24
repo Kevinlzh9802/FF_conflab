@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
-
+import pandas as pd
+# pd.options.mode.copy_on_write = True
 
 def get_foot_orientation(coords: Sequence[float], is_left_handed: bool) -> Tuple[float, Tuple[float, float]]:
     arr = np.asarray(coords, dtype=float).copy()
@@ -43,9 +44,10 @@ def process_foot_data(T, is_left_handed: bool):
     For each row, expects an n x 48 features array. Adjusts columns [2:3] and [4]
     using foot orientation and position.
     """
+    
     for i in range(len(T)):
         features = T['footFeat'][i]
-        if features is None or len(features) == 0:
+        if features is None or features.shape[1] == 0:
             continue
         M1 = features[:, 0:24].copy()
         M2 = features[:, 24:48].copy()
