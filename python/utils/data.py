@@ -1,8 +1,30 @@
 import json, os
 import pandas as pd
 import numpy as np
+from utils.scripts import concat_segs
+from utils.pose import process_foot_data
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
+
+def process_data(base_dir):
+    data = load_all_data(base_dir)
+
+    # Process foot features if present
+    if hasattr(data, 'columns') and ('footFeat' in data.columns):
+        data = process_foot_data(data)
+
+    # Translate script calls to functions (placeholders/stubs in utils)
+    data = concat_segs(data)
+
+    # Assign incremental ids if not present
+    if hasattr(data, 'assign'):
+        try:
+            data = data.assign(id=np.arange(1, len(data) + 1))
+        except Exception:
+            pass
+
+    data.to_pickle(base_dir + "data.pkl")
+
 
 def load_all_data(base_dir: str) -> pd.DataFrame:
     all_data = None
@@ -51,3 +73,6 @@ def load_features(base_dir, nrows):
             arr = arr.reshape(1, -1)
         feats.append(arr)
     return feats
+
+if __name__ == '__main__': 
+    process_data("../data/export/")

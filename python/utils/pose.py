@@ -38,7 +38,7 @@ def get_foot_orientation(coords: Sequence[float], is_left_handed: bool) -> Tuple
     return float(theta), pos
 
 
-def process_foot_data(T, is_left_handed: bool):
+def process_foot_data(T):
     """Process a table-like object T with column 'footFeat'.
 
     For each row, expects an n x 48 features array. Adjusts columns [2:3] and [4]
@@ -52,10 +52,10 @@ def process_foot_data(T, is_left_handed: bool):
         M1 = features[:, 0:24].copy()
         M2 = features[:, 24:48].copy()
         for j in range(M1.shape[0]):
-            theta1, pos1 = get_foot_orientation(M1[j, 16:24], is_left_handed)
+            theta1, pos1 = get_foot_orientation(M1[j, 16:24], True)
             M1[j, 1:3] = np.array(pos1) * np.array([1920.0, 1080.0])
             M1[j, 3] = theta1
-            theta2, pos2 = get_foot_orientation(M2[j, 16:24], is_left_handed)
+            theta2, pos2 = get_foot_orientation(M2[j, 16:24], False)
             M2[j, 1:3] = np.array(pos2)
             M2[j, 3] = theta2
         T['footFeat'][i] = np.hstack([M1, M2])

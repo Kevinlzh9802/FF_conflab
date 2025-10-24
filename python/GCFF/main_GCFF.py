@@ -25,14 +25,11 @@ from typing import Any, Dict, List, Tuple
 import os
 import numpy as np
 import argparse
-import scipy.io as sio
+import pandas as pd
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, gc
-from utils.pose import process_foot_data
-from utils.table import filter_and_concat_table
 from utils.speaking import read_speaking_status, get_status_for_group
-from utils.scripts import concat_segs, constructFormations, detectGroupNumBreakpoints
-from utils.load_data import load_all_data
+from utils.scripts import constructFormations, detectGroupNumBreakpoints
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
 
@@ -67,31 +64,12 @@ def run_gcff_sequence(data, params: Params, clue: str, speaking_status: Any, use
 
     Returns (results_dict, data_out)
     """
-    # Process foot features if present
-    if hasattr(data, 'columns') and ('footFeat' in data.columns):
-        data = process_foot_data(data, is_left_handed=not use_real)
-
-    # Translate script calls to functions (placeholders/stubs in utils)
-    data = concat_segs(data)
-
-    # Assign incremental ids if not present
-    if hasattr(data, 'assign'):
-        try:
-            data = data.assign(id=np.arange(1, len(data) + 1))
-        except Exception:
-            pass
-
-    # Filter and concatenate selected keys if provided; else pass-through
-    if hasattr(data, 'keys') and callable(getattr(data, 'keys')):
-        used_data = data
-    else:
-        used_data = data
 
     # Build features per frame for the selected clue
     feat_col = f"{clue}Feat"
-    features = list(used_data[feat_col]) if hasattr(used_data, '__getitem__') else []
-    GTgroups = list(used_data['GT']) if ('GT' in getattr(used_data, 'columns', [])) else [None] * len(features)
-    timestamps = list(used_data['Timestamp']) if ('Timestamp' in getattr(used_data, 'columns', [])) else list(range(len(features)))
+    features = list(data[feat_col]) if hasattr(data, '__getitem__') else []
+    GTgroups = list(data['GT']) if ('GT' in getattr(data, 'columns', [])) else [None] * len(features)
+    timestamps = list(data['Timestamp']) if ('Timestamp' in getattr(data, 'columns', [])) else list(range(len(features)))
 
     T = len(features)
     TP = np.zeros(T)
@@ -129,7 +107,7 @@ def run_gcff_sequence(data, params: Params, clue: str, speaking_status: Any, use
 
         # Optionally collect speaking status per-frame (if structure available)
         try:
-            info = used_data.iloc[idx][['Cam', 'Vid', 'Seg', 'Timestamp']]
+            info = data.iloc[idx][['Cam', 'Vid', 'Seg', 'Timestamp']]
             sp, cf = read_speaking_status(speaking_status, int(info.Vid), int(info.Seg), int(info.Timestamp) + 1, 1)
             if isinstance(sp, (list, np.ndarray)) and groups:
                 ss = get_status_for_group(np.arange(len(sp)), sp, groups)
@@ -160,10 +138,10 @@ def run_gcff_sequence(data, params: Params, clue: str, speaking_status: Any, use
     }
 
     # Translate remaining scripts to function calls (placeholders for now)
-    _formations = constructFormations(results, data=used_data)
-    _breakpoints = detectGroupNumBreakpoints(results, data=used_data)
+    _formations = constructFormations(results, data=data)
+    _breakpoints = detectGroupNumBreakpoints(results, data=data)
 
-    return results, used_data
+    return results, data
 
 
 if __name__ == '__main__':  # pragma: no cover
@@ -175,6 +153,6 @@ if __name__ == '__main__':  # pragma: no cover
     parser.add_argument('--use-real', type=bool, default=True)
     args = parser.parse_args()
 
-    data = load_all_data(args.data)
+    data = pd.read_pickle(args.data + "data.pkl")
     res, _ = run_gcff_sequence(data, Params(args.stride, args.mdl), args.clue, speaking_status=None, use_real=args.use_real)
     print('F1_avg:', res['F1_avg'])
