@@ -33,7 +33,9 @@ from utils.pose import process_foot_data
 from utils.table import filter_and_concat_table
 from utils.speaking import read_speaking_status, get_status_for_group
 from utils.scripts import concatSegs, constructFormations, detectGroupNumBreakpoints
+from utils.load_data import load_all_data
 
+ALL_CLUES = ["head", "shoulder", "hip", "foot"]
 
 @dataclass
 class Params:
@@ -184,8 +186,7 @@ if __name__ == '__main__':  # pragma: no cover
         else:
             raise SystemExit(f'Unsupported file format: {file_ext}. Please provide a .mat or .pkl file.')
     else:
-        import hdf5storage  # pip install hdf5storage
-        data = hdf5storage.loadmat('../data/mydata.mat')
+        data = load_all_data()
 
     res, _ = run_gcff_sequence(data, Params(args.stride, args.mdl), args.clue, speaking_status=None, use_real=args.use_real)
     print('F1_avg:', res['F1_avg'])
