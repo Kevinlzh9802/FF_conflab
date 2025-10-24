@@ -31,7 +31,7 @@ from gcff_core import ff_deletesingletons, ff_evalgroups, gc
 from utils.pose import process_foot_data
 from utils.table import filter_and_concat_table
 from utils.speaking import read_speaking_status, get_status_for_group
-from utils.scripts import concatSegs, constructFormations, detectGroupNumBreakpoints
+from utils.scripts import concat_segs, constructFormations, detectGroupNumBreakpoints
 from utils.load_data import load_all_data
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
@@ -72,7 +72,7 @@ def run_gcff_sequence(data, params: Params, clue: str, speaking_status: Any, use
         data = process_foot_data(data, is_left_handed=not use_real)
 
     # Translate script calls to functions (placeholders/stubs in utils)
-    data = concatSegs(data)
+    data = concat_segs(data)
 
     # Assign incremental ids if not present
     if hasattr(data, 'assign'):

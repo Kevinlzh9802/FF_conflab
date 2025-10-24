@@ -29,20 +29,21 @@ def _add_merged_column(df: pd.DataFrame) -> pd.DataFrame:
 def concat_segs(data: pd.DataFrame) -> pd.DataFrame:
     """Port of utils/concatSegs.m.
 
-    For each (Vid, Cam), create a continuous 'concat_ts' by merging per-Seg timestamps.
-    Assumes columns: Cam, Vid, Seg, Timestamp. Returns updated DataFrame.
+    For each (Vid, Cam), treat rows as a continuous time sequence and
+    concatenate their timestamps based on the order of Seg values.
+
+    Adds a new column 'concat_ts' to the DataFrame without altering
+    original 'Seg' or 'Timestamp' values.
     """
     df = data.copy()
-    for vid in [2, 3]:
-        for cam in [2, 4, 6, 8]:
-            mask = (df['Cam'] == cam) & (df['Vid'] == vid)
-            if not mask.any():
-                continue
-            rows = df.loc[mask, ['Seg', 'Timestamp']].copy()
-            merged = _add_merged_column(rows)
-            df.loc[mask, 'Seg'] = merged['Seg'].values
-            df.loc[mask, 'Timestamp'] = merged['Timestamp'].values
-            df.loc[mask, 'concat_ts'] = merged['concat_ts'].values
+    df['concat_ts'] = np.nan
+    if 'Vid' not in df.columns or 'Cam' not in df.columns:
+        return df
+    groups = df.groupby(['Vid', 'Cam'], sort=False)
+    for (vid, cam), idx in groups.groups.items():
+        sub = df.loc[idx, ['Seg', 'Timestamp']].copy()
+        merged = _add_merged_column(sub)
+        df.loc[idx, 'concat_ts'] = merged['concat_ts'].values
     return df
 
 
@@ -170,10 +171,6 @@ def _equal_groups(a, b):
 
 
 # Aliases matching original MATLAB script names
-def concatSegs(data):  # pragma: no cover - placeholder
-    return concat_segs(data)
-
-
 def constructFormations(results: dict, data=None):  # pragma: no cover - placeholder
     return construct_formations(results, data=data)
 
