@@ -103,9 +103,13 @@ def gcff_sequence(features, GTgroups, params, speaking_status):
             continue
         # MATLAB: feat = features{idx}(:, [1:24] + 24 * use_real)
         # Expect feat as 2D array where columns include [ID,x,y,alpha,...]
-        cols = np.arange(0 if not params.use_real else 24, 24 + (24 if params.use_real else 0))
-        cols = cols[: min(feat.shape[1], 24)] if feat.shape[1] >= 24 else np.arange(feat.shape[1])
-        F = feat[:, cols]
+        if params.use_real:
+            F = feat[:, 24:28]
+        else:
+            F = feat[:, 0:4]
+        # cols = np.arange(0 if not params.use_real else 24, 24 + (24 if params.use_real else 0))
+        # cols = cols[: min(feat.shape[1], 24)] if feat.shape[1] >= 24 else np.arange(feat.shape[1])
+        # F = feat[:, cols]
         labels = gc(F[:, :4], params.stride, params.mdl)
         groups = []
         for lab in range(int(labels.max()) + 1 if labels.size else 0):

@@ -266,8 +266,8 @@ def gc(f: np.ndarray, stride: float, MDL_in: float) -> np.ndarray:
     locs = find_locs(f, stride)
     unary, _ = calc_distance(locs, f, np.arange(locs.shape[0]), MDL_in)
     N = f.shape[0]
-    neigh = np.zeros((0, N), dtype=float)
-    weight = np.zeros((0, N), dtype=float)
+    neigh = np.zeros((1, N), dtype=float)
+    weight = np.zeros((1, N), dtype=float)
     seg = np.arange(N, dtype=float)
     segold = np.zeros_like(seg)
     MAX_ITER = 10

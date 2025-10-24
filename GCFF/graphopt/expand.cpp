@@ -1,6 +1,13 @@
 #include"class.cpp"
 #include "mex.h"
 #include<cstdio>
+
+// Enable lightweight debug logging by compiling with -DDEBUG_EXPAND
+#ifdef DEBUG_EXPAND
+#define DPRINTF(...) mexPrintf(__VA_ARGS__)
+#else
+#define DPRINTF(...)
+#endif
 void mexFunction (int nlhs, mxArray *out[],
 		  int nrhs, const mxArray *in[]) {
  if (nrhs != 6)
@@ -17,6 +24,8 @@ void mexFunction (int nlhs, mxArray *out[],
 
   double* pweight=mxGetPr(in[2]);
   double* hweight=mxGetPr(in[4]);
+
+  DPRINTF("[expand] points=%d hyp=%d maxn=%d p2=%d thresh=%g\n", points, hyp, maxn, p2, thresh);
 
   //  mexPrintf("Are we dead now?\n");
   ////clog<<"hyp "<<hyp<<endl;
@@ -47,22 +56,34 @@ void mexFunction (int nlhs, mxArray *out[],
     //clog<<"mxGetM(in[4]) "<<mxGetM(in[4])<<endl;
     mexErrMsgTxt("Matrix 1^T, and vector 5 must be of same length.");
   }
- printf("Done tests\n");
+  DPRINTF("[expand] input validation done\n");
   hypothesis H(points,0,hyp,0,hweight,maxn);
 
   H.un= mxGetPr(in[0]);
-  for (unsigned int i = 0; i !=points*hyp; ++i)
+  // basic stats for unary and pair weights
+  double umin=1e300, umax=-1e300, usum=0;
+  for (unsigned int i = 0; i !=points*hyp; ++i) {
     if(H.un[i]<0){
       //clog<<"i: "<<i<<"H.un[i]: "<<H.un[i]<<endl;
       mexErrMsgTxt("hweight[i] must be >= 0");
     }
-    else if(H.un[i]>thresh)
+    else if(H.un[i]>thresh){
       H.un[i]=thresh;
+    }
+    umin = (H.un[i] < umin)? H.un[i]: umin;
+    umax = (H.un[i] > umax)? H.un[i]: umax;
+    usum += H.un[i];
+  }
+  DPRINTF("[expand] unary: min=%g max=%g sum=%g\n", umin, umax, usum);
 
   H._ncost=pweight;
       
   for (unsigned int i = 0; i !=points;++i)
     H.label[i]=mxGetPr(in[3])[i];
+  // print first few labels
+  for (int i=0; i< (points<5?points:5); ++i) {
+    DPRINTF("[expand] label[%d]=%d\n", i, H.label[i]);
+  }
   for(unsigned int i=0;i!=points;++i){
     if (H.label[i]>=hyp)
       mexErrMsgTxt("All labels must be less than number of hypothesis");
@@ -84,7 +105,18 @@ void mexFunction (int nlhs, mxArray *out[],
       }
       // //clog<<H.neigh[i*maxn+j]<<endl;
     } 
+  // simple neigh stats
+  int neg1count=0; int nmin=1000000000; int nmax=-1000000000;
+  for (int i=0;i<points;++i){
+    for (int j=0;j<maxn;++j){
+      int v = H.neigh_p[i*maxn+j];
+      if (v==-1) ++neg1count;
+      if (v!=-1){ if (v<nmin) nmin=v; if (v>nmax) nmax=v; }
+    }
+  }
+  DPRINTF("[expand] neigh_p: min=%d max=%d count(-1)=%d\n", nmin, nmax, neg1count);
   H.solve();
+  DPRINTF("[expand] solve() completed\n");
   
   out[0]=mxCreateDoubleMatrix(points,hyp,mxREAL);   
   H.annotate((double*)mxGetPr(out[0]),thresh);
@@ -96,8 +128,17 @@ void mexFunction (int nlhs, mxArray *out[],
   out[1]=mxCreateDoubleMatrix(points,1,mxREAL);
   for (int i = 0; i !=points; ++i)
     mxGetPr(out[1])[i]=H.label[i];
+  // checksum for outputs
+  double asum=0; double *A=(double*)mxGetPr(out[0]);
+  for (int i=0;i<points*hyp;++i) asum+=A[i];
+  DPRINTF("[expand] annotate sum=%g labels[0..4]=(%g,%g,%g,%g,%g)\n", asum,
+    points>0?mxGetPr(out[1])[0]:-1,
+    points>1?mxGetPr(out[1])[1]:-1,
+    points>2?mxGetPr(out[1])[2]:-1,
+    points>3?mxGetPr(out[1])[3]:-1,
+    points>4?mxGetPr(out[1])[4]:-1);
  
-
+ 
   return ;
 }
  

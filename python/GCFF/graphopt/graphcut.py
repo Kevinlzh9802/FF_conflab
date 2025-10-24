@@ -1,7 +1,17 @@
 import math
+import os
 from typing import List, Tuple
 
 import numpy as np
+
+
+def _dbg_enabled() -> bool:
+    return os.environ.get("GCFF_DEBUG", "").lower() in {"1", "true", "yes", "on"}
+
+
+def _dbg_print(prefix: str, msg: str):
+    if _dbg_enabled():
+        print(f"[graphcut.{prefix}] {msg}")
 
 
 class _Dinic:
@@ -348,6 +358,8 @@ def expand(unary: np.ndarray,
            hypweight: np.ndarray,
            thresh: float) -> Tuple[np.ndarray, np.ndarray]:
     unary = np.asarray(unary, dtype=float)
+    if _dbg_enabled():
+        _dbg_print("expand", f"unary shape={unary.shape} dtype={unary.dtype} min={np.min(unary):.6g} max={np.max(unary):.6g}")
     points, hyp = unary.shape
     neigh_pair = np.asarray(neigh_pair, dtype=float)
     maxn = neigh_pair.shape[0]
@@ -375,8 +387,24 @@ def expand(unary: np.ndarray,
     # Here we accept 1-based neighbors and convert to 0-based with -1 for 0
     n_p = np.asarray(neigh_pair, dtype=np.int64).T  # to (points, maxn)
     n_p = n_p - 1
+    if _dbg_enabled():
+        _dbg_print(
+            "expand",
+            f"neigh_pair shape={neigh_pair.shape} maxn={maxn} points={points} min={int(np.min(neigh_pair)) if neigh_pair.size else 'NA'} max={int(np.max(neigh_pair)) if neigh_pair.size else 'NA'}",
+        )
+        _dbg_print(
+            "expand",
+            f"converted neigh_p stats: min={int(np.min(n_p)) if n_p.size else 'NA'} max={int(np.max(n_p)) if n_p.size else 'NA'} count(-1)={(n_p==-1).sum() if n_p.size else 0}")
+        _dbg_print(
+            "expand",
+            f"pair_costs min={np.min(pair_costs):.6g} max={np.max(pair_costs):.6g} hypweight min={np.min(hypweight):.6g} max={np.max(hypweight):.6g} thresh={thresh}",
+        )
     H.neigh_p = n_p
+    if _dbg_enabled():
+        _dbg_print("expand", f"initial labels unique={np.unique(H.label)[:10]}")
     H.solve()
+    if _dbg_enabled():
+        _dbg_print("expand", f"final labels unique={np.unique(H.label)[:10]}")
     annot = H.annotate(float(thresh))
     return annot, H.label.copy()
 
@@ -391,6 +419,8 @@ def multi(unary: np.ndarray,
     points, hyp = unary.shape
     neigh_overlap = np.asarray(neigh_overlap, dtype=float)
     maxn = neigh_overlap.shape[0]
+    if _dbg_enabled():
+        _dbg_print("multi", f"unary shape={unary.shape} maxn={maxn} thresh={thresh} lambda={lam}")
     if neigh_overlap.shape[1] != points:
         raise ValueError("neigh_overlap must have shape (maxn, points)")
     interior_labels = np.asarray(interior_labels, dtype=float).reshape(-1)
@@ -426,6 +456,8 @@ def allgc(unary: np.ndarray,
           thresh: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     unary = np.asarray(unary, dtype=float)
     points, hyp = unary.shape
+    if _dbg_enabled():
+        _dbg_print("allgc", f"unary shape={unary.shape} lam={lam} thresh={thresh}")
     neigh_overlap = np.asarray(neigh_overlap, dtype=float)
     maxn_m = neigh_overlap.shape[0]
     if neigh_overlap.shape[1] != points:
@@ -456,6 +488,9 @@ def allgc(unary: np.ndarray,
     H.label = np.asarray(current_labels, dtype=np.int64).copy()
     H.neigh_m = np.asarray(neigh_overlap, dtype=np.int64).T - 1
     H.neigh_p = np.asarray(neigh_pair, dtype=np.int64).T - 1
+    if _dbg_enabled():
+        _dbg_print("allgc", f"neigh_m: maxn={maxn_m} min={int(np.min(neigh_overlap)) if neigh_overlap.size else 'NA'} max={int(np.max(neigh_overlap)) if neigh_overlap.size else 'NA'}")
+        _dbg_print("allgc", f"neigh_p: maxn={maxn_p} min={int(np.min(neigh_pair)) if neigh_pair.size else 'NA'} max={int(np.max(neigh_pair)) if neigh_pair.size else 'NA'}")
     H.solve()
     annot = H.annotate(float(thresh))
     # For compatibility with MEX, return a third matrix for "outliers" even if zeros
