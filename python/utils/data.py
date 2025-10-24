@@ -74,5 +74,19 @@ def load_features(base_dir, nrows):
         feats.append(arr)
     return feats
 
+def filter_and_concat_table(data, used_parts):
+    df = data
+    if isinstance(df, pd.DataFrame) and used_parts:
+        sel = df.iloc[0:0].copy()
+        for key in used_parts:
+            if isinstance(key, str) and len(key) == 3 and key.isdigit():
+                cam, vid, seg = int(key[0]), int(key[1]), int(key[2])
+                mask = (df['Cam'] == cam) & (df['Vid'] == vid) & (df['Seg'] == seg)
+                if mask.any():
+                    sel = pd.concat([sel, df.loc[mask]], ignore_index=True)
+        if len(sel) > 0:
+            df = sel
+    return df
+
 if __name__ == '__main__': 
     process_data("../data/export/")

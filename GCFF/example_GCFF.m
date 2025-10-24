@@ -44,7 +44,7 @@ end
 %     "631", "632", "633", "634", "635", "636", ...
 %     "831", "832", "833", "834", "835"];
 
-params.used_parts = ["233"];
+params.used_parts = ["429"];
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
