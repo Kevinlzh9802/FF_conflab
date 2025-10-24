@@ -4,10 +4,11 @@ import numpy as np
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
 
-def load_all_data() -> pd.DataFrame:
+def load_all_data(base_dir: str) -> pd.DataFrame:
     all_data = None
     for clue in ALL_CLUES:
-        data = load_data(clue)
+        clue_dir = base_dir + clue
+        data = load_data(clue_dir)
         if all_data is None:
             all_data = data
             all_data.rename(columns={"Features": clue+"Feat"}, inplace=True)
@@ -15,9 +16,7 @@ def load_all_data() -> pd.DataFrame:
             all_data[clue+"Feat"] = data["Features"]
     return all_data
 
-def load_data(clue: str) -> pd.DataFrame:
-    base = "../data/export/" + clue
-
+def load_data(base: str) -> pd.DataFrame:
     # 1) metadata
     meta = pd.read_csv(os.path.join(base, "metadata.csv"))
 

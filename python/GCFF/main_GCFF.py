@@ -25,7 +25,6 @@ from typing import Any, Dict, List, Tuple
 import os
 import numpy as np
 import argparse
-import pickle
 import scipy.io as sio
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, gc
@@ -169,24 +168,13 @@ def run_gcff_sequence(data, params: Params, clue: str, speaking_status: Any, use
 
 if __name__ == '__main__':  # pragma: no cover
     parser = argparse.ArgumentParser(description='Run GCFF main pipeline.')
-    parser.add_argument('--data', type=str, required=False, help='Path to pickled DataFrame with features and metadata')
+    parser.add_argument('--data', type=str, required=False, help='Path to parent directory with features and metadata', default="../data/export/")
     parser.add_argument('--clue', type=str, default='head', choices=['head', 'shoulder', 'hip', 'foot'])
     parser.add_argument('--stride', type=float, default=40.0)
     parser.add_argument('--mdl', type=float, default=6000.0)
     parser.add_argument('--use-real', type=bool, default=True)
     args = parser.parse_args()
 
-    if args.data:
-        file_ext = os.path.splitext(args.data)[1].lower()
-        if file_ext == '.pkl':
-            with open(args.data, 'rb') as f:
-                data = pickle.load(f)
-        elif file_ext == '.mat':
-            data = sio.loadmat(args.data, spmatrix=False)
-        else:
-            raise SystemExit(f'Unsupported file format: {file_ext}. Please provide a .mat or .pkl file.')
-    else:
-        data = load_all_data()
-
+    data = load_all_data(args.data)
     res, _ = run_gcff_sequence(data, Params(args.stride, args.mdl), args.clue, speaking_status=None, use_real=args.use_real)
     print('F1_avg:', res['F1_avg'])
