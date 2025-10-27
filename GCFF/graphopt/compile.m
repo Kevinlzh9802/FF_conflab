@@ -6,6 +6,6 @@
 % mex expand.cpp -DDEBUG_EXPAND
 % mex multi.cpp 
 
-mex -v CXXFLAGS="$CXXFLAGS -DDEBUG_EXPAND -O2" expand.cpp
+mex -v CXXFLAGS="$CXXFLAGS -DDEBUG_EXPAND -DDEBUG_SOLVE -O2" expand.cpp
 
 %load("/homes/jrkf/Public/pre_gc.mat", "K","s","old_labels","Lambda","Np","MDL")

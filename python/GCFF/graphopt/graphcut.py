@@ -14,6 +14,10 @@ def _dbg_print(prefix: str, msg: str):
         print(f"[graphcut.{prefix}] {msg}")
 
 
+def _dbg_detail() -> bool:
+    return os.environ.get("GCFF_DEBUG_DETAIL", "").lower() in {"1", "true", "yes", "on"}
+
+
 class _Dinic:
     def __init__(self):
         self.n = 0
@@ -151,16 +155,28 @@ class Hypothesis:
         self.neigh_m = np.full((self.nodes, self.max_neigh_m), -1, dtype=np.int64) if self.max_neigh_m > 0 else np.zeros((self.nodes, 0), dtype=np.int64)
         self._ncost = None  # to be assigned: shape (nodes, max_neigh_p)
         self.g = _Graph()
+        self._base0 = None  # base for data nodes
+        self._base1 = None  # base for auxiliary nodes allocated in construct_multi
+
+    def _abs_index(self, idx: int) -> int:
+        # Map C++-style indices to absolute indices in our graph
+        # [0 .. nodes-1]          -> base0 + idx
+        # [nodes .. 2*nodes-1]    -> base1 + (idx - nodes)
+        if 0 <= idx < self.nodes:
+            return (self._base0 if self._base0 is not None else 0) + idx
+        if self.nodes <= idx < 2 * self.nodes and self._base1 is not None:
+            return self._base1 + (idx - self.nodes)
+        return idx
 
     def add_tweights(self, i: int, w1: float, w2: float, _id: str):
         if (w1 == 0) and (w2 == 0):
             return
-        self.g.add_tweights(i, float(w1), float(w2))
+        self.g.add_tweights(self._abs_index(i), float(w1), float(w2))
 
     def add_edge(self, i: int, j: int, w1: float, w2: float, _id: str):
         if i == j:
             return
-        self.g.add_edge(i, j, float(w1), float(w2))
+        self.g.add_edge(self._abs_index(i), self._abs_index(j), float(w1), float(w2))
 
     def unary(self, node: int, lab: int) -> float:
         return float(self.un[node, lab])
@@ -184,7 +200,8 @@ class Hypothesis:
         return float(self._ncost[n, n2])
 
     def construct_multi(self, alpha: int):
-        self.g.add_node(self.nodes)  # ensure base nodes exist
+        # Allocate auxiliary nodes block as in C++ (g->add_node(nodes))
+        self._base1 = self.g.add_node(self.nodes)
         for i in range(self.nodes):
             if self.label[i] != alpha:
                 nalpha = False
@@ -240,6 +257,8 @@ class Hypothesis:
                         self.add_edge(j, temp, self.hweight(i), 0.0, 'l')
 
     def construct_pairwise(self, alpha: int):
+        pos_cnt = 0
+        neg_cnt = 0
         for i in range(self.nodes):
             if self.label[i] != alpha:
                 cost = (1.0 - self.lambda_) * (self.unary(i, self.label[i]) - self.unary(i, alpha))
@@ -258,20 +277,45 @@ class Hypothesis:
                 if self.label[i] != alpha:
                     # add unary backward
                     self.add_tweights(i, max(-cost, 0.0), max(cost, 0.0), 'z')
+                    if cost >= 0:
+                        pos_cnt += 1
+                    else:
+                        neg_cnt += 1
+        if _dbg_enabled():
+            _dbg_print("pairwise", f"alpha={alpha} unary-back counts: pos={pos_cnt} neg={neg_cnt}")
 
     def expand(self, alpha: int):
+        # Optional pre-cost debug
+        if _dbg_enabled():
+            try:
+                _dbg_print("solve", f"before alpha={alpha} cost={self.cost():.6g}")
+            except Exception:
+                pass
         self.g.reset()
-        self.g.add_node(self.nodes)
+        self._base0 = self.g.add_node(self.nodes)
+        self._base1 = None
         if self.max_neigh_m > 0:
             self.construct_multi(alpha)
         self.construct_pairwise(alpha)
         self.construct_mdl_boykov(alpha)
         self.g.maxflow()
         # update labels: nodes at sink side take alpha
+        flips = 0
+        flipped_idx = []
         for i in range(self.nodes):
-            sink_side = self.g.what_segment(i, _Graph.SINK) == _Graph.SINK
+            sink_side = self.g.what_segment(self._abs_index(i), _Graph.SINK) == _Graph.SINK
             if self.label[i] != alpha and sink_side:
                 self.label[i] = alpha
+                flips += 1
+                if _dbg_detail():
+                    flipped_idx.append(i)
+        if _dbg_enabled():
+            try:
+                _dbg_print("expand", f"alpha={alpha} flips={flips} cost={self.cost():.6g}")
+                if _dbg_detail() and flipped_idx:
+                    _dbg_print("expand", f"flipped idx (first 20): {flipped_idx[:20]}")
+            except Exception:
+                pass
 
     def annotate(self, thresh: float) -> np.ndarray:
         out = np.zeros((self.nodes, self.hyp), dtype=float)
@@ -443,6 +487,8 @@ def multi(unary: np.ndarray,
     H.neigh_m = n_m
     H.solve()
     annot = H.annotate(float(thresh))
+    if _dbg_enabled():
+        _dbg_print("expand", f"annot sum={float(np.sum(annot)):.6g}")
     return annot, H.label.copy()
 
 

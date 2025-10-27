@@ -12,6 +12,13 @@
 #include "graph.cpp"
 #include "maxflow.cpp"
 #include <mex.h>
+
+// Lightweight debug printing
+#ifdef DEBUG_SOLVE
+#define DPRINTF(...) mexPrintf(__VA_ARGS__)
+#else
+#define DPRINTF(...)
+#endif
 #define xstr(s) str(s)
 #define str(s) #s
 #define DEBUG ___
@@ -273,11 +280,16 @@ public:
     
     g->maxflow();	  
 
+    int flips=0;
     for (int i = 0; i !=nodes; ++i){
       if ((label[i]!=alpha)&&
 	  (g->what_segment(i,Graph<double,double,double>::SINK)==Graph<double,double,double>::SINK))
+      {
 	label[i]=alpha;
+	++flips;
+      }
     }
+    DPRINTF("[class.expand] alpha=%d flips=%d cost=%g\n", alpha, flips, cost());
   }
   void disp_labels(){
     for (int i = 0; i !=nodes; ++i)
@@ -395,6 +407,7 @@ void fast_solve(){
 
       for (int j = 0; j !=hyp; ++j){
 	//printf("i: %d, j: %d, hyp %d\n",i,j,hyp);
+	DPRINTF("[class.solve] before alpha=%d cost=%g\n", j, c);
 	expand(j);
 	//      annotate(grid);
 	temp=cost();
@@ -409,7 +422,7 @@ void fast_solve(){
 	}
 	else {
 	  if (temp<c){
-	    printf ("Cost decreasing to %f\n",temp);
+	    DPRINTF ("[class.solve] after alpha=%d cost=%g -> %g\n", j, c, temp);
 	    i=0;
 	  }
 	  for (int i = 0; i !=nodes; ++i)
