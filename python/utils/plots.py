@@ -148,6 +148,7 @@ def plot_all_skeletons_3d(data_kp: Any,
                     ax=None,
                     title: Optional[str] = None,
                     show: bool = True,
+                    show_poses: Sequence[bool] = (True, True, True, True),
                     base_height: float = 170.0):
     """Plot 3D scatter of 2D keypoints (Z=0) extracted from the right 24 columns of feature set.
 
@@ -158,6 +159,7 @@ def plot_all_skeletons_3d(data_kp: Any,
       coefficients per keypoint name:
         head:1, nose:0.95, leftShoulder/rightShoulder:0.85, leftHip/rightHip:0.5,
         leftAnkle/rightAnkle:0.02, leftFoot/rightFoot:0.02
+    - show_poses: 1x4 booleans (head, shoulder, hip, foot) to toggle arrows.
     """
 
     arr = np.asarray(data_kp[key][frame_idx])
@@ -172,6 +174,25 @@ def plot_all_skeletons_3d(data_kp: Any,
     any_pts = False
     # Coefficients aligned with _extract_xy_from_headfeat_A order
     coefs = np.array([1.0, 0.95, 0.85, 0.85, 0.5, 0.5, 0.02, 0.02, 0.02, 0.02], dtype=float)
+
+    # Normalize/validate show_poses to 4-tuple of bools
+    def _normalize_flags(flags):
+        try:
+            # Broadcast single bool
+            if isinstance(flags, (bool, np.bool_)):
+                return (bool(flags),) * 4
+            seq = list(flags)
+            if len(seq) == 0:
+                return (False, False, False, False)
+            if len(seq) < 4:
+                seq = (seq * 4)[:4]
+            elif len(seq) > 4:
+                seq = seq[:4]
+            return tuple(bool(x) for x in seq)
+        except Exception:
+            return (True, True, True, True)
+
+    show_head, show_shoulder, show_hip, show_foot = _normalize_flags(show_poses)
     for ci, r in enumerate(rows):
         pts2 = _extract_xy_from_headfeat_A(A[r, :])  # (10,2)
         # Full arrays with NaNs for missing
@@ -244,14 +265,85 @@ def plot_all_skeletons_3d(data_kp: Any,
         pl(P[6], P[8]); pl(P[8], P[10])
         # [rightHip-rightAnkle-rightFoot]
         pl(P[7], P[9]); pl(P[9], P[11])
+
+        # --- Pose orientation arrows ---
+        def valid_xy(ix):
+            return (not np.isnan(X_all[ix])) and (not np.isnan(Y_all[ix]))
+
+        def draw_arrow(start_xyz, vec_xy, color):
+            if start_xyz is None or vec_xy is None:
+                return
+            sx, sy, sz = start_xyz
+            vx, vy = vec_xy
+            if any(np.isnan([sx, sy, sz, vx, vy])):
+                return
+            if vx == 0 and vy == 0:
+                return
+            try:
+                ax.quiver(sx, sy, sz, vx, vy, 0.0, color=color, linewidth=1.5, arrow_length_ratio=0.2)
+            except TypeError:
+                # Fallback if arrow_length_ratio not supported
+                ax.quiver(sx, sy, sz, vx, vy, 0.0, color=color, linewidth=1.5)
+
+        # 1) Head pose: head -> nose (ignore Z difference)
+        if show_head and valid_xy(0) and valid_xy(1):
+            start = (X_all[0], Y_all[0], Z_all[0])
+            vec = (X_all[1] - X_all[0], Y_all[1] - Y_all[0])
+            draw_arrow(start, vec, col)
+
+        # 2) Shoulder pose: from mid-shoulder, rotate (L->R) by +90 deg CCW
+        if show_shoulder and not np.any(np.isnan(midS)) and valid_xy(2) and valid_xy(3):
+            vx = X_all[3] - X_all[2]
+            vy = Y_all[3] - Y_all[2]
+            v_rot = (-vy, vx)
+            start = midS
+            draw_arrow(start, v_rot, col)
+
+        # 3) Hip pose: from mid-hip, rotate (L->R) by +90 deg CCW
+        if show_hip and not np.any(np.isnan(midH)) and valid_xy(4) and valid_xy(5):
+            vx = X_all[5] - X_all[4]
+            vy = Y_all[5] - Y_all[4]
+            v_rot = (-vy, vx)
+            start = midH
+            draw_arrow(start, v_rot, col)
+
+        # 4) Foot pose:
+        #    - start at mass center of [lAnkle, rAnkle, lFoot, rFoot]
+        #    - direction is average of rotated orientations of ankle (r-l) and foot (r-l)
+        idxs_center = [6, 7, 8, 9]
+        valid_center = [i for i in idxs_center if not (np.isnan(X_all[i]) or np.isnan(Y_all[i]) or np.isnan(Z_all[i]))]
+        if show_foot and len(valid_center) > 0:
+            cx = float(np.nanmean([X_all[i] for i in valid_center]))
+            cy = float(np.nanmean([Y_all[i] for i in valid_center]))
+            cz = float(np.nanmean([Z_all[i] for i in valid_center]))
+
+            vecs = []
+            # ankle orientation
+            if valid_xy(6) and valid_xy(7):
+                ax_vx = X_all[7] - X_all[6]
+                ax_vy = Y_all[7] - Y_all[6]
+                vecs.append(np.array([-ax_vy, ax_vx], dtype=float))
+            # foot orientation
+            if valid_xy(8) and valid_xy(9):
+                ft_vx = X_all[9] - X_all[8]
+                ft_vy = Y_all[9] - Y_all[8]
+                vecs.append(np.array([-ft_vy, ft_vx], dtype=float))
+
+            if len(vecs) > 0:
+                # average direction of available vectors
+                v_avg = np.nanmean(np.stack(vecs, axis=0), axis=0)
+                if not np.any(np.isnan(v_avg)) and not (v_avg[0] == 0 and v_avg[1] == 0):
+                    draw_arrow((cx, cy, cz), (float(v_avg[0]), float(v_avg[1])), col)
     if any_pts:
-        # try to set equal aspect from all plotted points
-        # collect limits from current data
-        xdata = np.concatenate([c._offsets3d[0] for c in ax.collections]) if ax.collections else np.array([0])
-        ydata = np.concatenate([c._offsets3d[1] for c in ax.collections]) if ax.collections else np.array([0])
-        zdata = np.concatenate([c._offsets3d[2] for c in ax.collections]) if ax.collections else np.array([0])
+        # try to set equal aspect from all plotted points (scatter only)
+        # filter collections that have _offsets3d (e.g., Path3DCollection from scatter)
+        scatters = [c for c in ax.collections if hasattr(c, '_offsets3d')] if ax.collections else []
+        xdata = np.concatenate([c._offsets3d[0] for c in scatters]) if scatters else np.array([0])
+        ydata = np.concatenate([c._offsets3d[1] for c in scatters]) if scatters else np.array([0])
+        zdata = np.concatenate([c._offsets3d[2] for c in scatters]) if scatters else np.array([0])
         _set_equal_3d(ax, np.asarray(xdata), np.asarray(ydata), np.asarray(zdata))
         ax.legend(loc='upper right', fontsize=8)
     if show and fig is not None:
         plt.show()
     return ax
+
