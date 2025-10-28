@@ -22,7 +22,7 @@ def process_data(base_dir):
             data = data.assign(id=np.arange(1, len(data) + 1))
         except Exception:
             pass
-
+    # TODO: sort the columns
     data.to_pickle(base_dir + "data.pkl")
 
 
@@ -74,7 +74,7 @@ def load_features(base_dir, nrows):
         feats.append(arr)
     return feats
 
-def filter_and_concat_table(data, used_parts):
+def filter_and_concat_table(data, used_parts): #TODO: move to table.py
     df = data
     if isinstance(df, pd.DataFrame) and used_parts:
         sel = df.iloc[0:0].copy()

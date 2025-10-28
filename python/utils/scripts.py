@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 
-def _add_merged_column(df: pd.DataFrame) -> pd.DataFrame:
+def _add_merged_column(df: pd.DataFrame) -> pd.DataFrame:  # TODO: move to table.py
     ids = pd.unique(df['Seg'])
     offset = 0.0
     concat_ts = np.full((len(df),), np.nan, dtype=float)
@@ -55,7 +55,7 @@ def construct_formations(results: dict, data: pd.DataFrame, speaking_status: Dic
     If speaking_status provided with merged arrays per vid, computes avg_speaker.
     Returns a pandas DataFrame 'formations'.
     """
-    from utils.python.groups import record_unique_groups
+    from utils.groups import record_unique_groups
 
     col_name = 'GT'
     vids = sorted(pd.unique(data['Vid']))

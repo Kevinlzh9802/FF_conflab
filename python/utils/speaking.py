@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
-
 import numpy as np
-
 from .groups import filter_group_by_members
+from scipy.io import loadmat
 
 
-def read_speaking_status(sp_status: Dict[str, Any], vid: int, seg: int, n: int, window: int):
+def read_speaking_status(data_path):
+    mat = loadmat(data_path, squeeze_me=True, struct_as_record=False)
+    S = mat['speaking_status']
+    speaking = {fn: getattr(S.speaking, fn) for fn in S.index.speaking_keys}
+    confidence = {fn: getattr(S.confidence, fn) for fn in S.index.confidence_keys}
+    return {'speaking': speaking, 'confidence': confidence}
+
+
+def get_speaking_status_single(sp_status: Dict[str, Any], vid: int, seg: int, n: int, window: int):
     """Read speaking status row(s) from a nested dict structure similar to MATLAB.
 
     sp_status['speaking'] contains keys like 'vidX_segy' mapping to arrays.
@@ -100,3 +107,6 @@ def collect_matching_groups(vector: Sequence[int], ts: Iterable[int], vid: int, 
 def count_speaker_groups(*args, **kwargs):  # pragma: no cover - placeholder
     raise NotImplementedError("countSpeakerGroups requires project-specific table structures; TODO later.")
 
+
+if __name__ == '__main__': 
+    read_speaking_status('../data/expert/speaking_status_py.mat')
