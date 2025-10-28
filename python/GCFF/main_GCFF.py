@@ -31,6 +31,7 @@ from gcff_core import ff_deletesingletons, ff_evalgroups, gc
 from utils.speaking import read_speaking_status, get_status_for_group
 from utils.scripts import constructFormations, detectGroupNumBreakpoints
 from utils.data import filter_and_concat_table
+from utils.groups import turn_singletons_to_groups
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
 USED_SEGS = ["429"]
@@ -72,14 +73,14 @@ def gcff_experiments(data: pd.DataFrame, params: Params, speaking_status: Any):
         feat_col = f"{clue}Feat"
         features = list(data[feat_col]) if hasattr(data, '__getitem__') else []
         GTgroups = list(data['GT']) if ('GT' in getattr(data, 'columns', [])) else [None] * len(features)
-        timestamps = list(data['Timestamp']) if ('Timestamp' in getattr(data, 'columns', [])) else list(range(len(features)))
-
-        results, data_returned = gcff_sequence(features, GTgroups, params, speaking_status)
-
+        # timestamps = list(data['Timestamp']) if ('Timestamp' in getattr(data, 'columns', [])) else list(range(len(features)))
+        results, _ = gcff_sequence(features, GTgroups, params, speaking_status)
+        data[f"{clue}Res"] = results['groups']
     # Translate remaining scripts to function calls (placeholders for now)
+    # sp_merged = merge_speaking()
     # _formations = constructFormations(results, data=data)
     # _breakpoints = detectGroupNumBreakpoints(results, data=data)
-    return results, data_returned
+    return data
 
 def gcff_sequence(features, GTgroups, params, speaking_status):
     """High-level pipeline adapted from example_GCFF.m.
@@ -115,11 +116,15 @@ def gcff_sequence(features, GTgroups, params, speaking_status):
         for lab in range(int(labels.max()) + 1 if labels.size else 0):
             members = F[labels == lab, 0].astype(int).tolist()
             groups.append(members)
+
         # Delete singletons
-        groups = ff_deletesingletons(groups) if groups else []
+        if not ff_deletesingletons(groups):  # which means groups are all singletons
+            groups = []
+        groups = turn_singletons_to_groups(groups)
+        GT = turn_singletons_to_groups(GTgroups[idx])
         groups_out[idx] = groups
-        # Apply GT filtering too
-        GT = ff_deletesingletons(GTgroups[idx]) if (GTgroups and GTgroups[idx]) else []
+
+        # GT = ff_deletesingletons(GTgroups[idx]) if (GTgroups and GTgroups[idx]) else []
         # Evaluate
         pr, re, tp, fp, fn = ff_evalgroups(groups, GT, TH='card', cardmode=0)
         precision[idx], recall[idx], TP[idx], FP[idx], FN[idx] = pr, re, tp, fp, fn
@@ -156,8 +161,6 @@ def gcff_sequence(features, GTgroups, params, speaking_status):
         's_speaker': np.array(s_speaker),
         # 'body_orientations': clue,
     }
-
-
 
     return results, data
 

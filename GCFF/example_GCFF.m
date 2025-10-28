@@ -74,14 +74,14 @@ for clue = clues
 
     used_data.(f_name) = results.(clue).groups;
     results.(clue).original_data = used_data;
-    data_results(used_data.id, 'headRes') = results.(clue).groups;
+    data_results(used_data.id, f_name) = results.(clue).groups;
 end
 
 % analysis = data_results(~cellfun(@isempty, data_results.headRes) & data_results.concat_id, :);
 
 run constructFormations.m;
 % run plotAllCluesComparison.m;
-run detectGroupNumBreakpoints.m;
+% run detectGroupNumBreakpoints.m;
 % run detectSubFloor.m;
 % run spatialScores.m;
 
@@ -123,9 +123,9 @@ for idxFrame = 1:length(timestamp)
             groups{idxFrame} = [];
         end
     end
-    if ~isempty(GTgroups{idxFrame})
-        GTgroups{idxFrame} = ff_deletesingletons(GTgroups{idxFrame}) ;
-    end
+    % if ~isempty(GTgroups{idxFrame})
+    %     GTgroups{idxFrame} = ff_deletesingletons(GTgroups{idxFrame}) ;
+    % end
     [precision(idxFrame),recall(idxFrame),TP(idxFrame),FP(idxFrame),FN(idxFrame)] = ff_evalgroups(groups{idxFrame},GTgroups{idxFrame},'card') ;
     
 
