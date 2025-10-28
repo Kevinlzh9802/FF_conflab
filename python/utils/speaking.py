@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 import numpy as np
-from .groups import filter_group_by_members
+from groups import filter_group_by_members
 from scipy.io import loadmat
 
 
@@ -109,4 +109,4 @@ def count_speaker_groups(*args, **kwargs):  # pragma: no cover - placeholder
 
 
 if __name__ == '__main__': 
-    read_speaking_status('../data/expert/speaking_status_py.mat')
+    read_speaking_status('../data/export/speaking_status_py.mat')
