@@ -33,6 +33,7 @@ from utils.speaking import read_speaking_status, get_status_for_group
 from utils.scripts import constructFormations, detectGroupNumBreakpoints
 from utils.data import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
+from utils.plots import plot_all_skeletons_3d
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
 USED_SEGS = ["429"]
@@ -43,7 +44,7 @@ class Params:
     mdl: float
     use_real: bool
     used_parts: Optional[List[str]] = None  # e.g., ["233", "429"]
-    data_paths: dict
+    data_paths: Optional[Dict] = None
 
 
 def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -> None:
@@ -73,16 +74,19 @@ def gcff_experiments(params: Params):
     data_kp = filter_and_concat_table(data_kp, params.used_parts)
 
     # Build features per frame for the selected clue
-    for clue in ALL_CLUES:
-        feat_col = f"{clue}Feat"
-        features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
-        GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
+    # for clue in ALL_CLUES:
+    #     feat_col = f"{clue}Feat"
+    #     features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
+    #     GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
 
-        results = gcff_sequence(features, GTgroups, params)
-        data_kp[f"{clue}Res"] = results['groups']
+    #     results = gcff_sequence(features, GTgroups, params)
+    #     data_kp[f"{clue}Res"] = results['groups']
 
     # Translate remaining scripts to function calls (placeholders for now)
     # _breakpoints = detectGroupNumBreakpoints(results, data=data)
+
+    # generate 3D skeleton view
+    plot_all_skeletons_3d(data_kp, 0)
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):

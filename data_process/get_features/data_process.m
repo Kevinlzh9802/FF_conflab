@@ -85,22 +85,22 @@ for k = 26:length(Files)
             frame_data(p,6) = headY;
             frame_data(p,7) = noseX;
             frame_data(p,8) = noseY;
-
+            
             frame_data(p,9) = leftShoulderX;
             frame_data(p,10) = leftShoulderY;
             frame_data(p,11) = rightShoulderX;
             frame_data(p,12) = rightShoulderY;
-
+            
             frame_data(p,13) = leftHipX;
             frame_data(p,14) = leftHipY;
             frame_data(p,15) = rightHipX;
             frame_data(p,16) = rightHipY;
-
+            
             frame_data(p,17) = leftAnkleX;
             frame_data(p,18) = leftAnkleY;
             frame_data(p,19) = rightAnkleX;
             frame_data(p,20) = rightAnkleY;
-
+            
             frame_data(p,21) = leftFootX;
             frame_data(p,22) = leftFootY;
             frame_data(p,23) = rightFootX;
