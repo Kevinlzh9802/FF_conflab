@@ -26,6 +26,7 @@ import os
 import numpy as np
 import argparse
 import pandas as pd
+import h5py
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, gc
 from utils.speaking import read_speaking_status, get_status_for_group
@@ -42,6 +43,7 @@ class Params:
     mdl: float
     use_real: bool
     used_parts: Optional[List[str]] = None  # e.g., ["233", "429"]
+    data_paths: dict
 
 
 def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -> None:
@@ -64,25 +66,26 @@ def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -
     print("")
 
 
-def gcff_experiments(data: pd.DataFrame, params: Params, speaking_status: Any):
-    # Optional: filter and concat table by 3-digit keys in params.used_parts
-    data = filter_and_concat_table(data, params.used_parts)
+def gcff_experiments(params: Params):
+    # read keypoint data
+    data_kp = pd.read_pickle(params.data_paths["kp"])
+    # filter and concat table by 3-digit keys in params.used_parts
+    data_kp = filter_and_concat_table(data_kp, params.used_parts)
 
     # Build features per frame for the selected clue
     for clue in ALL_CLUES:
         feat_col = f"{clue}Feat"
-        features = list(data[feat_col]) if hasattr(data, '__getitem__') else []
-        GTgroups = list(data['GT']) if ('GT' in getattr(data, 'columns', [])) else [None] * len(features)
-        # timestamps = list(data['Timestamp']) if ('Timestamp' in getattr(data, 'columns', [])) else list(range(len(features)))
-        results, _ = gcff_sequence(features, GTgroups, params, speaking_status)
-        data[f"{clue}Res"] = results['groups']
-    # Translate remaining scripts to function calls (placeholders for now)
-    # sp_merged = merge_speaking()
-    # _formations = constructFormations(results, data=data)
-    # _breakpoints = detectGroupNumBreakpoints(results, data=data)
-    return data
+        features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
+        GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
 
-def gcff_sequence(features, GTgroups, params, speaking_status):
+        results = gcff_sequence(features, GTgroups, params)
+        data_kp[f"{clue}Res"] = results['groups']
+
+    # Translate remaining scripts to function calls (placeholders for now)
+    # _breakpoints = detectGroupNumBreakpoints(results, data=data)
+    return data_kp
+
+def gcff_sequence(features, GTgroups, params):
     """High-level pipeline adapted from example_GCFF.m.
 
     Returns (results_dict, data_out)
@@ -108,16 +111,13 @@ def gcff_sequence(features, GTgroups, params, speaking_status):
             F = feat[:, 24:28]
         else:
             F = feat[:, 0:4]
-        # cols = np.arange(0 if not params.use_real else 24, 24 + (24 if params.use_real else 0))
-        # cols = cols[: min(feat.shape[1], 24)] if feat.shape[1] >= 24 else np.arange(feat.shape[1])
-        # F = feat[:, cols]
         labels = gc(F[:, :4], params.stride, params.mdl)
         groups = []
         for lab in range(int(labels.max()) + 1 if labels.size else 0):
             members = F[labels == lab, 0].astype(int).tolist()
             groups.append(members)
 
-        # Delete singletons
+        # Deal with
         if not ff_deletesingletons(groups):  # which means groups are all singletons
             groups = []
         groups = turn_singletons_to_groups(groups)
@@ -130,19 +130,19 @@ def gcff_sequence(features, GTgroups, params, speaking_status):
         precision[idx], recall[idx], TP[idx], FP[idx], FN[idx] = pr, re, tp, fp, fn
 
         # Optionally collect speaking status per-frame (if structure available)
-        try:
-            if isinstance(data, pd.DataFrame):
-                info = data.iloc[idx][['Cam', 'Vid', 'Seg', 'Timestamp']]
-                sp, cf = read_speaking_status(speaking_status, int(info.Vid), int(info.Seg), int(info.Timestamp) + 1, 1)
-                if isinstance(sp, (list, np.ndarray)) and groups:
-                    ss = get_status_for_group(np.arange(len(sp)), sp, groups)
-                    for vals in ss:
-                        ssv = float(np.sum(vals))
-                        if not (ssv > 10 or ssv < 0):
-                            group_sizes.append(len(vals))
-                            s_speaker.append(ssv)
-        except Exception:
-            pass
+        # try:
+        #     if isinstance(data, pd.DataFrame):
+        #         info = data.iloc[idx][['Cam', 'Vid', 'Seg', 'Timestamp']]
+        #         sp, cf = read_speaking_status(speaking_status, int(info.Vid), int(info.Seg), int(info.Timestamp) + 1, 1)
+        #         if isinstance(sp, (list, np.ndarray)) and groups:
+        #             ss = get_status_for_group(np.arange(len(sp)), sp, groups)
+        #             for vals in ss:
+        #                 ssv = float(np.sum(vals))
+        #                 if not (ssv > 10 or ssv < 0):
+        #                     group_sizes.append(len(vals))
+        #                     s_speaker.append(ssv)
+        # except Exception:
+        #     pass
 
         display_frame_results(idx + 1, T, groups, GT)
 
@@ -162,7 +162,7 @@ def gcff_sequence(features, GTgroups, params, speaking_status):
         # 'body_orientations': clue,
     }
 
-    return results, data
+    return results
 
 
 if __name__ == '__main__':  # pragma: no cover
@@ -174,7 +174,11 @@ if __name__ == '__main__':  # pragma: no cover
     parser.add_argument('--use-real', type=bool, default=True)
     args = parser.parse_args()
 
-    data = pd.read_pickle(args.data + "data.pkl")
     params = Params(args.stride, args.mdl, args.use_real, used_parts=USED_SEGS)
-    res, _ = gcff_experiments(data, params, speaking_status=None)
+    params.data_paths = {
+        "kp": args.data + "data.pkl",
+        "sp": args.data + "sp_merged.pkl",
+        "frames": args.data + "frames/",
+    }
+    res, _ = gcff_experiments(params)
     print('F1_avg:', res['F1_avg'])

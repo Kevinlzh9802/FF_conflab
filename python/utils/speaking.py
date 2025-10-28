@@ -2,9 +2,84 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 import numpy as np
-from groups import filter_group_by_members
+import os
+import re
+import pickle
+from utils.groups import filter_group_by_members
 from scipy.io import loadmat
 
+
+def write_sp_merged(read_path, write_path):
+    """Read exported speaking_status .mat and write merged per-video pickles.
+
+    - read_path: path to .mat produced by GCFF/convertData.m (contains struct 'speaking_status')
+    - write_path: path to .pkl to write; saved object is a dict:
+        {
+          'speaking': { vid: merged_matrix },
+          'confidence': { vid: merged_matrix }
+        }
+      where merged_matrix has shape ((1 + total_time), num_ids)
+      with first row the ID list and subsequent rows the concatenated timeline.
+    """
+    ss = read_speaking_status(read_path)
+    speaking = ss['speaking']
+    confidence = ss['confidence']
+
+    # Collect vids from keys like 'vid2_seg8'
+    def parse_key(k: str):
+        m = re.match(r"vid(\d+)_seg(\d+)$", k)
+        if not m:
+            return None
+        return int(m.group(1)), int(m.group(2))
+
+    # Map vid -> list of (seg, key)
+    vids: Dict[int, List[Tuple[int, str]]] = {}
+    for k in speaking.keys():
+        p = parse_key(k)
+        if p is None:
+            continue
+        vid, seg = p
+        vids.setdefault(vid, []).append((seg, k))
+
+    merged_sp: Dict[int, np.ndarray] = {}
+    merged_cf: Dict[int, np.ndarray] = {}
+
+    for vid, pairs in vids.items():
+        # sort by seg increasing
+        pairs.sort(key=lambda x: x[0])
+        # Merge speaking
+        sp_arr = np.asarray(speaking[pairs[0][1]])
+        for _, key in pairs[1:]:
+            sp_arr = merge_speaking_status(sp_arr, np.asarray(speaking[key]))
+        # Merge confidence
+        cf_arr = np.asarray(confidence[pairs[0][1]])
+        for _, key in pairs[1:]:
+            cf_arr = merge_speaking_status(cf_arr, np.asarray(confidence[key]))
+        # Optional: ensure both have identical ID rows
+        if sp_arr.shape[1] != cf_arr.shape[1] or not np.array_equal(sp_arr[0, :], cf_arr[0, :]):
+            # reconcile by union of IDs
+            ids_sp = sp_arr[0, :].astype(int)
+            ids_cf = cf_arr[0, :].astype(int)
+            all_ids = np.unique(np.concatenate([ids_sp, ids_cf]))
+            # reindex helper
+            def reindex(arr, all_ids):
+                ids = arr[0, :].astype(int)
+                data = arr[1:, :]
+                out = np.full((data.shape[0], all_ids.size), np.nan)
+                loc = {int(pid): i for i, pid in enumerate(ids)}
+                for j, pid in enumerate(all_ids):
+                    if int(pid) in loc:
+                        out[:, j] = data[:, loc[int(pid)]]
+                return np.vstack([all_ids.reshape(1, -1), out])
+            sp_arr = reindex(sp_arr, all_ids)
+            cf_arr = reindex(cf_arr, all_ids)
+        merged_sp[vid] = sp_arr
+        merged_cf[vid] = cf_arr
+
+    out = {'speaking': merged_sp, 'confidence': merged_cf}
+    os.makedirs(os.path.dirname(write_path) or '.', exist_ok=True)
+    with open(write_path, 'wb') as f:
+        pickle.dump(out, f)
 
 def read_speaking_status(data_path):
     mat = loadmat(data_path, squeeze_me=True, struct_as_record=False)
@@ -109,4 +184,4 @@ def count_speaker_groups(*args, **kwargs):  # pragma: no cover - placeholder
 
 
 if __name__ == '__main__': 
-    read_speaking_status('../data/export/speaking_status_py.mat')
+    write_sp_merged('../data/export/speaking_status_py.mat', '../data/export/sp_merged.pkl')
