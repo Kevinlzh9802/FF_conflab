@@ -104,16 +104,55 @@ class _Dinic:
         return vis
 
 
-class _Graph:
-    SINK = 1
+def _select_backend() -> str:
+    b = os.environ.get("GCFF_MAXFLOW", "").lower()
+    if b.startswith("bk"):
+        return "bk"
+    return "dinic"
 
-    def __init__(self, max_nodes_hint: int = 0):
+
+class _BKGraph:
+    def __init__(self):
+        try:
+            import maxflow  # type: ignore
+        except Exception as e:
+            raise RuntimeError("BK backend requested but 'maxflow' package is not installed") from e
+        self._maxflow = maxflow
+        self.g = maxflow.Graph[float]()
+        self.n = 0
+
+    def add_node(self, count: int = 1) -> int:
+        start = self.n
+        self.g.add_nodes(int(count))
+        self.n += int(count)
+        return start
+
+    def add_edge(self, i: int, j: int, w1: float, w2: float):
+        if i == j:
+            return
+        if w1 < 0 or w2 < 0:
+            raise ValueError("Edge capacities must be >= 0")
+        self.g.add_edge(int(i), int(j), float(w1), float(w2))
+
+    def add_tweights(self, i: int, w_source: float, w_sink: float):
+        if w_source < 0 or w_sink < 0:
+            raise ValueError("Terminal capacities must be >= 0")
+        self.g.add_tedge(int(i), float(w_source), float(w_sink))
+
+    def maxflow(self) -> float:
+        return float(self.g.maxflow())
+
+    def what_segment(self, i: int) -> int:
+        seg = self.g.get_segment(int(i))
+        # maxflow.SINK is 1
+        return int(seg)
+
+
+class _DinicGraph:
+    def __init__(self):
         self._g = _Dinic()
         self.source = self._g.add_node(1)
         self.sink = self._g.add_node(1)
-
-    def reset(self):
-        self.__init__()
 
     def add_node(self, count: int = 1) -> int:
         return self._g.add_node(count)
@@ -136,9 +175,53 @@ class _Graph:
     def maxflow(self) -> float:
         return self._g.maxflow(self.source, self.sink)
 
-    def what_segment(self, i: int, which) -> int:
+    def what_segment(self, i: int) -> int:
         reach = self._g.reachable_from(self.source)
-        return _Graph.SINK if not reach[i] else 0
+        return 1 if not reach[i] else 0
+
+    def reset(self):
+        self.__init__()
+
+
+class _Graph:
+    SINK = 1
+
+    def __init__(self, max_nodes_hint: int = 0):
+        self._backend = _select_backend()
+        if self._backend == "bk":
+            try:
+                self._g = _BKGraph()
+                if _dbg_enabled():
+                    _dbg_print("backend", "using BK (pymaxflow)")
+            except RuntimeError:
+                # fallback to dinic
+                self._backend = "dinic"
+                self._g = _DinicGraph()
+                if _dbg_enabled():
+                    _dbg_print("backend", "BK not available, falling back to Dinic")
+        else:
+            self._g = _DinicGraph()
+            if _dbg_enabled():
+                _dbg_print("backend", "using Dinic")
+
+    def reset(self):
+        self.__init__()
+
+    def add_node(self, count: int = 1) -> int:
+        return self._g.add_node(count)
+
+    def add_edge(self, i: int, j: int, w1: float, w2: float):
+        self._g.add_edge(i, j, w1, w2)
+
+    def add_tweights(self, i: int, w_source: float, w_sink: float):
+        self._g.add_tweights(i, w_source, w_sink)
+
+    def maxflow(self) -> float:
+        return self._g.maxflow()
+
+    def what_segment(self, i: int, which) -> int:
+        # return 1 for sink, 0 for source
+        return self._g.what_segment(i)
 
 
 class Hypothesis:
@@ -248,13 +331,29 @@ class Hypothesis:
         nclass = np.zeros(self.hyp, dtype=bool)
         for i in range(self.nodes):
             nclass[self.label[i]] = True
+        temp_nodes = 0
+        edge_count = 0
+        min_w = float('inf')
+        max_w = 0.0
+        sum_w = 0.0
         for i in range(self.hyp):
             if (i != alpha) and nclass[i] and self.hweight(i) > 0:
                 temp = self.g.add_node(1)
-                self.add_tweights(temp, 0.0, self.hweight(i), 'z')
+                w = self.hweight(i)
+                self.add_tweights(temp, 0.0, w, 'z')
+                temp_nodes += 1
+                min_w = min(min_w, w)
+                max_w = max(max_w, w)
+                sum_w += w
                 for j in range(self.nodes):
                     if self.label[j] == i:
-                        self.add_edge(j, temp, self.hweight(i), 0.0, 'l')
+                        self.add_edge(j, temp, w, 0.0, 'l')
+                        edge_count += 1
+        if _dbg_enabled():
+            if temp_nodes == 0:
+                _dbg_print("mdl", f"alpha={alpha} MDL: temps=0 edges=0")
+            else:
+                _dbg_print("mdl", f"alpha={alpha} MDL: temps={temp_nodes} edges={edge_count} w[min={min_w:.6g}, max={max_w:.6g}, sum={sum_w:.6g}]")
 
     def construct_pairwise(self, alpha: int):
         pos_cnt = 0

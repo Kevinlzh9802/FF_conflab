@@ -12,7 +12,7 @@ def ff_deletesingletons(groups: List[Sequence[int]]) -> List[List[int]]:
     groups: list of iterables of ints
     returns: filtered list with only groups of size > 1
     """
-    return [list(g) for g in groups if len(g) > 1]
+    return [list(g) for g in groups if (isinstance(g, list) and len(g) > 1)]
 
 
 def ff_evalgroups(

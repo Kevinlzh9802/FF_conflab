@@ -188,18 +188,28 @@ public:
       nclass[label[i]]=true;
     }
 
-    
+    int temp_nodes = 0;
+    int edge_count = 0;
+    double min_w = INFINITY;
+    double max_w = 0.0;
+    double sum_w = 0.0;
     for (int i = 0; i !=hyp; ++i){
       if ((i!=alpha)&&(nclass[i])&&hweight(i)){
-	
 	int temp= g->add_node();
-	add_tweights(temp,0,hweight(i),'z');
+	double w = hweight(i);
+	add_tweights(temp,0,w,'z');
+	++temp_nodes;
+	if (w<min_w) min_w=w;
+	if (w>max_w) max_w=w;
+	sum_w += w;
 	for (int j = 0; j !=nodes; ++j)
 	  if (label[j]==i){
-	    add_edge(j,temp,hweight(i),0,'l');
+	    add_edge(j,temp,w,0,'l');
+	    ++edge_count;
 	  }
       }
     }
+    DPRINTF("[class.mdl] alpha=%d temps=%d edges=%d w[min=%g max=%g sum=%g]\n", alpha, temp_nodes, edge_count, (min_w==INFINITY?0:min_w), max_w, sum_w);
   }
   void construct_mdl_standard(const int alpha){
     //Not needed see Yuri Boykov's work on MDL priors
