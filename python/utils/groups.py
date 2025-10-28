@@ -1,7 +1,5 @@
 from __future__ import annotations
-
 from typing import Iterable, List, Sequence, Tuple
-
 import itertools
 
 
@@ -97,3 +95,10 @@ def record_unique_groups(T, g_name: str):
         result.append({'participants': participants, 'timestamps': timestamps, 'Cam': cams})
     return result
 
+
+def turn_singletons_to_groups(groups: List) -> List[List[int]]:
+    groups_copy = groups.copy()
+    for idx in range(len(groups)):
+        if isinstance(groups[idx], int):
+            groups_copy[idx] = [groups[idx]]
+    return groups_copy
