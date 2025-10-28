@@ -195,8 +195,15 @@ def plot_all_skeletons_3d(data_kp: Any,
 
         # Scatter keypoints and midpoints
         col = tuple(colors[ci % len(colors)])
+        # Person ID from first column of A (if available)
+        pid = A[r, 0] if A.shape[1] > 0 else np.nan
+        try:
+            pid_int = int(pid) if not np.isnan(pid) else None
+        except Exception:
+            pid_int = None
+        legend_label = f"id{pid_int}" if pid_int is not None else f"p{r}"
         mask_pts = ~np.isnan(X_all) & ~np.isnan(Y_all) & ~np.isnan(Z_all)
-        ax.scatter(X_all[mask_pts], Y_all[mask_pts], Z_all[mask_pts], s=20, color=col, label=f"p{r}")
+        ax.scatter(X_all[mask_pts], Y_all[mask_pts], Z_all[mask_pts], s=20, color=col, label=legend_label)
         if not np.any(np.isnan(midS)):
             ax.scatter([midS[0]], [midS[1]], [midS[2]], s=20, color=col)
         if not np.any(np.isnan(midH)):

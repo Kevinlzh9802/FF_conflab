@@ -184,5 +184,5 @@ if __name__ == '__main__':  # pragma: no cover
         "sp": args.data + "sp_merged.pkl",
         "frames": args.data + "frames/",
     }
-    res, _ = gcff_experiments(params)
-    print('F1_avg:', res['F1_avg'])
+    res = gcff_experiments(params)
+    # print('F1_avg:', res['F1_avg'])
