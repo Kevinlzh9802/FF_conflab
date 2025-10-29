@@ -68,27 +68,34 @@ def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -
 
 
 def gcff_experiments(params: Params):
-    # read keypoint data
-    data_kp = pd.read_pickle(params.data_paths["kp"])
+    # read keypoint data, prioritize finished data with detections
+    try:
+        data_kp = pd.read_pickle(params.data_paths["kp_finished"])
+        detection_done = True
+    except:
+        data_kp = pd.read_pickle(params.data_paths["kp"])
+        detection_done = False
     # filter and concat table by 3-digit keys in params.used_parts
     data_kp = filter_and_concat_table(data_kp, params.used_parts)
 
     # Build features per frame for the selected clue
-    for clue in ALL_CLUES:
-        feat_col = f"{clue}Feat"
-        features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
-        GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
+    if not detection_done:
+        for clue in ALL_CLUES:
+            feat_col = f"{clue}Feat"
+            features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
+            GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
 
-        results = gcff_sequence(features, GTgroups, params)
-        data_kp[f"{clue}Res"] = results['groups']
+            results = gcff_sequence(features, GTgroups, params)
+            data_kp[f"{clue}Res"] = results['groups']
 
-    data_kp.to_pickle("../data/export/data_finished.pkl")
+        data_kp.to_pickle("../data/export/data_finished.pkl")
+    
     # Translate remaining scripts to function calls (placeholders for now)
     # _breakpoints = detectGroupNumBreakpoints(results, data=data)
 
     # generate 3D skeleton view
     # plot_all_skeletons(data_kp=data_kp, frame_idx=0, projection='2d')
-    # plot_pose_panels(data_kp=data_kp, frame_idx=0)
+    plot_pose_panels(data_kp=data_kp, frame_idx=2035)
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):
@@ -182,6 +189,7 @@ if __name__ == '__main__':  # pragma: no cover
     params = Params(args.stride, args.mdl, args.use_real, used_parts=USED_SEGS)
     params.data_paths = {
         "kp": args.data + "data.pkl",
+        "kp_finished": args.data + "data_finished.pkl",
         "sp": args.data + "sp_merged.pkl",
         "frames": args.data + "frames/",
     }
