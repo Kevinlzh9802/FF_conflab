@@ -36,7 +36,7 @@ from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_pose_panels
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
-USED_SEGS = ["433"]
+USED_SEGS = []
 
 @dataclass
 class Params:
@@ -82,12 +82,13 @@ def gcff_experiments(params: Params):
         results = gcff_sequence(features, GTgroups, params)
         data_kp[f"{clue}Res"] = results['groups']
 
+    data_kp.to_pickle("../data/export/data_finished.pkl")
     # Translate remaining scripts to function calls (placeholders for now)
     # _breakpoints = detectGroupNumBreakpoints(results, data=data)
 
     # generate 3D skeleton view
     # plot_all_skeletons(data_kp=data_kp, frame_idx=0, projection='2d')
-    plot_pose_panels(data_kp=data_kp, frame_idx=0)
+    # plot_pose_panels(data_kp=data_kp, frame_idx=0)
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):
@@ -107,7 +108,7 @@ def gcff_sequence(features, GTgroups, params):
 
     for idx in range(T):
         feat = features[idx]
-        if feat is None or len(feat) == 0:
+        if feat is None or len(feat) == 0 or feat.shape[1] == 0:
             groups_out[idx] = []
             continue
         # MATLAB: feat = features{idx}(:, [1:24] + 24 * use_real)
