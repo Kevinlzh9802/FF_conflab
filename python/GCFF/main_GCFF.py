@@ -21,9 +21,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple, Optional
+from pathlib import Path
 
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 import argparse
 import pandas as pd
 import h5py
@@ -93,9 +95,36 @@ def gcff_experiments(params: Params):
     # Translate remaining scripts to function calls (placeholders for now)
     # _breakpoints = detectGroupNumBreakpoints(results, data=data)
 
-    # generate 3D skeleton view
-    # plot_all_skeletons(data_kp=data_kp, frame_idx=0, projection='2d')
-    plot_pose_panels(data_kp=data_kp, frame_idx=350)
+    # TODO: separate as a function and move it to plots.py
+    results_dir = Path(__file__).resolve().parents[2] / 'data' / 'results' / 'panel_plots'
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    total_frames = len(data_kp)
+    for frame_idx in range(total_frames):
+        fig, _ = plot_pose_panels(data_kp=data_kp, frame_idx=frame_idx, show=True)
+
+        try:
+            cam_val = int(data_kp['Cam'].iloc[frame_idx])
+        except Exception:
+            cam_val = 0
+        try:
+            vid_val = int(data_kp['Vid'].iloc[frame_idx])
+        except Exception:
+            vid_val = 0
+        try:
+            seg_val = int(data_kp['Seg'].iloc[frame_idx])
+        except Exception:
+            seg_val = 0
+        try:
+            timestamp_val = int(data_kp['Timestamp'].iloc[frame_idx])
+        except Exception:
+            timestamp_val = frame_idx
+
+        filename = f"panel_{cam_val}{vid_val}{seg_val}_{timestamp_val}_{frame_idx}.png"
+        fig_path = results_dir / filename
+        fig.savefig(fig_path, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):

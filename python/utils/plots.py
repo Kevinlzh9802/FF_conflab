@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import textwrap
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -630,6 +631,7 @@ def plot_all_skeletons(data_kp: Any,
     if arr.ndim != 2 or arr.shape[1] < 48:
         raise ValueError(f"Expected (m x 48) array for {key}[{frame_idx}], got {arr.shape}")
     A = arr[:, 24:48]
+    B = arr[:, 0:24]
     m = A.shape[0]
     rows = list(range(m)) if persons is None else list(persons)
 
@@ -708,6 +710,7 @@ def _plot_pose_panel(ax,
                      person_lookup: Optional[Dict[int, PersonSkeleton]] = None,
                      point_selector=None,
                      clue: Optional[str] = None,
+                     show_ids: bool = True,
                      x_lim: Optional[Tuple[float, float]] = None,
                      y_lim: Optional[Tuple[float, float]] = None):
     x_vals: list = []
@@ -760,14 +763,14 @@ def _plot_pose_panel(ax,
             start, vec = _get_pose_arrow(person, arrow_key)
             if start is not None and vec is not None:
                 anchor = _draw_arrow(ax, start, vec, '2d', col, x_vals, y_vals)
-                if anchor is not None:
+                if anchor is not None and show_ids:
                     id_anchor = anchor
                 any_content = True
-        if id_anchor is None:
+        if show_ids and id_anchor is None:
             valid = ~np.isnan(person.points[:, :2]).any(axis=1)
             if np.any(valid):
                 id_anchor = person.points[valid][0][:2]
-        if id_anchor is not None:
+        if show_ids and id_anchor is not None:
             ax.text(float(id_anchor[0]) + 6.0, float(id_anchor[1]) + 6.0, _person_label(person), color=col, fontsize=8)
 
     ax.set_xlabel('X')
@@ -803,7 +806,7 @@ def plot_pose_panels(data_kp: Any,
                      figsize: Tuple[int, int] = (14, 8)):
     """Generate a 5-panel 2D overview of pose keypoints and orientations.
 
-    The X axis is fixed to [-50, 450]; the Y axis is centered at
+    The X axis is fixed to [-50, 600]; the Y axis is centered at
     c_y = 100 * data_kp['Cam'][frame_idx] with a +/- 250 span.
     """
 
@@ -811,6 +814,7 @@ def plot_pose_panels(data_kp: Any,
     if arr.ndim != 2 or arr.shape[1] < 48:
         raise ValueError(f"Expected (m x 48) array for {key}[{frame_idx}], got {arr.shape}")
     A = arr[:, 24:48]
+    B = arr[:, 0:24]
     m = A.shape[0]
     rows = list(range(m)) if persons is None else list(persons)
 
@@ -860,31 +864,36 @@ def plot_pose_panels(data_kp: Any,
     ax_shoulder = fig.add_subplot(gs[0, 1])
     ax_hip = fig.add_subplot(gs[0, 2])
     ax_foot = fig.add_subplot(gs[1, 0])
-    ax_all = fig.add_subplot(gs[1, 1:])
+    ax_all = fig.add_subplot(gs[1, 1])
+    ax_image = fig.add_subplot(gs[1, 2])
 
     head_flag, shoulder_flag, hip_flag, foot_flag = show_flags
     _plot_pose_panel(ax_head, persons_data, colors, [0, 1], 'head', head_flag, 'Head pose',
                      groups=clue_groups['head'], person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.points[0]),
                      clue='head',
+                     show_ids=False,
                      x_lim=x_limits, y_lim=y_limits)
     _plot_pose_panel(ax_shoulder, persons_data, colors, [2, 3], 'shoulder', shoulder_flag,
                      'Shoulder pose', midpoint_attr='mid_shoulder',
                      groups=clue_groups['shoulder'], person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.mid_shoulder),
                      clue='shoulder',
+                     show_ids=False,
                      x_lim=x_limits, y_lim=y_limits)
     _plot_pose_panel(ax_hip, persons_data, colors, [4, 5], 'hip', hip_flag, 'Hip pose',
                      midpoint_attr='mid_hip',
                      groups=clue_groups['hip'], person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.mid_hip),
                      clue='hip',
+                     show_ids=False,
                      x_lim=x_limits, y_lim=y_limits)
     _plot_pose_panel(ax_foot, persons_data, colors, [6, 7, 8, 9], 'foot', foot_flag,
                      'Foot pose', center_attr='foot_center',
                      groups=clue_groups['foot'], person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.foot_center),
                      clue='foot',
+                     show_ids=False,
                      x_lim=x_limits, y_lim=y_limits)
 
     plot_all_skeletons(
@@ -902,10 +911,57 @@ def plot_pose_panels(data_kp: Any,
     )
 
     gt_text = _format_groups_text(gt_groups, prefix='GT: ')
-    ax_all.text(0.5, -0.18, gt_text, transform=ax_all.transAxes,
-                ha='center', va='top', fontsize=8, color='0.3', clip_on=False)
 
-    axes = [ax_head, ax_shoulder, ax_hip, ax_foot, ax_all]
+    try:
+        cam_val = int(cam_float)
+    except (TypeError, ValueError):
+        cam_val = 0
+    try:
+        vid_val = int(data_kp['Vid'][frame_idx])  # type: ignore[index]
+    except Exception:
+        vid_val = 0
+    try:
+        seg_val = int(data_kp['Seg'][frame_idx])  # type: ignore[index]
+    except Exception:
+        seg_val = 0
+    try:
+        t_val = int(data_kp['Timestamp'][frame_idx])  # type: ignore[index]
+    except Exception:
+        t_val = frame_idx
+
+    frames_dir = Path(__file__).resolve().parents[2] / 'data' / 'export' / 'frames'
+    frame_name = f"frame_{cam_val}{vid_val}{seg_val}_{t_val}.png"
+    frame_path = frames_dir / frame_name
+
+    ax_image.set_title('Frame image')
+    ax_image.axis('off')
+    try:
+        if frame_path.exists():
+            img = plt.imread(frame_path)
+            ax_image.imshow(img)
+            img_h, img_w = img.shape[0], img.shape[1]
+            for idx_row, person in enumerate(persons_data):
+                if idx_row >= B.shape[0]:
+                    continue
+                head_xy = B[idx_row, 4:6].astype(float)
+                if head_xy.shape[0] < 2 or np.any(np.isnan(head_xy)):
+                    continue
+                px = head_xy[0] * img_w
+                py = head_xy[1] * img_h
+                ax_image.text(px, py, _person_label(person), color='yellow', fontsize=9,
+                              ha='left', va='bottom',
+                              bbox=dict(facecolor='black', alpha=0.4, pad=1, edgecolor='none'))
+        else:
+            ax_image.text(0.5, 0.5, f"Image not found:\n{frame_name}", ha='center', va='center',
+                          fontsize=8, color='0.4')
+    except Exception as exc:
+        ax_image.text(0.5, 0.5, f"Error loading image:\n{exc}", ha='center', va='center',
+                      fontsize=8, color='0.4')
+
+    ax_image.text(0.5, -0.18, gt_text, transform=ax_image.transAxes,
+                  ha='center', va='top', fontsize=8, color='0.3', clip_on=False)
+
+    axes = [ax_head, ax_shoulder, ax_hip, ax_foot, ax_all, ax_image]
     fig.tight_layout()
     if show:
         plt.show()
