@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -36,6 +36,8 @@ def _set_equal_3d(ax, X: np.ndarray, Y: np.ndarray, Z: np.ndarray):
     ax.set_ylim(mid_y - max_range/2, mid_y + max_range/2)
     ax.set_zlim(mid_z - max_range/2, mid_z + max_range/2)
 
+
+ARROW_LENGTH = 25.0
 
 SKELETON_Z_COEFS = np.array([1.0, 0.95, 0.85, 0.85, 0.5, 0.5, 0.02, 0.02, 0.02, 0.02], dtype=float)
 
@@ -169,7 +171,11 @@ def _normalize_groups(groups) -> Sequence[Sequence[int]]:
     normalized = []
     if groups is None:
         return normalized
-    for g in groups:
+    try:
+        iterator = list(groups)
+    except TypeError:
+        return normalized
+    for g in iterator:
         members = []
         if isinstance(g, (list, tuple, set, np.ndarray)):
             for m in g:
@@ -187,14 +193,40 @@ def _normalize_groups(groups) -> Sequence[Sequence[int]]:
     return normalized
 
 
+def _convex_hull(points: np.ndarray) -> np.ndarray:
+    pts = np.asarray(points, dtype=float)
+    if pts.shape[0] <= 2:
+        return pts
+    pts = np.unique(pts, axis=0)
+    if pts.shape[0] <= 2:
+        return pts
+    pts = pts[np.lexsort((pts[:, 1], pts[:, 0]))]
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(tuple(p))
+    upper = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(tuple(p))
+    hull = lower[:-1] + upper[:-1]
+    return np.asarray(hull, dtype=float)
+
+
 def _draw_group_polygons(ax,
                          groups: Sequence[Sequence[int]],
                          person_lookup: Dict[int, PersonSkeleton],
                          point_selector):
     if not groups:
         return
-    colors = plt.cm.Set2(np.linspace(0, 1, max(len(groups), 1)))
-    for idx, members in enumerate(groups):
+    color = 'lime'
+    for members in groups:
         pts = []
         for member in members:
             person = person_lookup.get(member)
@@ -206,15 +238,13 @@ def _draw_group_polygons(ax,
             pts.append(np.asarray(xy, dtype=float))
         if not pts:
             continue
-        pts_arr = np.asarray(pts, dtype=float)
-        color = colors[idx % len(colors)]
-        if pts_arr.shape[0] >= 3:
-            poly = Polygon(pts_arr, closed=True, facecolor=color, alpha=0.2, edgecolor=color, linewidth=2)
-            ax.add_patch(poly)
-        elif pts_arr.shape[0] == 2:
-            ax.plot(pts_arr[:, 0], pts_arr[:, 1], color=color, linewidth=2, linestyle='--')
-        else:
-            ax.scatter(pts_arr[:, 0], pts_arr[:, 1], color=color, s=80, facecolors='none', edgecolors=color, linewidth=1.5)
+        hull = _convex_hull(np.asarray(pts, dtype=float))
+        if hull.shape[0] >= 3:
+            ax.add_patch(Polygon(hull, closed=True, facecolor='none', edgecolor=color, linewidth=2))
+        elif hull.shape[0] == 2:
+            ax.plot(hull[:, 0], hull[:, 1], color=color, linewidth=2)
+        elif hull.shape[0] == 1:
+            ax.scatter(hull[:, 0], hull[:, 1], color=color, s=60, marker='o')
 
 
 def _get_pose_arrow(person: PersonSkeleton, pose: str) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
@@ -265,6 +295,12 @@ def _draw_arrow(ax, start: Optional[np.ndarray], vec: Optional[np.ndarray], proj
         return
     if np.allclose([vx, vy], [0.0, 0.0]):
         return
+    norm = math.hypot(vx, vy)
+    if norm == 0 or np.isnan(norm):
+        return
+    vx = (vx / norm) * ARROW_LENGTH
+    vy = (vy / norm) * ARROW_LENGTH
+
     if projection == '3d':
         sz = float(start[2])
         if np.isnan(sz):
@@ -677,6 +713,13 @@ def _plot_pose_panel(ax,
         _finalize_2d_axis(ax, x_vals, y_vals)
     if groups and person_lookup and point_selector:
         _draw_group_polygons(ax, groups, person_lookup, point_selector)
+    if groups is not None:
+        if groups:
+            group_str = ', '.join('[' + ', '.join(str(m) for m in group) + ']' for group in groups)
+        else:
+            group_str = '[]'
+        ax.text(0.5, -0.18, f"Groups: {group_str}", transform=ax.transAxes,
+                ha='center', va='top', fontsize=8, color='0.3', clip_on=False)
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         ax.legend(loc='best', fontsize=8)
