@@ -33,10 +33,10 @@ from utils.speaking import read_speaking_status, get_status_for_group
 from utils.scripts import constructFormations, detectGroupNumBreakpoints
 from utils.data import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
-from utils.plots import plot_all_skeletons
+from utils.plots import plot_all_skeletons, plot_pose_panels
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
-USED_SEGS = ["834"]
+USED_SEGS = ["433"]
 
 @dataclass
 class Params:
@@ -86,7 +86,8 @@ def gcff_experiments(params: Params):
     # _breakpoints = detectGroupNumBreakpoints(results, data=data)
 
     # generate 3D skeleton view
-    plot_all_skeletons(data_kp=data_kp, frame_idx=0, projection='2d')
+    # plot_all_skeletons(data_kp=data_kp, frame_idx=0, projection='2d')
+    plot_pose_panels(data_kp=data_kp, frame_idx=0)
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):
