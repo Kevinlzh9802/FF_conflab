@@ -74,7 +74,7 @@ def load_features(base_dir, nrows):
         feats.append(arr)
     return feats
 
-def filter_and_concat_table(data, used_parts): #TODO: move to table.py
+def filter_and_concat_table(data, used_parts=None): #TODO: move to table.py
     df = data
     if isinstance(df, pd.DataFrame) and used_parts:
         sel = df.iloc[0:0].copy()
