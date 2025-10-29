@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
 
 
 def _setup_3d(ax=None, title: Optional[str] = None):
@@ -150,6 +151,70 @@ def _iter_person_skeletons(A: np.ndarray, rows: Sequence[int], base_height: floa
 
 def _person_label(person: PersonSkeleton) -> str:
     return f"{person.pid}" if person.pid is not None else f"p{person.row_index}"
+
+
+def _safe_xy(point: Optional[np.ndarray]) -> Optional[np.ndarray]:
+    if point is None:
+        return None
+    arr = np.asarray(point, dtype=float).reshape(-1)
+    if arr.size < 2:
+        return None
+    xy = arr[:2]
+    if np.any(np.isnan(xy)):
+        return None
+    return xy
+
+
+def _normalize_groups(groups) -> Sequence[Sequence[int]]:
+    normalized = []
+    if groups is None:
+        return normalized
+    for g in groups:
+        members = []
+        if isinstance(g, (list, tuple, set, np.ndarray)):
+            for m in g:
+                try:
+                    members.append(int(m))
+                except (TypeError, ValueError):
+                    continue
+        else:
+            try:
+                members.append(int(g))
+            except (TypeError, ValueError):
+                members = []
+        if members:
+            normalized.append(members)
+    return normalized
+
+
+def _draw_group_polygons(ax,
+                         groups: Sequence[Sequence[int]],
+                         person_lookup: Dict[int, PersonSkeleton],
+                         point_selector):
+    if not groups:
+        return
+    colors = plt.cm.Set2(np.linspace(0, 1, max(len(groups), 1)))
+    for idx, members in enumerate(groups):
+        pts = []
+        for member in members:
+            person = person_lookup.get(member)
+            if person is None:
+                continue
+            xy = point_selector(person)
+            if xy is None:
+                continue
+            pts.append(np.asarray(xy, dtype=float))
+        if not pts:
+            continue
+        pts_arr = np.asarray(pts, dtype=float)
+        color = colors[idx % len(colors)]
+        if pts_arr.shape[0] >= 3:
+            poly = Polygon(pts_arr, closed=True, facecolor=color, alpha=0.2, edgecolor=color, linewidth=2)
+            ax.add_patch(poly)
+        elif pts_arr.shape[0] == 2:
+            ax.plot(pts_arr[:, 0], pts_arr[:, 1], color=color, linewidth=2, linestyle='--')
+        else:
+            ax.scatter(pts_arr[:, 0], pts_arr[:, 1], color=color, s=80, facecolors='none', edgecolors=color, linewidth=1.5)
 
 
 def _get_pose_arrow(person: PersonSkeleton, pose: str) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
@@ -556,6 +621,9 @@ def _plot_pose_panel(ax,
                      title: str,
                      midpoint_attr: Optional[str] = None,
                      center_attr: Optional[str] = None,
+                     groups: Optional[Sequence[Sequence[int]]] = None,
+                     person_lookup: Optional[Dict[int, PersonSkeleton]] = None,
+                     point_selector=None,
                      x_lim: Optional[Tuple[float, float]] = None,
                      y_lim: Optional[Tuple[float, float]] = None):
     x_vals: list = []
@@ -607,6 +675,8 @@ def _plot_pose_panel(ax,
         ax.set_aspect('equal', adjustable='box')
     else:
         _finalize_2d_axis(ax, x_vals, y_vals)
+    if groups and person_lookup and point_selector:
+        _draw_group_polygons(ax, groups, person_lookup, point_selector)
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         ax.legend(loc='best', fontsize=8)
@@ -648,9 +718,27 @@ def plot_pose_panels(data_kp: Any,
     x_limits = (-50.0, 450.0)
     y_limits = (c_y - 250.0, c_y + 250.0)
 
+    clue_groups: Dict[str, Sequence[Sequence[int]]] = {}
+    for clue in ('head', 'shoulder', 'hip', 'foot'):
+        col = f"{clue}Res"
+        try:
+            raw_groups = data_kp[col][frame_idx]  # type: ignore[index]
+        except Exception:
+            raw_groups = None
+        clue_groups[clue] = _normalize_groups(raw_groups)
+
     show_flags = _normalize_show_flags(show_poses)
     persons_data = list(_iter_person_skeletons(A, rows, base_height))
     colors = plt.cm.tab10(np.linspace(0, 1, max(len(rows), 1)))
+    person_lookup: Dict[int, PersonSkeleton] = {}
+    for person in persons_data:
+        if person.pid is not None:
+            person_lookup[int(person.pid)] = person
+        if person.row_index not in person_lookup:
+            person_lookup[person.row_index] = person
+        adj_key = person.row_index + 1
+        if adj_key not in person_lookup:
+            person_lookup[adj_key] = person
 
     fig = plt.figure(figsize=figsize)
     gs = fig.add_gridspec(2, 3, hspace=0.35, wspace=0.3)
@@ -662,14 +750,24 @@ def plot_pose_panels(data_kp: Any,
 
     head_flag, shoulder_flag, hip_flag, foot_flag = show_flags
     _plot_pose_panel(ax_head, persons_data, colors, [0, 1], 'head', head_flag, 'Head pose',
+                     groups=clue_groups['head'], person_lookup=person_lookup,
+                     point_selector=lambda p: _safe_xy(p.points[0]),
                      x_lim=x_limits, y_lim=y_limits)
     _plot_pose_panel(ax_shoulder, persons_data, colors, [2, 3], 'shoulder', shoulder_flag,
                      'Shoulder pose', midpoint_attr='mid_shoulder',
+                     groups=clue_groups['shoulder'], person_lookup=person_lookup,
+                     point_selector=lambda p: _safe_xy(p.mid_shoulder),
                      x_lim=x_limits, y_lim=y_limits)
     _plot_pose_panel(ax_hip, persons_data, colors, [4, 5], 'hip', hip_flag, 'Hip pose',
-                     midpoint_attr='mid_hip', x_lim=x_limits, y_lim=y_limits)
+                     midpoint_attr='mid_hip',
+                     groups=clue_groups['hip'], person_lookup=person_lookup,
+                     point_selector=lambda p: _safe_xy(p.mid_hip),
+                     x_lim=x_limits, y_lim=y_limits)
     _plot_pose_panel(ax_foot, persons_data, colors, [6, 7, 8, 9], 'foot', foot_flag,
-                     'Foot pose', center_attr='foot_center', x_lim=x_limits, y_lim=y_limits)
+                     'Foot pose', center_attr='foot_center',
+                     groups=clue_groups['foot'], person_lookup=person_lookup,
+                     point_selector=lambda p: _safe_xy(p.foot_center),
+                     x_lim=x_limits, y_lim=y_limits)
 
     plot_all_skeletons(
         data_kp,

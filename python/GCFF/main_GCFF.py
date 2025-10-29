@@ -74,13 +74,13 @@ def gcff_experiments(params: Params):
     data_kp = filter_and_concat_table(data_kp, params.used_parts)
 
     # Build features per frame for the selected clue
-    # for clue in ALL_CLUES:
-    #     feat_col = f"{clue}Feat"
-    #     features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
-    #     GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
+    for clue in ALL_CLUES:
+        feat_col = f"{clue}Feat"
+        features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
+        GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
 
-    #     results = gcff_sequence(features, GTgroups, params)
-    #     data_kp[f"{clue}Res"] = results['groups']
+        results = gcff_sequence(features, GTgroups, params)
+        data_kp[f"{clue}Res"] = results['groups']
 
     # Translate remaining scripts to function calls (placeholders for now)
     # _breakpoints = detectGroupNumBreakpoints(results, data=data)
