@@ -95,7 +95,7 @@ def gcff_experiments(params: Params):
 
     # generate 3D skeleton view
     # plot_all_skeletons(data_kp=data_kp, frame_idx=0, projection='2d')
-    plot_pose_panels(data_kp=data_kp, frame_idx=2035)
+    plot_pose_panels(data_kp=data_kp, frame_idx=350)
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):

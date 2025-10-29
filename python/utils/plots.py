@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import textwrap
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 import numpy as np
@@ -38,6 +39,13 @@ def _set_equal_3d(ax, X: np.ndarray, Y: np.ndarray, Z: np.ndarray):
 
 
 ARROW_LENGTH = 25.0
+
+LABEL_MAP = {
+    'head': {0: '[LH]', 1: '[RH]'},
+    'shoulder': {2: 'LS', 3: 'RS'},
+    'hip': {4: 'LI', 5: 'RI'},
+    'foot': {6: 'LA', 7: 'RA', 8: 'LF', 9: 'RF'},
+}
 
 SKELETON_Z_COEFS = np.array([1.0, 0.95, 0.85, 0.85, 0.5, 0.5, 0.02, 0.02, 0.02, 0.02], dtype=float)
 
@@ -193,6 +201,14 @@ def _normalize_groups(groups) -> Sequence[Sequence[int]]:
     return normalized
 
 
+def _format_groups_text(groups: Optional[Sequence[Sequence[int]]], prefix: str = 'Groups: ', width: int = 48) -> str:
+    if not groups:
+        body = '[]'
+    else:
+        body = ', '.join('[' + ', '.join(str(int(m)) for m in group) + ']' for group in groups)
+    text = prefix + body
+    return textwrap.fill(text, width=width, break_long_words=False, break_on_hyphens=False, max_lines=2, placeholder='…')
+
 def _convex_hull(points: np.ndarray) -> np.ndarray:
     pts = np.asarray(points, dtype=float)
     if pts.shape[0] <= 2:
@@ -288,33 +304,36 @@ def _get_pose_arrow(person: PersonSkeleton, pose: str) -> Tuple[Optional[np.ndar
 def _draw_arrow(ax, start: Optional[np.ndarray], vec: Optional[np.ndarray], projection: str,
                 color, x_vals: Optional[list] = None, y_vals: Optional[list] = None):
     if start is None or vec is None:
-        return
+        return None
     sx, sy = float(start[0]), float(start[1])
     vx, vy = float(vec[0]), float(vec[1])
     if any(np.isnan([sx, sy, vx, vy])):
-        return
+        return None
     if np.allclose([vx, vy], [0.0, 0.0]):
-        return
+        return None
     norm = math.hypot(vx, vy)
     if norm == 0 or np.isnan(norm):
-        return
+        return None
     vx = (vx / norm) * ARROW_LENGTH
     vy = (vy / norm) * ARROW_LENGTH
 
     if projection == '3d':
         sz = float(start[2])
         if np.isnan(sz):
-            return
+            return None
         try:
             ax.quiver(sx, sy, sz, vx, vy, 0.0, color=color, linewidth=1.5, arrow_length_ratio=0.2)
         except TypeError:
             ax.quiver(sx, sy, sz, vx, vy, 0.0, color=color, linewidth=1.5)
+        return np.array([sx, sy, sz], dtype=float)
     else:
         ax.quiver(sx, sy, vx, vy, color=color, angles='xy', scale_units='xy', scale=1.0, width=0.005)
         if x_vals is not None:
             x_vals.extend([sx, sx + vx])
         if y_vals is not None:
             y_vals.extend([sy, sy + vy])
+        return np.array([sx, sy], dtype=float)
+    return None
 
 
 def _finalize_2d_axis(ax, x_vals, y_vals):
@@ -425,19 +444,47 @@ def _plot_person_skeleton(ax,
     plot_segment(right_hip, right_ankle)
     plot_segment(right_ankle, right_foot)
 
+    id_anchor = None
     show_head, show_shoulder, show_hip, show_foot = show_flags
     if show_head:
         start, vec = _get_pose_arrow(person, 'head')
-        _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        if anchor is not None:
+            id_anchor = anchor
     if show_shoulder:
         start, vec = _get_pose_arrow(person, 'shoulder')
-        _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        if anchor is not None and id_anchor is None:
+            id_anchor = anchor
     if show_hip:
         start, vec = _get_pose_arrow(person, 'hip')
-        _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        if anchor is not None and id_anchor is None:
+            id_anchor = anchor
     if show_foot:
         start, vec = _get_pose_arrow(person, 'foot')
-        _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        if anchor is not None and id_anchor is None:
+            id_anchor = anchor
+
+    if id_anchor is None:
+        if projection == '3d':
+            valid = ~np.isnan(points[:, :3]).any(axis=1)
+            if np.any(valid):
+                id_anchor = points[valid][0]
+        else:
+            valid = ~np.isnan(points[:, :2]).any(axis=1)
+            if np.any(valid):
+                id_anchor = points[valid][0][:2]
+
+    label = _person_label(person)
+    if id_anchor is not None:
+        if projection == '3d' and len(id_anchor) >= 3:
+            ax.text(float(id_anchor[0]), float(id_anchor[1]), float(id_anchor[2]), label,
+                    color=color, fontsize=8)
+        elif projection == '2d' or len(id_anchor) == 2:
+            ax.text(float(id_anchor[0]) + 5.0, float(id_anchor[1]) + 5.0, label,
+                    color=color, fontsize=8)
 
     return plotted
 
@@ -660,12 +707,14 @@ def _plot_pose_panel(ax,
                      groups: Optional[Sequence[Sequence[int]]] = None,
                      person_lookup: Optional[Dict[int, PersonSkeleton]] = None,
                      point_selector=None,
+                     clue: Optional[str] = None,
                      x_lim: Optional[Tuple[float, float]] = None,
                      y_lim: Optional[Tuple[float, float]] = None):
     x_vals: list = []
     y_vals: list = []
     labels_added = set()
     any_content = False
+    label_lookup = LABEL_MAP.get(clue or '', {})
 
     for idx, person in enumerate(persons):
         col = tuple(colors[idx % len(colors)])
@@ -682,6 +731,16 @@ def _plot_pose_panel(ax,
             x_vals.extend(xs.tolist())
             y_vals.extend(ys.tolist())
             any_content = True
+            for local_idx, global_idx in enumerate(indices):
+                lab = label_lookup.get(global_idx)
+                if lab is None:
+                    continue
+                if local_idx >= pts.shape[0]:
+                    continue
+                px, py = pts[local_idx, 0], pts[local_idx, 1]
+                if np.isnan(px) or np.isnan(py):
+                    continue
+                ax.text(float(px) + 4.0, float(py) + 4.0, lab, color=col, fontsize=7)
         if midpoint_attr:
             mid = getattr(person, midpoint_attr, None)
             if mid is not None and not np.any(np.isnan(mid[:2])):
@@ -696,11 +755,20 @@ def _plot_pose_panel(ax,
                 x_vals.append(float(center[0]))
                 y_vals.append(float(center[1]))
                 any_content = True
+        id_anchor = None
         if show_flag and arrow_key:
             start, vec = _get_pose_arrow(person, arrow_key)
             if start is not None and vec is not None:
-                _draw_arrow(ax, start, vec, '2d', col, x_vals, y_vals)
+                anchor = _draw_arrow(ax, start, vec, '2d', col, x_vals, y_vals)
+                if anchor is not None:
+                    id_anchor = anchor
                 any_content = True
+        if id_anchor is None:
+            valid = ~np.isnan(person.points[:, :2]).any(axis=1)
+            if np.any(valid):
+                id_anchor = person.points[valid][0][:2]
+        if id_anchor is not None:
+            ax.text(float(id_anchor[0]) + 6.0, float(id_anchor[1]) + 6.0, _person_label(person), color=col, fontsize=8)
 
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -714,11 +782,8 @@ def _plot_pose_panel(ax,
     if groups and person_lookup and point_selector:
         _draw_group_polygons(ax, groups, person_lookup, point_selector)
     if groups is not None:
-        if groups:
-            group_str = ', '.join('[' + ', '.join(str(m) for m in group) + ']' for group in groups)
-        else:
-            group_str = '[]'
-        ax.text(0.5, -0.18, f"Groups: {group_str}", transform=ax.transAxes,
+        group_text = _format_groups_text(groups)
+        ax.text(0.5, -0.18, group_text, transform=ax.transAxes,
                 ha='center', va='top', fontsize=8, color='0.3', clip_on=False)
     handles, labels = ax.get_legend_handles_labels()
     if handles:
@@ -758,7 +823,7 @@ def plot_pose_panels(data_kp: Any,
     except (TypeError, ValueError):
         cam_float = 0.0
     c_y = 100.0 * cam_float
-    x_limits = (-50.0, 450.0)
+    x_limits = (-50.0, 600.0)
     y_limits = (c_y - 250.0, c_y + 250.0)
 
     clue_groups: Dict[str, Sequence[Sequence[int]]] = {}
@@ -769,6 +834,12 @@ def plot_pose_panels(data_kp: Any,
         except Exception:
             raw_groups = None
         clue_groups[clue] = _normalize_groups(raw_groups)
+
+    try:
+        raw_gt = data_kp['GT'][frame_idx]  # type: ignore[index]
+    except Exception:
+        raw_gt = None
+    gt_groups = _normalize_groups(raw_gt)
 
     show_flags = _normalize_show_flags(show_poses)
     persons_data = list(_iter_person_skeletons(A, rows, base_height))
@@ -795,21 +866,25 @@ def plot_pose_panels(data_kp: Any,
     _plot_pose_panel(ax_head, persons_data, colors, [0, 1], 'head', head_flag, 'Head pose',
                      groups=clue_groups['head'], person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.points[0]),
+                     clue='head',
                      x_lim=x_limits, y_lim=y_limits)
     _plot_pose_panel(ax_shoulder, persons_data, colors, [2, 3], 'shoulder', shoulder_flag,
                      'Shoulder pose', midpoint_attr='mid_shoulder',
                      groups=clue_groups['shoulder'], person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.mid_shoulder),
+                     clue='shoulder',
                      x_lim=x_limits, y_lim=y_limits)
     _plot_pose_panel(ax_hip, persons_data, colors, [4, 5], 'hip', hip_flag, 'Hip pose',
                      midpoint_attr='mid_hip',
                      groups=clue_groups['hip'], person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.mid_hip),
+                     clue='hip',
                      x_lim=x_limits, y_lim=y_limits)
     _plot_pose_panel(ax_foot, persons_data, colors, [6, 7, 8, 9], 'foot', foot_flag,
                      'Foot pose', center_attr='foot_center',
                      groups=clue_groups['foot'], person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.foot_center),
+                     clue='foot',
                      x_lim=x_limits, y_lim=y_limits)
 
     plot_all_skeletons(
@@ -825,6 +900,10 @@ def plot_pose_panels(data_kp: Any,
         projection='2d',
         axis_limits=(x_limits, y_limits),
     )
+
+    gt_text = _format_groups_text(gt_groups, prefix='GT: ')
+    ax_all.text(0.5, -0.18, gt_text, transform=ax_all.transAxes,
+                ha='center', va='top', fontsize=8, color='0.3', clip_on=False)
 
     axes = [ax_head, ax_shoulder, ax_hip, ax_foot, ax_all]
     fig.tight_layout()
