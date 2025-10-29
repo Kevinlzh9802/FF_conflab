@@ -101,7 +101,7 @@ def gcff_experiments(params: Params):
 
     total_frames = len(data_kp)
     for frame_idx in range(total_frames):
-        fig, _ = plot_pose_panels(data_kp=data_kp, frame_idx=frame_idx, show=True)
+        fig, _ = plot_pose_panels(data_kp=data_kp, frame_idx=frame_idx, show=False)
 
         try:
             cam_val = int(data_kp['Cam'].iloc[frame_idx])

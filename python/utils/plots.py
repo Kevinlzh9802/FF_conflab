@@ -803,7 +803,7 @@ def plot_pose_panels(data_kp: Any,
                      show: bool = True,
                      show_poses: Sequence[bool] = (True, True, True, True),
                      base_height: float = 170.0,
-                     figsize: Tuple[int, int] = (14, 8)):
+                     figsize: Tuple[float, float] = (19.2, 10.8)):
     """Generate a 5-panel 2D overview of pose keypoints and orientations.
 
     The X axis is fixed to [-50, 600]; the Y axis is centered at
