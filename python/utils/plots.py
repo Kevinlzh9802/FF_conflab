@@ -141,16 +141,17 @@ def _extract_xy_from_headfeat_A(A_row: np.ndarray) -> np.ndarray:
     return np.asarray(pts, dtype=float)
 
 
-def plot_all_skeletons_3d(data_kp: Any,
-                    frame_idx: int,
-                    key: str = 'headFeat',
-                    persons: Optional[Sequence[int]] = None,
-                    ax=None,
-                    title: Optional[str] = None,
-                    show: bool = True,
-                    show_poses: Sequence[bool] = (True, True, True, True),
-                    base_height: float = 170.0):
-    """Plot 3D scatter of 2D keypoints (Z=0) extracted from the right 24 columns of feature set.
+def plot_all_skeletons(data_kp: Any,
+                       frame_idx: int,
+                       key: str = 'headFeat',
+                       persons: Optional[Sequence[int]] = None,
+                       ax=None,
+                       title: Optional[str] = None,
+                       show: bool = True,
+                       show_poses: Sequence[bool] = (True, True, True, True),
+                       base_height: float = 170.0,
+                       projection: str = '3d'):
+    """Plot skeleton keypoints for one frame in 2D or 3D.
 
     - data_kp[key][frame_idx] must be an (m x 48) array. We take A = [:, 24:48] (0-based slicing)
       and map indices per MATLAB description (subtract 1 already handled here).
@@ -160,7 +161,13 @@ def plot_all_skeletons_3d(data_kp: Any,
         head:1, nose:0.95, leftShoulder/rightShoulder:0.85, leftHip/rightHip:0.5,
         leftAnkle/rightAnkle:0.02, leftFoot/rightFoot:0.02
     - show_poses: 1x4 booleans (head, shoulder, hip, foot) to toggle arrows.
+    - projection: choose '3d' (default) for a 3D scatter or '2d' to plot on the XY plane.
     """
+
+    plot_title = title or f"HeadFeat (XY) - {key}[{frame_idx}]"
+    projection = projection.lower()
+    if projection not in ('2d', '3d'):
+        raise ValueError(f"projection must be '2d' or '3d', got {projection}")
 
     arr = np.asarray(data_kp[key][frame_idx])
     if arr.ndim != 2 or arr.shape[1] < 48:
@@ -169,7 +176,19 @@ def plot_all_skeletons_3d(data_kp: Any,
     m = A.shape[0]
     rows = list(range(m)) if persons is None else list(persons)
 
-    fig, ax = _setup_3d(ax, title or f"HeadFeat (XY) - {key}[{frame_idx}]")
+    x_vals = []
+    y_vals = []
+
+    if projection == '3d':
+        fig, ax = _setup_3d(ax, plot_title)
+    else:
+        fig = None
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(6, 5))
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_title(plot_title)
+
     colors = plt.cm.tab10(np.linspace(0, 1, max(len(rows), 1)))
     any_pts = False
     # Coefficients aligned with _extract_xy_from_headfeat_A order
@@ -223,17 +242,41 @@ def plot_all_skeletons_3d(data_kp: Any,
         except Exception:
             pid_int = None
         legend_label = f"id{pid_int}" if pid_int is not None else f"p{r}"
-        mask_pts = ~np.isnan(X_all) & ~np.isnan(Y_all) & ~np.isnan(Z_all)
-        ax.scatter(X_all[mask_pts], Y_all[mask_pts], Z_all[mask_pts], s=20, color=col, label=legend_label)
+        mask_xy = ~np.isnan(X_all) & ~np.isnan(Y_all)
+        if projection == '3d':
+            mask_pts = mask_xy & ~np.isnan(Z_all)
+            ax.scatter(X_all[mask_pts], Y_all[mask_pts], Z_all[mask_pts], s=20, color=col, label=legend_label)
+        else:
+            pts_x = X_all[mask_xy]
+            pts_y = Y_all[mask_xy]
+            if pts_x.size > 0:
+                ax.scatter(pts_x, pts_y, s=20, color=col, label=legend_label)
+                x_vals.extend(pts_x.tolist())
+                y_vals.extend(pts_y.tolist())
         if not np.any(np.isnan(midS)):
-            ax.scatter([midS[0]], [midS[1]], [midS[2]], s=20, color=col)
+            if projection == '3d':
+                ax.scatter([midS[0]], [midS[1]], [midS[2]], s=20, color=col)
+            else:
+                ax.scatter([midS[0]], [midS[1]], s=20, color=col)
+                x_vals.append(float(midS[0]))
+                y_vals.append(float(midS[1]))
         if not np.any(np.isnan(midH)):
-            ax.scatter([midH[0]], [midH[1]], [midH[2]], s=20, color=col)
+            if projection == '3d':
+                ax.scatter([midH[0]], [midH[1]], [midH[2]], s=20, color=col)
+            else:
+                ax.scatter([midH[0]], [midH[1]], s=20, color=col)
+                x_vals.append(float(midH[0]))
+                y_vals.append(float(midH[1]))
 
         # Helper to draw a line if both endpoints are valid
         def pl(a, b):
             if (not np.any(np.isnan(a))) and (not np.any(np.isnan(b))):
-                ax.plot([a[0], b[0]], [a[1], b[1]], [a[2], b[2]], color=col, linewidth=2)
+                if projection == '3d':
+                    ax.plot([a[0], b[0]], [a[1], b[1]], [a[2], b[2]], color=col, linewidth=2)
+                else:
+                    ax.plot([a[0], b[0]], [a[1], b[1]], color=col, linewidth=2)
+                    x_vals.extend([float(a[0]), float(b[0])])
+                    y_vals.extend([float(a[1]), float(b[1])])
 
         # Assemble points
         P = [
@@ -275,15 +318,20 @@ def plot_all_skeletons_3d(data_kp: Any,
                 return
             sx, sy, sz = start_xyz
             vx, vy = vec_xy
-            if any(np.isnan([sx, sy, sz, vx, vy])):
+            if any(np.isnan([sx, sy, vx, vy])):
                 return
             if vx == 0 and vy == 0:
                 return
-            try:
-                ax.quiver(sx, sy, sz, vx, vy, 0.0, color=color, linewidth=1.5, arrow_length_ratio=0.2)
-            except TypeError:
-                # Fallback if arrow_length_ratio not supported
-                ax.quiver(sx, sy, sz, vx, vy, 0.0, color=color, linewidth=1.5)
+            if projection == '3d':
+                try:
+                    ax.quiver(sx, sy, sz, vx, vy, 0.0, color=color, linewidth=1.5, arrow_length_ratio=0.2)
+                except TypeError:
+                    # Fallback if arrow_length_ratio not supported
+                    ax.quiver(sx, sy, sz, vx, vy, 0.0, color=color, linewidth=1.5)
+            else:
+                ax.quiver(sx, sy, vx, vy, color=color, angles='xy', scale_units='xy', scale=1.0, width=0.005)
+                x_vals.extend([float(sx), float(sx + vx)])
+                y_vals.extend([float(sy), float(sy + vy)])
 
         # 1) Head pose: head -> nose (ignore Z difference)
         if show_head and valid_xy(0) and valid_xy(1):
@@ -337,13 +385,35 @@ def plot_all_skeletons_3d(data_kp: Any,
     if any_pts:
         # try to set equal aspect from all plotted points (scatter only)
         # filter collections that have _offsets3d (e.g., Path3DCollection from scatter)
-        scatters = [c for c in ax.collections if hasattr(c, '_offsets3d')] if ax.collections else []
-        xdata = np.concatenate([c._offsets3d[0] for c in scatters]) if scatters else np.array([0])
-        ydata = np.concatenate([c._offsets3d[1] for c in scatters]) if scatters else np.array([0])
-        zdata = np.concatenate([c._offsets3d[2] for c in scatters]) if scatters else np.array([0])
-        _set_equal_3d(ax, np.asarray(xdata), np.asarray(ydata), np.asarray(zdata))
-        ax.legend(loc='upper right', fontsize=8)
+        if projection == '3d':
+            scatters = [c for c in ax.collections if hasattr(c, '_offsets3d')] if ax.collections else []
+            xdata = np.concatenate([c._offsets3d[0] for c in scatters]) if scatters else np.array([0])
+            ydata = np.concatenate([c._offsets3d[1] for c in scatters]) if scatters else np.array([0])
+            zdata = np.concatenate([c._offsets3d[2] for c in scatters]) if scatters else np.array([0])
+            _set_equal_3d(ax, np.asarray(xdata), np.asarray(ydata), np.asarray(zdata))
+        else:
+            if x_vals and y_vals:
+                x_arr = np.asarray(x_vals, dtype=float)
+                y_arr = np.asarray(y_vals, dtype=float)
+                valid_mask = ~np.isnan(x_arr) & ~np.isnan(y_arr)
+                if np.any(valid_mask):
+                    x_arr = x_arr[valid_mask]
+                    y_arr = y_arr[valid_mask]
+                    xmin, xmax = x_arr.min(), x_arr.max()
+                    ymin, ymax = y_arr.min(), y_arr.max()
+                    span = max(xmax - xmin, ymax - ymin)
+                    if span == 0:
+                        span = 1.0
+                    pad = span * 0.1
+                    cx = 0.5 * (xmax + xmin)
+                    cy = 0.5 * (ymax + ymin)
+                    lim_half = 0.5 * span + pad
+                    ax.set_xlim(cx - lim_half, cx + lim_half)
+                    ax.set_ylim(cy - lim_half, cy + lim_half)
+                    ax.set_aspect('equal', adjustable='box')
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            ax.legend(loc='upper right', fontsize=8)
     if show and fig is not None:
         plt.show()
     return ax
-
