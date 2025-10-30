@@ -42,7 +42,7 @@ def _set_equal_3d(ax, X: np.ndarray, Y: np.ndarray, Z: np.ndarray):
 ARROW_LENGTH = 25.0
 
 LABEL_MAP = {
-    'head': {0: '[LH]', 1: '[RH]'},
+    'head': {0: 'H', 1: 'N'},
     'shoulder': {2: 'LS', 3: 'RS'},
     'hip': {4: 'LI', 5: 'RI'},
     'foot': {6: 'LA', 7: 'RA', 8: 'LF', 9: 'RF'},
@@ -208,7 +208,7 @@ def _format_groups_text(groups: Optional[Sequence[Sequence[int]]], prefix: str =
     else:
         body = ', '.join('[' + ', '.join(str(int(m)) for m in group) + ']' for group in groups)
     text = prefix + body
-    return textwrap.fill(text, width=width, break_long_words=False, break_on_hyphens=False, max_lines=2, placeholder='…')
+    return textwrap.fill(text, width=width, break_long_words=False, break_on_hyphens=False, max_lines=3, placeholder='…')
 
 def _convex_hull(points: np.ndarray) -> np.ndarray:
     pts = np.asarray(points, dtype=float)
@@ -334,7 +334,6 @@ def _draw_arrow(ax, start: Optional[np.ndarray], vec: Optional[np.ndarray], proj
         if y_vals is not None:
             y_vals.extend([sy, sy + vy])
         return np.array([sx, sy], dtype=float)
-    return None
 
 
 def _finalize_2d_axis(ax, x_vals, y_vals):

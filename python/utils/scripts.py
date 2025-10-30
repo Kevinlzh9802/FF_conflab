@@ -104,7 +104,7 @@ def construct_formations(results: dict, data: pd.DataFrame, speaking_status: Dic
     return formations
 
 
-def detect_group_num_breakpoints(results: dict, data: pd.DataFrame, clues: List[str] | None = None):
+def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = None):
     """Port of utils/detectGroupNumBreakpoints.m (simplified).
 
     - Finds breakpoints where any clue's groups change for each (Vid, Cam)
@@ -174,6 +174,3 @@ def _equal_groups(a, b):
 def constructFormations(results: dict, data=None):  # pragma: no cover - placeholder
     return construct_formations(results, data=data)
 
-
-def detectGroupNumBreakpoints(results: dict, data=None):  # pragma: no cover - placeholder
-    return detect_group_num_breakpoints(results, data=data)
