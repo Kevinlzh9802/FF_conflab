@@ -101,8 +101,6 @@ def gcff_experiments(params: Params):
 
     total_frames = len(data_kp)
     for frame_idx in range(total_frames):
-        fig, _ = plot_pose_panels(data_kp=data_kp, frame_idx=frame_idx, show=False)
-
         try:
             cam_val = int(data_kp['Cam'].iloc[frame_idx])
         except Exception:
@@ -123,6 +121,7 @@ def gcff_experiments(params: Params):
         filename = f"panel_{cam_val}{vid_val}{seg_val}_{timestamp_val}_{frame_idx}.png"
         fig_path = results_dir / filename
         if not fig_path.exists():
+            fig, _ = plot_pose_panels(data_kp=data_kp, frame_idx=frame_idx, show=False)
             fig.savefig(fig_path, dpi=150, bbox_inches='tight')
         else:
             print(f"File {fig_path} already exists")
