@@ -79,7 +79,7 @@ end
 
 % analysis = data_results(~cellfun(@isempty, data_results.headRes) & data_results.concat_id, :);
 
-run constructFormations.m;
+% run constructFormations.m;
 % run plotAllCluesComparison.m;
 % run detectGroupNumBreakpoints.m;
 % run detectSubFloor.m;
@@ -107,7 +107,7 @@ recall = zeros(1,length(timestamp)) ;
 s_speaker = [];
 group_sizes = [];
 
-for idxFrame = 1:length(timestamp)
+for idxFrame = 19:length(timestamp)
     % gg represents group_id
     feat = features{idxFrame}(:, [1:24] + 24 * use_real);
     gg = gc(feat(:, 1:4), stride, mdl);
