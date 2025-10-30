@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 
-
+# TODO: move all functions in this file to other files
 def _add_merged_column(df: pd.DataFrame) -> pd.DataFrame:  # TODO: move to table.py
     ids = pd.unique(df['Seg'])
     offset = 0.0
@@ -164,7 +164,9 @@ def _equal_groups(a, b):
         if isinstance(a, list) and isinstance(b, list):
             if len(a) != len(b):
                 return False
-            return all(sorted(x) == sorted(y) for x, y in zip(a, b))
+            norm_a = sorted(sorted(x) for x in a)
+            norm_b = sorted(sorted(x) for x in b)
+            return norm_a == norm_b
         return a == b
     except Exception:
         return False
@@ -173,4 +175,3 @@ def _equal_groups(a, b):
 # Aliases matching original MATLAB script names
 def constructFormations(results: dict, data=None):  # pragma: no cover - placeholder
     return construct_formations(results, data=data)
-

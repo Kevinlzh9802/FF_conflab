@@ -25,16 +25,14 @@ from pathlib import Path
 
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import argparse
 import pandas as pd
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, graph_cut
-from utils.speaking import read_speaking_status, get_status_for_group
 from utils.scripts import constructFormations, detect_group_num_breakpoints
 from utils.data import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
-from utils.plots import plot_all_skeletons, plot_pose_panels, plot_panels_df
+from utils.plots import plot_all_skeletons, plot_panels_df
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
 USED_SEGS = ["429"]
@@ -69,6 +67,7 @@ def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -
 
 
 def gcff_experiments(params: Params):
+    force_rerun = False  # TODO: make this an argument
     # read keypoint data, prioritize finished data with detections
     try:
         data_kp = pd.read_pickle(params.data_paths["kp_finished"])
@@ -80,7 +79,7 @@ def gcff_experiments(params: Params):
     data_kp = filter_and_concat_table(data_kp, params.used_parts)
 
     # Build features per frame for the selected clue
-    if not detection_done:
+    if not detection_done or force_rerun:
         for clue in ALL_CLUES:
             feat_col = f"{clue}Feat"
             features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
@@ -141,21 +140,6 @@ def gcff_sequence(features, GTgroups, params):
         # Evaluate
         pr, re, tp, fp, fn = ff_evalgroups(groups, GT, TH='card', cardmode=0)
         precision[idx], recall[idx], TP[idx], FP[idx], FN[idx] = pr, re, tp, fp, fn
-
-        # Optionally collect speaking status per-frame (if structure available)
-        # try:
-        #     if isinstance(data, pd.DataFrame):
-        #         info = data.iloc[idx][['Cam', 'Vid', 'Seg', 'Timestamp']]
-        #         sp, cf = read_speaking_status(speaking_status, int(info.Vid), int(info.Seg), int(info.Timestamp) + 1, 1)
-        #         if isinstance(sp, (list, np.ndarray)) and groups:
-        #             ss = get_status_for_group(np.arange(len(sp)), sp, groups)
-        #             for vals in ss:
-        #                 ssv = float(np.sum(vals))
-        #                 if not (ssv > 10 or ssv < 0):
-        #                     group_sizes.append(len(vals))
-        #                     s_speaker.append(ssv)
-        # except Exception:
-        #     pass
 
         display_frame_results(idx + 1, T, groups, GT)
 
