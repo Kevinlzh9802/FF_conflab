@@ -197,8 +197,7 @@ class _Graph:
                 # fallback to dinic
                 self._backend = "dinic"
                 self._g = _DinicGraph()
-                if _dbg_enabled():
-                    _dbg_print("backend", "BK not available, falling back to Dinic")
+                print("warning: BK not available, falling back to Dinic")
         else:
             self._g = _DinicGraph()
             if _dbg_enabled():
