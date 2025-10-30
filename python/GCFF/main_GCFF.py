@@ -122,7 +122,10 @@ def gcff_experiments(params: Params):
 
         filename = f"panel_{cam_val}{vid_val}{seg_val}_{timestamp_val}_{frame_idx}.png"
         fig_path = results_dir / filename
-        fig.savefig(fig_path, dpi=150, bbox_inches='tight')
+        if not fig_path.exists():
+            fig.savefig(fig_path, dpi=150, bbox_inches='tight')
+        else:
+            print(f"File {fig_path} already exists")
         plt.close(fig)
 
     return data_kp
