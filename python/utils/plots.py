@@ -811,8 +811,10 @@ def plot_pose_panels(data_kp: Any,
     """
 
     arr = np.asarray(data_kp[key][frame_idx])
+    fig = plt.figure(figsize=figsize)
     if arr.ndim != 2 or arr.shape[1] < 48:
-        raise ValueError(f"Expected (m x 48) array for {key}[{frame_idx}], got {arr.shape}")
+        Warning(f"Expected (m x 48) array for {key}[{frame_idx}], got {arr.shape}")
+        return fig, None
     A = arr[:, 24:48]
     B = arr[:, 0:24]
     m = A.shape[0]
@@ -858,7 +860,6 @@ def plot_pose_panels(data_kp: Any,
         if adj_key not in person_lookup:
             person_lookup[adj_key] = person
 
-    fig = plt.figure(figsize=figsize)
     gs = fig.add_gridspec(2, 3, hspace=0.35, wspace=0.3)
     ax_head = fig.add_subplot(gs[0, 0])
     ax_shoulder = fig.add_subplot(gs[0, 1])

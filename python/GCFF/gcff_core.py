@@ -227,7 +227,7 @@ def ff_plot_person_tv(xx_feat, yy_feat=None, alpha_feat=None, col="b", scale=1.0
     return ax
 
 
-def gc(f: np.ndarray, stride: float, MDL_in: float) -> np.ndarray:
+def graph_cut(f: np.ndarray, stride: float, MDL_in: float) -> np.ndarray:
     """Runs graph-cuts clustering as in GCFF/gc.m.
 
     f: Nx4 array where columns are [ID, x, y, alpha]

@@ -28,9 +28,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 import pandas as pd
-import h5py
 
-from gcff_core import ff_deletesingletons, ff_evalgroups, gc
+from gcff_core import ff_deletesingletons, ff_evalgroups, graph_cut
 from utils.speaking import read_speaking_status, get_status_for_group
 from utils.scripts import constructFormations, detectGroupNumBreakpoints
 from utils.data import filter_and_concat_table
@@ -90,7 +89,7 @@ def gcff_experiments(params: Params):
             results = gcff_sequence(features, GTgroups, params)
             data_kp[f"{clue}Res"] = results['groups']
 
-        data_kp.to_pickle("../data/export/data_finished.pkl")
+        data_kp.to_pickle(params.data_paths["kp_finished"])
     
     # Translate remaining scripts to function calls (placeholders for now)
     # _breakpoints = detectGroupNumBreakpoints(results, data=data)
@@ -122,11 +121,11 @@ def gcff_experiments(params: Params):
         fig_path = results_dir / filename
         if not fig_path.exists():
             fig, _ = plot_pose_panels(data_kp=data_kp, frame_idx=frame_idx, show=False)
-            fig.savefig(fig_path, dpi=150, bbox_inches='tight')
+            fig.savefig(fig_path, dpi=150, bbox_inches=None)
+            plt.close(fig)
         else:
             print(f"File {fig_path} already exists")
-        plt.close(fig)
-
+        
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):
@@ -155,7 +154,7 @@ def gcff_sequence(features, GTgroups, params):
             F = feat[:, 24:28]
         else:
             F = feat[:, 0:4]
-        labels = gc(F[:, :4], params.stride, params.mdl)
+        labels = graph_cut(F[:, :4], params.stride, params.mdl)
         groups = []
         for lab in range(int(labels.max()) + 1 if labels.size else 0):
             members = F[labels == lab, 0].astype(int).tolist()

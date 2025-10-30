@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from gcff_core import gc, ff_deletesingletons, ff_evalgroups
+from gcff_core import graph_cut, ff_deletesingletons, ff_evalgroups
 
 
 @dataclass
@@ -37,7 +37,7 @@ def example_GCFF(features: List[np.ndarray], GTgroups: List[List[List[int]]], pa
         feat = features[t]
         if feat is None or feat.size == 0:
             continue
-        gg = gc(feat[:, :4], params.stride, params.mdl)
+        gg = graph_cut(feat[:, :4], params.stride, params.mdl)
         groups_t: List[List[int]] = []
         for lab in range(int(gg.max()) + 1):
             members = feat[gg == lab, 0].astype(int).tolist()
@@ -72,7 +72,7 @@ def example_GCFF_noGT(features: List[np.ndarray], params: Params):
         feat = features[t]
         if feat is None or feat.size == 0:
             continue
-        gg = gc(feat[:, :4], params.stride, params.mdl)
+        gg = graph_cut(feat[:, :4], params.stride, params.mdl)
         groups_t: List[List[int]] = []
         for lab in range(int(gg.max()) + 1):
             members = feat[gg == lab, 0].astype(int).tolist()
