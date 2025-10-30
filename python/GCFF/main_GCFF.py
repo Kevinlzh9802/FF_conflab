@@ -69,17 +69,22 @@ def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -
 def gcff_experiments(params: Params):
     force_rerun = True  # TODO: make this an argument
     # read keypoint data, prioritize finished data with detections
-    try:
-        data_kp = pd.read_pickle(params.data_paths["kp_finished"])
-        detection_done = True
-    except:
+    if force_rerun:
         data_kp = pd.read_pickle(params.data_paths["kp"])
-        detection_done = False
+        rerun = True
+    else:
+        try:
+            data_kp = pd.read_pickle(params.data_paths["kp_finished"])
+            rerun = False
+        except:
+            data_kp = pd.read_pickle(params.data_paths["kp"])
+            rerun = True
+        
     # filter and concat table by 3-digit keys in params.used_parts
     data_kp = filter_and_concat_table(data_kp, params.used_parts)
 
     # Build features per frame for the selected clue
-    if not detection_done or force_rerun:
+    if rerun:
         for clue in ALL_CLUES:
             feat_col = f"{clue}Feat"
             features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
