@@ -967,3 +967,35 @@ def plot_pose_panels(data_kp: Any,
     if show:
         plt.show()
     return fig, axes
+
+def plot_panels_df(data_kp):
+    results_dir = Path(__file__).resolve().parents[2] / 'data' / 'results' / 'panel_plots'
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    total_frames = len(data_kp)
+    for frame_idx in range(total_frames):
+        try:
+            cam_val = int(data_kp['Cam'].iloc[frame_idx])
+        except Exception:
+            cam_val = 0
+        try:
+            vid_val = int(data_kp['Vid'].iloc[frame_idx])
+        except Exception:
+            vid_val = 0
+        try:
+            seg_val = int(data_kp['Seg'].iloc[frame_idx])
+        except Exception:
+            seg_val = 0
+        try:
+            timestamp_val = int(data_kp['Timestamp'].iloc[frame_idx])
+        except Exception:
+            timestamp_val = frame_idx
+
+        filename = f"panel_{cam_val}{vid_val}{seg_val}_{timestamp_val}_{frame_idx}.png"
+        fig_path = results_dir / filename
+        if not fig_path.exists():
+            fig, _ = plot_pose_panels(data_kp=data_kp, frame_idx=frame_idx, show=False)
+            fig.savefig(fig_path, dpi=150, bbox_inches=None)
+            plt.close(fig)
+        else:
+            print(f"File {fig_path} already exists")
