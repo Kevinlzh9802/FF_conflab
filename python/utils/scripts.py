@@ -5,7 +5,7 @@ Fill in implementations when ready or integrate your project-specific logic.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence
 
 import numpy as np
 import pandas as pd
@@ -104,6 +104,7 @@ def construct_formations(results: dict, data: pd.DataFrame, speaking_status: Dic
     return formations
 
 
+# TODO: move to analysis.py
 def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = None):
     """Port of utils/detectGroupNumBreakpoints.m (simplified).
 
@@ -126,6 +127,7 @@ def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = N
                 continue
             breakpoints: List[int] = []
             prev_groups = None
+            groups_by_timestamp: Dict[int, List[Any]] = {}
             for t in ts:
                 current_groups = []
                 for clue in clues:
@@ -134,6 +136,7 @@ def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = N
                         current_groups.append(cam_data.loc[row_idx[0], clue])
                     else:
                         current_groups.append([])
+                groups_by_timestamp[int(t)] = current_groups
                 if prev_groups is None or any(not _equal_groups(a, b) for a, b in zip(current_groups, prev_groups)):
                     breakpoints.append(t)
                 prev_groups = current_groups
@@ -146,14 +149,18 @@ def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = N
             for i in range(len(breakpoints) - 1):
                 start = int(breakpoints[i])
                 end = int(breakpoints[i + 1])
-                rows.append({
+                window_groups = groups_by_timestamp.get(start, [[] for _ in clues])
+                row_dict = {
                     'id': i + 1,
                     'Vid': int(vid),
                     'Cam': int(cam),
                     'time': [start, end],
                     'length': end - start + 1,
                     'speaking_all_time': [],
-                })
+                }
+                for clue_name, groups_val in zip(clues, window_groups):
+                    row_dict[clue_name] = groups_val
+                rows.append(row_dict)
     return pd.DataFrame(rows)
 
 
@@ -170,8 +177,3 @@ def _equal_groups(a, b):
         return a == b
     except Exception:
         return False
-
-
-# Aliases matching original MATLAB script names
-def constructFormations(results: dict, data=None):  # pragma: no cover - placeholder
-    return construct_formations(results, data=data)
