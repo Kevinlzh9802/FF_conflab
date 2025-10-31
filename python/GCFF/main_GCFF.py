@@ -29,10 +29,11 @@ import argparse
 import pandas as pd
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, graph_cut
-from utils.scripts import constructFormations, detect_group_num_breakpoints
+from utils.scripts import detect_group_num_breakpoints
 from utils.data import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_panels_df
+from utils.speaking import count_speaker_groups
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
 USED_SEGS = []
@@ -67,7 +68,7 @@ def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -
 
 
 def gcff_experiments(params: Params):
-    force_rerun = True  # TODO: make this an argument
+    force_rerun = False  # TODO: make this an argument
     # read keypoint data, prioritize finished data with detections
     if force_rerun:
         data_kp = pd.read_pickle(params.data_paths["kp"])
@@ -96,10 +97,11 @@ def gcff_experiments(params: Params):
         data_kp.to_pickle(params.data_paths["kp_finished"])
     
     # Translate remaining scripts to function calls (placeholders for now)
-    # breakpoints = detect_group_num_breakpoints(data=data_kp)
-
+    breakpoints = detect_group_num_breakpoints(data=data_kp)
+    breakpoints = count_speaker_groups(breakpoints)
+    
     # Save detection results as panels
-    plot_panels_df(data_kp)
+    # plot_panels_df(data_kp)
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):
@@ -175,6 +177,7 @@ if __name__ == '__main__':  # pragma: no cover
     parser.add_argument('--use-real', type=bool, default=True)
     args = parser.parse_args()
 
+    # TODO: move params to config.yaml
     params = Params(args.stride, args.mdl, args.use_real, used_parts=USED_SEGS)
     params.data_paths = {
         "kp": args.data + "data.pkl",
