@@ -4,15 +4,15 @@ all_clues:
   - hip
   - foot
 
-used_segs:
-  - "429"
+used_segs: []
+  # - "429"
+
+force_rerun: True
+use_space: true
 
 params:
   stride: 40.0
   mdl: 6000.0
-  use_real: true
-  used_parts:
-    - "429"
 
 data_paths:
   kp: ../data/export/data.pkl

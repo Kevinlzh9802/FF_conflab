@@ -27,24 +27,15 @@ import os
 import numpy as np
 import argparse
 import pandas as pd
+import yaml
+from munch import Munch
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, graph_cut
 from utils.scripts import detect_group_num_breakpoints
-from utils.data import filter_and_concat_table, process_columns
+from utils.data import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_panels_df
 from utils.speaking import count_speaker_groups
-
-ALL_CLUES = ["head", "shoulder", "hip", "foot"]
-USED_SEGS = []
-
-@dataclass
-class Params:
-    stride: float
-    mdl: float
-    use_real: bool
-    used_parts: Optional[List[str]] = None  # e.g., ["233", "429"]
-    data_paths: Optional[Dict] = None
 
 
 def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -> None:
@@ -67,37 +58,35 @@ def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -
     print("")
 
 
-def gcff_experiments(params: Params):
-    force_rerun = False  # TODO: make this an argument
-
+def gcff_experiments(config: Munch) -> pd.DataFrame:
     # read keypoint data, prioritize finished data with detections
-    if force_rerun:
-        data_kp = pd.read_pickle(params.data_paths["kp"])
+    if config.force_rerun:
+        data_kp = pd.read_pickle(config.data_paths.kp)
         rerun = True
     else:
         try:
-            data_kp = pd.read_pickle(params.data_paths["kp_finished"])
+            data_kp = pd.read_pickle(config.data_paths.kp_finished)
             rerun = False
         except:
-            data_kp = pd.read_pickle(params.data_paths["kp"])
+            data_kp = pd.read_pickle(config.data_paths.kp)
             rerun = True
 
     # filter and concat table by 3-digit keys in params.used_parts
-    data_kp = filter_and_concat_table(data_kp, params.used_parts)
+    data_kp = filter_and_concat_table(data_kp, config.used_segs)
 
     # Build features per frame for the selected clue
     if rerun:
-        for clue in ALL_CLUES:
-            if params.use_real:
+        for clue in config.all_clues:
+            if config.use_space:
                 features = [data_kp["spaceFeat"][k][clue] for k in range(len(data_kp))]
             else:
                 features = [data_kp["pixelFeat"][k][clue] for k in range(len(data_kp))]
             GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
 
-            results = gcff_sequence(features, GTgroups, params)
+            results = gcff_sequence(features, GTgroups, config.params)
             data_kp[f"{clue}Res"] = results['groups']
 
-        data_kp.to_pickle(params.data_paths["kp_finished"])
+        data_kp.to_pickle(config.data_paths.kp_finished)
     
     # Translate remaining scripts to function calls (placeholders for now)
     breakpoints = detect_group_num_breakpoints(data=data_kp)
@@ -167,20 +156,29 @@ def gcff_sequence(features, GTgroups, params):
 
 if __name__ == '__main__':  # pragma: no cover
     parser = argparse.ArgumentParser(description='Run GCFF main pipeline.')
-    parser.add_argument('--data', type=str, required=False, help='Path to parent directory with features and metadata', default="../data/export/")
-    parser.add_argument('--clue', type=str, default='head', choices=['head', 'shoulder', 'hip', 'foot'])
-    parser.add_argument('--stride', type=float, default=40.0)
-    parser.add_argument('--mdl', type=float, default=6000.0)
-    parser.add_argument('--use-real', type=bool, default=True)
+    parser.add_argument('--config', type=str, default="./configs/config_GCFF.yaml", help='Path to config YAML file')
+    parser.add_argument('--stride', type=float, default=None)
+    parser.add_argument('--mdl', type=float, default=None)
+    parser.add_argument('--use-space', type=bool, default=None)
+    parser.add_argument('--force-rerun', type=bool, default=None)
     args = parser.parse_args()
 
-    # TODO: move params to config.yaml
-    params = Params(args.stride, args.mdl, args.use_real, used_parts=USED_SEGS)
-    params.data_paths = {
-        "kp": args.data + "data.pkl",
-        "kp_finished": args.data + "data_finished.pkl",
-        "sp": args.data + "sp_merged.pkl",
-        "frames": args.data + "frames/",
-    }
-    res = gcff_experiments(params)
+    with open(args.config) as stream:
+        config = yaml.safe_load(stream)
+    
+    config = Munch(config)
+    for key, item in config.items():
+        if isinstance(item, dict):
+            config[key] = Munch(item)
+    
+    if args.stride is not None:
+        config.params.stride = args.stride
+    if args.mdl is not None:
+        config.params.mdl = args.mdl
+    if args.use_space is not None:
+        config.use_space = args.use_space
+    if args.force_rerun is not None:
+        config.force_rerun = args.force_rerun
+
+    res = gcff_experiments(config)
     # print('F1_avg:', res['F1_avg'])
