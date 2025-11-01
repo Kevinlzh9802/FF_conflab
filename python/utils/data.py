@@ -22,7 +22,7 @@ def process_data(base_dir):
             data = data.assign(id=np.arange(1, len(data) + 1))
         except Exception:
             pass
-    # TODO: sort the columns
+    data = process_columns(data)
     data.to_pickle(base_dir + "data.pkl")
 
 
@@ -86,6 +86,47 @@ def filter_and_concat_table(data, used_parts=None): #TODO: move to table.py
                     sel = pd.concat([sel, df.loc[mask]], ignore_index=True)
         if len(sel) > 0:
             df = sel
+    return df
+
+def process_columns(df):
+    pixel_feats = []
+    space_feats = []
+    pixel_coords = []
+    space_coords = []
+    
+    for _, row in df.iterrows():
+        # store features from all clues
+        pixel_feat = {clue: [] for clue in ALL_CLUES}
+        space_feat = {clue: [] for clue in ALL_CLUES}
+        for clue in ALL_CLUES:
+            feat = row.get(f"{clue}Feat", None)
+            if feat is not None and feat.shape[1] > 0:
+                pixel_feat[clue] = feat[:, 0:4]
+                space_feat[clue] = feat[:, 24:28]
+            else:
+                pixel_feat[clue] = np.array([])
+                space_feat[clue] = np.array([])
+        pixel_feats.append(pixel_feat)
+        space_feats.append(space_feat)
+
+        # Store coordinates from headFeat
+        headFeat = row.get(f"headFeat", None)
+        if headFeat is not None and headFeat.shape[1] > 0:
+            pixel_coord = headFeat[:, 4:24]
+            space_coord = headFeat[:, 28:48]
+        else:
+            pixel_coord = np.array([])
+            space_coord = np.array([])
+        pixel_coords.append(pixel_coord)
+        space_coords.append(space_coord)
+
+    df['pixelCoords'] = pixel_coords
+    df['spaceCoords'] = space_coords   
+    df["pixelFeat"] = pixel_feats
+    df["spaceFeat"] = space_feats
+
+    df.drop(columns=[f"{clue}Feat" for clue in ALL_CLUES], inplace=True)
+    df = df['row_id Cam Vid Seg concat_ts pixelCoords spaceCoords pixelFeat spaceFeat GT'.split()]
     return df
 
 if __name__ == '__main__': 

@@ -9,12 +9,12 @@ parent_dir = '../data/export'; mkdir(parent_dir);
 % end
 
 %% speaking status
-% load('../data/speaking_status.mat', 'speaking_status');
-% exportSpeaking(speaking_status);
+load('../data/speaking_status.mat', 'speaking_status');
+exportSpeaking(speaking_status);
 
 %% frames
 % load('../data/frames.mat', 'frames');
-exportFrames(frames)
+% exportFrames(frames)
 % exportFramesArray(frames, '../data/export/frames.mat')
 
 %% functions

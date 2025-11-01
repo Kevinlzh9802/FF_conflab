@@ -30,7 +30,7 @@ import pandas as pd
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, graph_cut
 from utils.scripts import detect_group_num_breakpoints
-from utils.data import filter_and_concat_table
+from utils.data import filter_and_concat_table, process_columns
 from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_panels_df
 from utils.speaking import count_speaker_groups
@@ -69,6 +69,7 @@ def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -
 
 def gcff_experiments(params: Params):
     force_rerun = False  # TODO: make this an argument
+
     # read keypoint data, prioritize finished data with detections
     if force_rerun:
         data_kp = pd.read_pickle(params.data_paths["kp"])
@@ -81,6 +82,8 @@ def gcff_experiments(params: Params):
             data_kp = pd.read_pickle(params.data_paths["kp"])
             rerun = True
         
+    data_kp = process_columns(data_kp)
+    
     # filter and concat table by 3-digit keys in params.used_parts
     data_kp = filter_and_concat_table(data_kp, params.used_parts)
 

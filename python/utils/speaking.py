@@ -320,4 +320,5 @@ def count_speaker_groups(
 
 
 if __name__ == '__main__': 
+    # TODO: make the two arguments configurable in config.yaml
     write_sp_merged('../data/export/speaking_status_py.mat', '../data/export/sp_merged.pkl')
