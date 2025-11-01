@@ -81,17 +81,17 @@ def gcff_experiments(params: Params):
         except:
             data_kp = pd.read_pickle(params.data_paths["kp"])
             rerun = True
-        
-    data_kp = process_columns(data_kp)
-    
+
     # filter and concat table by 3-digit keys in params.used_parts
     data_kp = filter_and_concat_table(data_kp, params.used_parts)
 
     # Build features per frame for the selected clue
     if rerun:
         for clue in ALL_CLUES:
-            feat_col = f"{clue}Feat"
-            features = list(data_kp[feat_col]) if hasattr(data_kp, '__getitem__') else []
+            if params.use_real:
+                features = [data_kp["spaceFeat"][k][clue] for k in range(len(data_kp))]
+            else:
+                features = [data_kp["pixelFeat"][k][clue] for k in range(len(data_kp))]
             GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
 
             results = gcff_sequence(features, GTgroups, params)
@@ -127,26 +127,20 @@ def gcff_sequence(features, GTgroups, params):
         if feat is None or len(feat) == 0 or feat.shape[1] == 0:
             groups_out[idx] = []
             continue
-        # MATLAB: feat = features{idx}(:, [1:24] + 24 * use_real)
-        # Expect feat as 2D array where columns include [ID,x,y,alpha,...]
-        if params.use_real:
-            F = feat[:, 24:28]
-        else:
-            F = feat[:, 0:4]
-        labels = graph_cut(F[:, :4], params.stride, params.mdl)
+
+        labels = graph_cut(feat, params.stride, params.mdl)
         groups = []
         for lab in range(int(labels.max()) + 1 if labels.size else 0):
-            members = F[labels == lab, 0].astype(int).tolist()
+            members = feat[labels == lab, 0].astype(int).tolist()
             groups.append(members)
 
-        # Deal with
+        # Deal with singletons
         if not ff_deletesingletons(groups):  # which means groups are all singletons
             groups = []
         groups = turn_singletons_to_groups(groups)
         GT = turn_singletons_to_groups(GTgroups[idx])
         groups_out[idx] = groups
 
-        # GT = ff_deletesingletons(GTgroups[idx]) if (GTgroups and GTgroups[idx]) else []
         # Evaluate
         pr, re, tp, fp, fn = ff_evalgroups(groups, GT, TH='card', cardmode=0)
         precision[idx], recall[idx], TP[idx], FP[idx], FN[idx] = pr, re, tp, fp, fn
