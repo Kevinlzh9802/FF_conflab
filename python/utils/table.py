@@ -49,19 +49,19 @@ def convert_cell_array_to_table(cell_array: List[List[Any]]):
     return out
 
 
-def filter_and_concat_table(T, keys: Optional[Sequence[str]] = None):
-    """Filter and concatenate rows where (Cam,Vid,Seg) matches keys like '233'."""
-    if keys is None or len(keys) == 0:
-        return T
-    out = []
-    for k in keys:
-        if not (isinstance(k, str) and len(k) == 3 and k.isdigit()):
-            raise ValueError("Each key must be a 3-digit numeric string")
-        cam, vid, seg = int(k[0]), int(k[1]), int(k[2])
-        for row in T:
-            if row['Cam'] == cam and row['Vid'] == vid and row['Seg'] == seg:
-                out.append(row)
-    return out
+# def filter_and_concat_table(T, keys: Optional[Sequence[str]] = None):
+#     """Filter and concatenate rows where (Cam,Vid,Seg) matches keys like '233'."""
+#     if keys is None or len(keys) == 0:
+#         return T
+#     out = []
+#     for k in keys:
+#         if not (isinstance(k, str) and len(k) == 3 and k.isdigit()):
+#             raise ValueError("Each key must be a 3-digit numeric string")
+#         cam, vid, seg = int(k[0]), int(k[1]), int(k[2])
+#         for row in T:
+#             if row['Cam'] == cam and row['Vid'] == vid and row['Seg'] == seg:
+#                 out.append(row)
+#     return out
 
 
 def filter_table(data_table, cam_values, vid_values, seg_values):
