@@ -63,7 +63,6 @@ def construct_formations(results: dict, data: pd.DataFrame, speaking_status: Dic
     return formations
 
 
-# TODO: move to analysis.py
 def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = None):
     """Port of utils/detectGroupNumBreakpoints.m (simplified).
 
