@@ -4,6 +4,7 @@ from typing import List
 
 import math
 import numpy as np
+import pandas as pd
 
 
 def compute_homogeneity(G1: List[List[int]], G2: List[List[int]]) -> float:
@@ -97,3 +98,19 @@ def compute_hic_matrix(GTgroups: List[List[int]], Detgroups: List[List[int]]) ->
     nz = row_sums[:, 0] > 0
     HIC[nz] = HIC[nz] / row_sums[nz]
     return HIC
+
+def getHIC(used_data: pd.DataFrame) -> pd.DataFrame:
+    """Populate a 'HIC' column by computing a head interaction consistency matrix.
+
+    Mirrors GCFF/getHIC.m behavior:
+    used_data.HIC = cell(height(used_data), 1);
+    used_data.HIC{k} = computeHICMatrix(used_data.GT{k}, used_data.headRes{k});
+
+    Unknown dependency: computeHICMatrix — TODO: provide implementation in utilities.
+    """
+    df = used_data.copy()
+    if 'HIC' not in df.columns:
+        df['HIC'] = [None] * len(df)
+    for idx, row in df.iterrows():
+        df.at[idx, 'HIC'] = compute_hic_matrix(row.get('GT'), row.get('headRes'))
+    return df
