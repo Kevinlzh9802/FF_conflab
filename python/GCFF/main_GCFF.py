@@ -28,27 +28,29 @@ import numpy as np
 import argparse
 import pandas as pd
 import yaml
-from munch import Munch
+from munch import Munch, unmunchify
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, graph_cut
 from analysis.cross_modal import detect_group_num_breakpoints, count_speaker_groups
 from utils.table import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_panels_df
-from utils.logging import display_frame_results
+from utils.logging import display_frame_results, start_logging, stop_logging, log_only, get_log_path
+from datetime import datetime
+import os
 
 
 def gcff_experiments(config: Munch) -> pd.DataFrame:
     # read keypoint data, prioritize finished data with detections
     if config.force_rerun:
-        data_kp = pd.read_pickle(config.data_paths.kp)
+        data_kp = pd.read_pickle(config.paths.kp)
         rerun = True
     else:
         try:
-            data_kp = pd.read_pickle(config.data_paths.kp_finished)
+            data_kp = pd.read_pickle(config.paths.kp_finished)
             rerun = False
         except:
-            data_kp = pd.read_pickle(config.data_paths.kp)
+            data_kp = pd.read_pickle(config.paths.kp)
             rerun = True
 
     # filter and concat table by 3-digit keys in params.used_parts
@@ -67,7 +69,7 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
             data_kp[f"{clue}Res"] = results['groups']
 
         if config.replace_df:
-            data_kp.to_pickle(config.data_paths.kp_finished)
+            data_kp.to_pickle(config.paths.kp_finished)
     
     # Translate remaining scripts to function calls (placeholders for now)
     breakpoints = detect_group_num_breakpoints(data=data_kp)
@@ -134,16 +136,7 @@ def gcff_sequence(features, GTgroups, params):
 
     return results
 
-
-if __name__ == '__main__':  # pragma: no cover
-    parser = argparse.ArgumentParser(description='Run GCFF main pipeline.')
-    parser.add_argument('--config', type=str, default="./configs/config_GCFF.yaml", help='Path to config YAML file')
-    parser.add_argument('--stride', type=float, default=None)
-    parser.add_argument('--mdl', type=float, default=None)
-    parser.add_argument('--use-space', type=bool, default=None)
-    parser.add_argument('--force-rerun', type=bool, default=None)
-    args = parser.parse_args()
-
+def set_config(args):
     with open(args.config) as stream:
         config = yaml.safe_load(stream)
     
@@ -161,5 +154,35 @@ if __name__ == '__main__':  # pragma: no cover
     if args.force_rerun is not None:
         config.force_rerun = args.force_rerun
 
-    res = gcff_experiments(config)
+    return config
+
+if __name__ == '__main__':  # pragma: no cover
+    parser = argparse.ArgumentParser(description='Run GCFF main pipeline.')
+    parser.add_argument('--config', type=str, default="./configs/config_GCFF.yaml", help='Path to config YAML file')
+    parser.add_argument('--stride', type=float, default=None)
+    parser.add_argument('--mdl', type=float, default=None)
+    parser.add_argument('--use-space', type=bool, default=None)
+    parser.add_argument('--force-rerun', type=bool, default=None)
+    
+    args = parser.parse_args()
+    config = set_config(args)
+
+    ts_display, log_path = get_log_path(config)
+    # Start tee logging
+    start_logging(log_path)
+    try:
+        print(f"Logging to: {log_path}")
+        # Log start time and config details to file only
+        log_only(f"Start time: {ts_display}")
+        try:
+            cfg_yaml = yaml.safe_dump(unmunchify(config), sort_keys=False, allow_unicode=True)
+        except Exception:
+            cfg_yaml = str(config)
+        log_only("Config:\n\n" + cfg_yaml.rstrip())
+        res = gcff_experiments(config)
+    finally:
+        # Log end time and ensure logs are flushed and file closed
+        end_dt = datetime.now()
+        log_only(f"End time: {end_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+        stop_logging()
     # print('F1_avg:', res['F1_avg'])

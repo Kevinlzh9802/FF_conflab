@@ -15,9 +15,10 @@ params:
   stride: 40.0
   mdl: 6000.0
 
-data_paths:
+paths:
   kp: ../data/export/data.pkl
   kp_finished: ../data/export/data_finished.pkl
   sp: ../data/export/sp_merged.pkl
   frames: ../data/export/frames/
   panel_plots: ../data/results/panel_plots/
+  log: ./experiments/logs/
