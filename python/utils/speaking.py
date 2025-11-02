@@ -74,8 +74,8 @@ def write_sp_merged(read_path, write_path):
                 return np.vstack([all_ids.reshape(1, -1), out])
             sp_arr = reindex(sp_arr, all_ids)
             cf_arr = reindex(cf_arr, all_ids)
-        merged_sp[vid] = sp_arr
-        merged_cf[vid] = cf_arr
+        merged_sp[vid] = sp_arr.astype(np.float32)
+        merged_cf[vid] = cf_arr.astype(np.float32)
 
     out = {'speaking': merged_sp, 'confidence': merged_cf}
     os.makedirs(os.path.dirname(write_path) or '.', exist_ok=True)
