@@ -18,97 +18,97 @@ def _dbg_detail() -> bool:
     return os.environ.get("GCFF_DEBUG_DETAIL", "").lower() in {"1", "true", "yes", "on"}
 
 
-class _Dinic:
-    def __init__(self):
-        self.n = 0
-        self.adj = []  # list of lists of edge indices
-        self.to = []
-        self.cap = []
-        self.rev = []  # index of reverse edge
+# class _Dinic:
+#     def __init__(self):
+#         self.n = 0
+#         self.adj = []  # list of lists of edge indices
+#         self.to = []
+#         self.cap = []
+#         self.rev = []  # index of reverse edge
 
-    def add_node(self, count: int = 1) -> int:
-        start = self.n
-        for _ in range(count):
-            self.adj.append([])
-            self.n += 1
-        return start
+#     def add_node(self, count: int = 1) -> int:
+#         start = self.n
+#         for _ in range(count):
+#             self.adj.append([])
+#             self.n += 1
+#         return start
 
-    def _add_edge_dir(self, u: int, v: int, c: float):
-        self.adj[u].append(len(self.to))
-        self.to.append(v)
-        self.cap.append(float(c))
-        self.rev.append(len(self.to) + 1)  # reverse will be next append
+#     def _add_edge_dir(self, u: int, v: int, c: float):
+#         self.adj[u].append(len(self.to))
+#         self.to.append(v)
+#         self.cap.append(float(c))
+#         self.rev.append(len(self.to) + 1)  # reverse will be next append
 
-        self.adj[v].append(len(self.to))
-        self.to.append(u)
-        self.cap.append(0.0)
-        self.rev.append(len(self.to) - 2)
+#         self.adj[v].append(len(self.to))
+#         self.to.append(u)
+#         self.cap.append(0.0)
+#         self.rev.append(len(self.to) - 2)
 
-    def add_edge(self, u: int, v: int, c_uv: float, c_vu: float):
-        self._add_edge_dir(u, v, c_uv)
-        self._add_edge_dir(v, u, c_vu)
+#     def add_edge(self, u: int, v: int, c_uv: float, c_vu: float):
+#         self._add_edge_dir(u, v, c_uv)
+#         self._add_edge_dir(v, u, c_vu)
 
-    def maxflow(self, s: int, t: int) -> float:
-        flow = 0.0
-        while True:
-            level = [-1] * self.n
-            q = [s]
-            level[s] = 0
-            for u in q:
-                for ei in self.adj[u]:
-                    v = self.to[ei]
-                    if self.cap[ei] > 1e-12 and level[v] < 0:
-                        level[v] = level[u] + 1
-                        q.append(v)
-            if level[t] < 0:
-                break
-            it = [0] * self.n
+#     def maxflow(self, s: int, t: int) -> float:
+#         flow = 0.0
+#         while True:
+#             level = [-1] * self.n
+#             q = [s]
+#             level[s] = 0
+#             for u in q:
+#                 for ei in self.adj[u]:
+#                     v = self.to[ei]
+#                     if self.cap[ei] > 1e-12 and level[v] < 0:
+#                         level[v] = level[u] + 1
+#                         q.append(v)
+#             if level[t] < 0:
+#                 break
+#             it = [0] * self.n
 
-            def dfs(u: int, f: float) -> float:
-                if u == t:
-                    return f
-                i = it[u]
-                while i < len(self.adj[u]):
-                    ei = self.adj[u][i]
-                    v = self.to[ei]
-                    if self.cap[ei] > 1e-12 and level[u] + 1 == level[v]:
-                        d = dfs(v, min(f, self.cap[ei]))
-                        if d > 1e-12:
-                            self.cap[ei] -= d
-                            rev_i = self.rev[ei]
-                            self.cap[rev_i] += d
-                            return d
-                    i += 1
-                    it[u] = i
-                return 0.0
+#             def dfs(u: int, f: float) -> float:
+#                 if u == t:
+#                     return f
+#                 i = it[u]
+#                 while i < len(self.adj[u]):
+#                     ei = self.adj[u][i]
+#                     v = self.to[ei]
+#                     if self.cap[ei] > 1e-12 and level[u] + 1 == level[v]:
+#                         d = dfs(v, min(f, self.cap[ei]))
+#                         if d > 1e-12:
+#                             self.cap[ei] -= d
+#                             rev_i = self.rev[ei]
+#                             self.cap[rev_i] += d
+#                             return d
+#                     i += 1
+#                     it[u] = i
+#                 return 0.0
 
-            while True:
-                pushed = dfs(s, float('inf'))
-                if pushed <= 1e-12:
-                    break
-                flow += pushed
-        return flow
+#             while True:
+#                 pushed = dfs(s, float('inf'))
+#                 if pushed <= 1e-12:
+#                     break
+#                 flow += pushed
+#         return flow
 
-    def reachable_from(self, s: int) -> List[bool]:
-        vis = [False] * self.n
-        stack = [s]
-        vis[s] = True
-        while stack:
-            u = stack.pop()
-            for ei in self.adj[u]:
-                if self.cap[ei] > 1e-12:
-                    v = self.to[ei]
-                    if not vis[v]:
-                        vis[v] = True
-                        stack.append(v)
-        return vis
+#     def reachable_from(self, s: int) -> List[bool]:
+#         vis = [False] * self.n
+#         stack = [s]
+#         vis[s] = True
+#         while stack:
+#             u = stack.pop()
+#             for ei in self.adj[u]:
+#                 if self.cap[ei] > 1e-12:
+#                     v = self.to[ei]
+#                     if not vis[v]:
+#                         vis[v] = True
+#                         stack.append(v)
+#         return vis
 
 
-def _select_backend() -> str:
-    b = os.environ.get("GCFF_MAXFLOW", "").lower()
-    if b.startswith("bk"):
-        return "bk"
-    return "dinic"
+# def _select_backend() -> str:
+#     b = os.environ.get("GCFF_MAXFLOW", "").lower()
+#     if b.startswith("bk"):
+#         return "bk"
+#     return "dinic"
 
 
 class _BKGraph:
@@ -148,60 +148,61 @@ class _BKGraph:
         return int(seg)
 
 
-class _DinicGraph:
-    def __init__(self):
-        self._g = _Dinic()
-        self.source = self._g.add_node(1)
-        self.sink = self._g.add_node(1)
+# class _DinicGraph:
+#     def __init__(self):
+#         self._g = _Dinic()
+#         self.source = self._g.add_node(1)
+#         self.sink = self._g.add_node(1)
 
-    def add_node(self, count: int = 1) -> int:
-        return self._g.add_node(count)
+#     def add_node(self, count: int = 1) -> int:
+#         return self._g.add_node(count)
 
-    def add_edge(self, i: int, j: int, w1: float, w2: float):
-        if i == j:
-            return
-        if w1 < 0 or w2 < 0:
-            raise ValueError("Edge capacities must be >= 0")
-        self._g.add_edge(i, j, w1, w2)
+#     def add_edge(self, i: int, j: int, w1: float, w2: float):
+#         if i == j:
+#             return
+#         if w1 < 0 or w2 < 0:
+#             raise ValueError("Edge capacities must be >= 0")
+#         self._g.add_edge(i, j, w1, w2)
 
-    def add_tweights(self, i: int, w_source: float, w_sink: float):
-        if w_source < 0 or w_sink < 0:
-            raise ValueError("Terminal capacities must be >= 0")
-        if w_source > 0:
-            self._g._add_edge_dir(self.source, i, w_source)
-        if w_sink > 0:
-            self._g._add_edge_dir(i, self.sink, w_sink)
+#     def add_tweights(self, i: int, w_source: float, w_sink: float):
+#         if w_source < 0 or w_sink < 0:
+#             raise ValueError("Terminal capacities must be >= 0")
+#         if w_source > 0:
+#             self._g._add_edge_dir(self.source, i, w_source)
+#         if w_sink > 0:
+#             self._g._add_edge_dir(i, self.sink, w_sink)
 
-    def maxflow(self) -> float:
-        return self._g.maxflow(self.source, self.sink)
+#     def maxflow(self) -> float:
+#         return self._g.maxflow(self.source, self.sink)
 
-    def what_segment(self, i: int) -> int:
-        reach = self._g.reachable_from(self.source)
-        return 1 if not reach[i] else 0
+#     def what_segment(self, i: int) -> int:
+#         reach = self._g.reachable_from(self.source)
+#         return 1 if not reach[i] else 0
 
-    def reset(self):
-        self.__init__()
+#     def reset(self):
+#         self.__init__()
 
 
 class _Graph:
     SINK = 1
 
     def __init__(self, max_nodes_hint: int = 0):
-        self._backend = _select_backend()
-        if self._backend == "bk":
-            try:
-                self._g = _BKGraph()
-                if _dbg_enabled():
-                    _dbg_print("backend", "using BK (pymaxflow)")
-            except RuntimeError:
-                # fallback to dinic
-                self._backend = "dinic"
-                self._g = _DinicGraph()
-                print("warning: BK not available, falling back to Dinic")
-        else:
-            self._g = _DinicGraph()
-            if _dbg_enabled():
-                _dbg_print("backend", "using Dinic")
+        self._g = _BKGraph()
+        # self._backend = _select_backend()
+        # if self._backend == "bk":
+        #     try:
+        #         self._g = _BKGraph()
+        #         if _dbg_enabled():
+        #             _dbg_print("backend", "using BK (pymaxflow)")
+        #     except RuntimeError:
+        #         # fallback to dinic
+        #         self._backend = "dinic"
+        #         self._g = _DinicGraph()
+        #         print("warning: BK not available, falling back to Dinic")
+        # else:
+        #     self._g = _DinicGraph()
+        #     if _dbg_enabled():
+        #         _dbg_print("backend", "using Dinic")
 
     def reset(self):
         self.__init__()
