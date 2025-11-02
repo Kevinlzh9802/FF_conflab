@@ -35,26 +35,92 @@ from analysis.cross_modal import detect_group_num_breakpoints, count_speaker_gro
 from utils.table import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_panels_df
+import sys
+import shutil
+import math
+
+# Optional: tqdm for clean multi-line progress display
+try:
+    from tqdm.auto import tqdm as _tqdm
+except Exception:  # pragma: no cover
+    _tqdm = None
 
 
 def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -> None:
-    print(f"Frame: {idx_frame}/{total_frames}")
-    # Found:
-    print("   FOUND:-- ", end="")
-    if groups:
-        for g in groups:
-            print(f" {g}", end=" |")
-    else:
-        print(" No Groups ", end="")
-    print("")
-    # GT:
-    print("   GT   :-- ", end="")
-    if GTgroups:
-        for g in GTgroups:
-            print(f" {g}", end=" |")
-    else:
-        print(" No Groups ", end="")
-    print("")
+    """Render a 3-line, in-place status that continuously updates.
+
+    Line 1: Frame n/N with tqdm progress bar (if available)
+    Line 2: FOUND: [found groups]
+    Line 3: GT:    [GT groups]
+
+    - Uses tqdm multi-bars when available for robust, non-flooding updates.
+    - Falls back to ANSI cursor control to update 3 logical lines even if they wrap.
+    """
+    found_txt = " |".join(str(g) for g in (groups or [])) or "No Groups"
+    gt_txt = " |".join(str(g) for g in (GTgroups or [])) or "No Groups"
+
+    # Preferred: tqdm stacked bars (positions 0..2)
+    if _tqdm is not None:
+        if not hasattr(display_frame_results, "_bars"):
+            # Initialize three bars on first call
+            p0 = _tqdm(total=total_frames, position=0, dynamic_ncols=True,
+                       leave=True, bar_format="Frame {n_fmt}/{total_fmt} {bar} {percentage:3.0f}%")
+            p1 = _tqdm(total=1, position=1, dynamic_ncols=True, leave=True,
+                       bar_format="FOUND: {desc}")
+            p2 = _tqdm(total=1, position=2, dynamic_ncols=True, leave=True,
+                       bar_format="GT:    {desc}")
+            display_frame_results._bars = (p0, p1, p2)  # type: ignore[attr-defined]
+
+        p0, p1, p2 = display_frame_results._bars  # type: ignore[attr-defined]
+
+        # Update progress and lines
+        p0.n = min(idx_frame, total_frames)
+        p0.refresh()
+        p1.set_description_str(found_txt)
+        p1.refresh()
+        p2.set_description_str(gt_txt)
+        p2.refresh()
+
+        if idx_frame >= total_frames:
+            p2.close(); p1.close(); p0.close()
+            delattr(display_frame_results, "_bars")  # type: ignore[attr-defined]
+        return
+
+    # Fallback: manual 3-line update using ANSI, handling wrapping
+    msg1 = f"Frame {idx_frame}/{total_frames}"
+    msg2 = f"FOUND: {found_txt}"
+    msg3 = f"GT:    {gt_txt}"
+
+    width = shutil.get_terminal_size(fallback=(80, 20)).columns or 80
+
+    def phys_rows(s: str) -> int:
+        # Estimate how many terminal rows the string will occupy when wrapped
+        # Avoid zero; treat empty as one row
+        return max(1, math.ceil(len(s) / max(1, width)))
+
+    new_h = phys_rows(msg1) + phys_rows(msg2) + phys_rows(msg3)
+    prev_h = getattr(display_frame_results, "_prev_h", 0)
+
+    if prev_h:
+        # Move cursor up to the beginning of the previous block
+        sys.stdout.write(f"\x1b[{prev_h}A")
+        # Clear previous block line by line
+        for i in range(prev_h):
+            sys.stdout.write("\r\x1b[2K")
+            if i < prev_h - 1:
+                sys.stdout.write("\n")
+        # Move back up to start position
+        sys.stdout.write(f"\x1b[{prev_h - 1}A" if prev_h > 1 else "\r")
+
+    # Print new block
+    print(msg1)
+    print(msg2)
+    print(msg3, end="", flush=True)
+
+    display_frame_results._prev_h = new_h  # type: ignore[attr-defined]
+    if idx_frame >= total_frames:
+        print("")
+        display_frame_results._prev_h = 0  # type: ignore[attr-defined]
 
 
 def gcff_experiments(config: Munch) -> pd.DataFrame:
@@ -110,7 +176,7 @@ def gcff_sequence(features, GTgroups, params):
     s_speaker: List[float] = []
     group_sizes: List[int] = []
 
-    for idx in range(T):
+    for idx in range(35, T):
         feat = features[idx]
         if feat is None or len(feat) == 0 or feat.shape[1] == 0:
             groups_out[idx] = []

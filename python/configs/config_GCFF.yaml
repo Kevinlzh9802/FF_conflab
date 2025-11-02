@@ -4,10 +4,10 @@ all_clues:
   - hip
   - foot
 
-used_segs: []
-  # - "429"
+used_segs:
+  - "429"
 
-force_rerun: False
+force_rerun: True
 use_space: True
 
 params:
