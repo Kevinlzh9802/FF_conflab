@@ -31,11 +31,10 @@ import yaml
 from munch import Munch
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, graph_cut
-from utils.scripts import detect_group_num_breakpoints
-from utils.data import filter_and_concat_table
+from analysis.cross_modal import detect_group_num_breakpoints, count_speaker_groups
+from utils.table import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_panels_df
-from utils.speaking import count_speaker_groups
 
 
 def display_frame_results(idx_frame: int, total_frames: int, groups, GTgroups) -> None:

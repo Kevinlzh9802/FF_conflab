@@ -1,8 +1,26 @@
-from __future__ import annotations
-
-from typing import Any, Iterable, List, Sequence, Tuple
-
+import json, os
+import pandas as pd
+import numpy as np
 import re
+
+
+from typing import Any, Iterable, List, Sequence, Tuple, Optional
+
+ALL_CLUES = ["head", "shoulder", "hip", "foot"]
+
+def filter_and_concat_table(data, used_segs=None): 
+    df = data
+    if isinstance(df, pd.DataFrame) and used_segs:
+        sel = df.iloc[0:0].copy()
+        for key in used_segs:
+            if isinstance(key, str) and len(key) == 3 and key.isdigit():
+                cam, vid, seg = int(key[0]), int(key[1]), int(key[2])
+                mask = (df['Cam'] == cam) & (df['Vid'] == vid) & (df['Seg'] == seg)
+                if mask.any():
+                    sel = pd.concat([sel, df.loc[mask]], ignore_index=True)
+        if len(sel) > 0:
+            df = sel
+    return df
 
 
 def convert_cell_array_to_table(cell_array: List[List[Any]]):
@@ -31,8 +49,10 @@ def convert_cell_array_to_table(cell_array: List[List[Any]]):
     return out
 
 
-def filter_and_concat_table(T, keys: Sequence[str]):
+def filter_and_concat_table(T, keys: Optional[Sequence[str]] = None):
     """Filter and concatenate rows where (Cam,Vid,Seg) matches keys like '233'."""
+    if keys is None or len(keys) == 0:
+        return T
     out = []
     for k in keys:
         if not (isinstance(k, str) and len(k) == 3 and k.isdigit()):
@@ -79,18 +99,4 @@ def find_matching_frame(table1, table2, n: int):
             return row['FrameData']
     return None
 
-
-def save_group_to_csv(T, path: str = 'f_formations.csv') -> None:
-    """Save a table with column 'formations' (list of groups) to CSV."""
-    import csv
-
-    rows = []
-    for row in T:
-        groups = row.get('formations') or []
-        for g in groups:
-            rows.append({'participants': " ".join(map(str, g))})
-    with open(path, 'w', newline='') as f:
-        w = csv.DictWriter(f, fieldnames=['participants'])
-        w.writeheader()
-        w.writerows(rows)
 

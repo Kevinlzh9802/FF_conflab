@@ -7,8 +7,8 @@ all_clues:
 used_segs: []
   # - "429"
 
-force_rerun: True
-use_space: true
+force_rerun: False
+use_space: True
 
 params:
   stride: 40.0

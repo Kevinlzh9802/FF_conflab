@@ -97,4 +97,3 @@ def compute_hic_matrix(GTgroups: List[List[int]], Detgroups: List[List[int]]) ->
     nz = row_sums[:, 0] > 0
     HIC[nz] = HIC[nz] / row_sums[nz]
     return HIC
-

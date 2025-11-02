@@ -1,7 +1,8 @@
-import json, os
+import os
 import pandas as pd
 import numpy as np
-from utils.scripts import concat_segs
+import json
+
 from utils.pose import process_foot_data
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
@@ -74,18 +75,38 @@ def load_features(base_dir, nrows):
         feats.append(arr)
     return feats
 
-def filter_and_concat_table(data, used_segs=None): #TODO: move to table.py
-    df = data
-    if isinstance(df, pd.DataFrame) and used_segs:
-        sel = df.iloc[0:0].copy()
-        for key in used_segs:
-            if isinstance(key, str) and len(key) == 3 and key.isdigit():
-                cam, vid, seg = int(key[0]), int(key[1]), int(key[2])
-                mask = (df['Cam'] == cam) & (df['Vid'] == vid) & (df['Seg'] == seg)
-                if mask.any():
-                    sel = pd.concat([sel, df.loc[mask]], ignore_index=True)
-        if len(sel) > 0:
-            df = sel
+def _add_merged_column(df: pd.DataFrame) -> pd.DataFrame: 
+    ids = pd.unique(df['Seg'])
+    offset = 0.0
+    concat_ts = np.full((len(df),), np.nan, dtype=float)
+    for seg_id in ids:
+        idx = df['Seg'] == seg_id
+        frames = df.loc[idx, 'Timestamp'].to_numpy(dtype=float)
+        merged = offset + frames
+        concat_ts[idx.to_numpy()] = merged
+        offset = merged[-1]
+    out = df.copy()
+    out['concat_ts'] = concat_ts
+    return out
+
+def concat_segs(data: pd.DataFrame) -> pd.DataFrame:
+    """Port of utils/concatSegs.m.
+
+    For each (Vid, Cam), treat rows as a continuous time sequence and
+    concatenate their timestamps based on the order of Seg values.
+
+    Adds a new column 'concat_ts' to the DataFrame without altering
+    original 'Seg' or 'Timestamp' values.
+    """
+    df = data.copy()
+    df['concat_ts'] = np.nan
+    if 'Vid' not in df.columns or 'Cam' not in df.columns:
+        return df
+    groups = df.groupby(['Vid', 'Cam'], sort=False)
+    for (vid, cam), idx in groups.groups.items():
+        sub = df.loc[idx, ['Seg', 'Timestamp']].copy()
+        merged = _add_merged_column(sub)
+        df.loc[idx, 'concat_ts'] = merged['concat_ts'].values
     return df
 
 def process_columns(df):
@@ -128,6 +149,21 @@ def process_columns(df):
     df.drop(columns=[f"{clue}Feat" for clue in ALL_CLUES], inplace=True)
     df = df['row_id Cam Vid Seg concat_ts pixelCoords spaceCoords pixelFeat spaceFeat GT'.split()]
     return df
+
+def save_group_to_csv(T, path: str = 'f_formations.csv') -> None:
+    """Save a table with column 'formations' (list of groups) to CSV."""
+    import csv
+
+    rows = []
+    for row in T:
+        groups = row.get('formations') or []
+        for g in groups:
+            rows.append({'participants': " ".join(map(str, g))})
+    with open(path, 'w', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=['participants'])
+        w.writeheader()
+        w.writerows(rows)
+
 
 if __name__ == '__main__': 
     process_data("../data/export/")
