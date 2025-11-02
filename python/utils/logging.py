@@ -33,6 +33,7 @@ class _TeeStream:
         if plain and set(plain) <= {"\r"}:
             self.flush()
             return
+        # TODO: still some blank lines in logs
         if self._map_cr_to_nl:
             out = out.replace("\r\n", "\n").replace("\r", "\n")
         if self._strip_ansi:
