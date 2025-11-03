@@ -146,16 +146,21 @@ def groups_speaker_belongs_clues(row, speakers: List):
 
 
 def groups_speaker_belongs(groups: List, speakers: List):
+    if len(speakers) == 0:
+        return []
     groups_contained = groups.copy()
+    remove_list = []
     for g in groups_contained:
         if len(set(g).intersection(set(speakers))) == 0:
-            groups_contained.remove(g)
+            remove_list.append(g)
+    for g in remove_list:
+        groups_contained.remove(g)
     return groups_contained
+
 
 def count_speaker_groups(
         breakpoints: pd.DataFrame,
         speaking_status_path: Optional[str] = "../data/export/sp_merged.pkl", 
-        group_counter: Optional[Callable[[Sequence[int], Dict[str, Any]], Any]] = None,
 ) -> pd.DataFrame:
     """Augment breakpoint windows with speaking metadata.
 
