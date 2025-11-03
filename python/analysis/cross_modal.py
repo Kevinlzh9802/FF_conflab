@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 import numpy as np
 import pandas as pd
 import pickle
+import matplotlib.pyplot as plt
 
 def construct_formations(results: dict, data: pd.DataFrame, speaking_status: Dict[str, Any] | None = None):
     """Simplified port of utils/constructFormations.m.
@@ -301,27 +302,73 @@ def filter_windows(windows: pd.DataFrame) -> pd.DataFrame:
             pass
         return False
 
-    def _to_comparable(value: Any) -> Any:
+    def _normalize_groups(value: Any) -> Any:
         if isinstance(value, pd.DataFrame):
             return value.values.tolist()
         if isinstance(value, pd.Series):
             return value.tolist()
         if isinstance(value, np.ndarray):
             return value.tolist()
+        if isinstance(value, tuple):
+            return list(value)
         return value
 
-    def _all_identical(values: List[Any]) -> bool:
+    def _all_identical(row: pd.Series) -> bool:
+        values = [_normalize_groups(row[col]) for col in result_cols]
         if not values:
             return True
         first = values[0]
-        return all(val == first for val in values[1:])
+        for other in values[1:]:
+            if not _equal_groups(first, other):
+                return False
+        return True
 
     non_empty_mask = ~windows[result_cols].applymap(_is_empty).any(axis=1)
-    identical_mask = windows[result_cols].apply(
-        lambda row: _all_identical([_to_comparable(v) for v in row]),
-        axis=1
-    )
+    identical_mask = windows[result_cols].apply(_all_identical, axis=1)
     speaking_mask = windows['num_speaking_in_scene'] > 1
 
     keep_mask = non_empty_mask & ~identical_mask & speaking_mask
     return windows.loc[keep_mask].copy()
+
+
+def cross_modal_analysis(data):
+    windows = detect_group_num_breakpoints(data=data)
+    windows = count_speaker_groups(windows)
+    windows = filter_windows(windows)
+    feature_cols = ['headRes', 'shoulderRes', 'hipRes', 'footRes']
+
+    if not windows.empty:
+        diff_df = pd.DataFrame({
+            feature: windows['num_groups_speaker_belong'].apply(
+                lambda entry: (entry if isinstance(entry, dict) else {}).get(feature, 0)
+            ) - windows['num_speaking_in_scene']
+            for feature in feature_cols
+        })
+
+        diff_values = sorted({
+            int(val)
+            for val in diff_df.to_numpy().ravel()
+            if pd.notna(val)
+        })
+        if diff_values:
+            x = np.arange(len(diff_values))
+            width = 0.2
+            offsets = np.linspace(-width * (len(feature_cols) - 1) / 2,
+                                  width * (len(feature_cols) - 1) / 2,
+                                  len(feature_cols))
+            fig, ax = plt.subplots(figsize=(10, 6))
+            for offset, feature in zip(offsets, feature_cols):
+                counts = diff_df[feature].value_counts().reindex(diff_values, fill_value=0)
+                ax.bar(x + offset, counts.values, width=width, label=feature)
+
+            ax.set_xlabel('num_groups_speaker_belong - num_speaking_in_scene')
+            ax.set_ylabel('Count')
+            ax.set_xticks(x)
+            ax.set_xticklabels([str(v) for v in diff_values])
+            ax.legend(title='Feature set')
+            ax.set_title('Distribution of group memberships minus in-scene speakers')
+            ax.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.6)
+            fig.tight_layout()
+            plt.show()
+
+    return windows
