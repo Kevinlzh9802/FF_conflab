@@ -147,9 +147,9 @@ def groups_speaker_belongs_clues(row, speakers: List):
 
 def groups_speaker_belongs(groups: List, speakers: List):
     groups_contained = groups.copy()
-    for idx, g in enumerate(groups_contained):
+    for g in groups_contained:
         if len(set(g).intersection(set(speakers))) == 0:
-            groups_contained.pop(idx)
+            groups_contained.remove(g)
     return groups_contained
 
 def count_speaker_groups(
