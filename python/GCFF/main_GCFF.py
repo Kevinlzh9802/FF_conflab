@@ -29,15 +29,14 @@ import argparse
 import pandas as pd
 import yaml
 from munch import Munch, unmunchify
+from datetime import datetime
 
 from gcff_core import ff_deletesingletons, ff_evalgroups, graph_cut
-from analysis.cross_modal import detect_group_num_breakpoints, count_speaker_groups
+from analysis.cross_modal import cross_modal_analysis
 from utils.table import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_panels_df
-from utils.logging import display_frame_results, start_logging, stop_logging, log_only, get_log_path
-from datetime import datetime
-import os
+from utils.exp_logging import display_frame_results, start_logging, stop_logging, log_only, get_log_path
 
 
 def gcff_experiments(config: Munch) -> pd.DataFrame:
@@ -71,9 +70,8 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
         if config.replace_df:
             data_kp.to_pickle(config.paths.kp_finished)
     
-    # Translate remaining scripts to function calls (placeholders for now)
-    breakpoints = detect_group_num_breakpoints(data=data_kp)
-    breakpoints = count_speaker_groups(breakpoints)
+    # Cross modal analysis
+    cross_modal_analysis(data=data_kp)
     
     # Save detection results as panels
     # plot_panels_df(data_kp)

@@ -5,9 +5,9 @@ all_clues:
   - foot
 
 used_segs:
-  - "429"
+  # - "429"
 
-force_rerun: True
+force_rerun: False
 use_space: True
 replace_df: False
 

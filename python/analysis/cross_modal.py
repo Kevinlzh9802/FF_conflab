@@ -1,67 +1,71 @@
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from collections import Counter
 
 import numpy as np
 import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
 
-def construct_formations(results: dict, data: pd.DataFrame, speaking_status: Dict[str, Any] | None = None):
-    """Simplified port of utils/constructFormations.m.
+FEATURE_COLS = ['headRes', 'shoulderRes', 'hipRes', 'footRes']
 
-    Builds a formations table from unique groups per Vid for the 'GT' column.
-    Adds cardinality, id, participants, timestamps (from concat_ts), Cam, Vid.
-    If speaking_status provided with merged arrays per vid, computes avg_speaker.
-    Returns a pandas DataFrame 'formations'.
-    """
-    from utils.groups import record_unique_groups
+# Probably deprecated in the future
+# def construct_formations(results: dict, data: pd.DataFrame, speaking_status: Dict[str, Any] | None = None):
+#     """Simplified port of utils/constructFormations.m.
 
-    col_name = 'GT'
-    vids = sorted(pd.unique(data['Vid']))
-    rows: List[Dict[str, Any]] = []
-    for vid in vids:
-        ana = data.loc[data['Vid'] == vid]
-        uniq = record_unique_groups(ana, col_name)
-        for entry in uniq:
-            rows.append({
-                'participants': entry['participants'],
-                'timestamps': entry['timestamps'],
-                'timestamps_all': entry['timestamps'],
-                'Cam': entry['Cam'],
-                'Vid': vid,
-            })
-    if not rows:
-        return pd.DataFrame(columns=['participants', 'timestamps', 'timestamps_all', 'Cam', 'Vid', 'cardinality', 'id', 'avg_speaker'])
-    formations = pd.DataFrame(rows)
-    formations['cardinality'] = formations['participants'].apply(lambda x: len(x))
-    formations['id'] = np.arange(1, len(formations) + 1)
-    # Filter basic constraints
-    formations = formations[formations['cardinality'] >= 1]
-    # Optional: compute avg_speaker if speaking_status provided as dict per vid: array with first row IDs, following rows status
-    def _avg_speaker(row):
-        if speaking_status is None:
-            return np.nan
-        vid = int(row['Vid'])
-        actions = speaking_status.get(vid)
-        if actions is None:
-            return np.nan
-        ids = actions[0, :]
-        ts = np.asarray(row['timestamps_all'], dtype=int)
-        cols = []
-        for p in row['participants']:
-            loc = np.where(ids == p)[0]
-            if loc.size:
-                cols.append(int(loc[0]))
-        if not cols or ts.size == 0:
-            return np.nan
-        sp = actions[1:, :]
-        ts = np.clip(ts, 1, sp.shape[0])
-        vals = sp[ts - 1][:, cols]
-        return float(np.sum(vals) / max(vals.size, 1))
+#     Builds a formations table from unique groups per Vid for the 'GT' column.
+#     Adds cardinality, id, participants, timestamps (from concat_ts), Cam, Vid.
+#     If speaking_status provided with merged arrays per vid, computes avg_speaker.
+#     Returns a pandas DataFrame 'formations'.
+#     """
+#     from utils.groups import record_unique_groups
 
-    formations['avg_speaker'] = formations.apply(_avg_speaker, axis=1)
-    return formations
+#     col_name = 'GT'
+#     vids = sorted(pd.unique(data['Vid']))
+#     rows: List[Dict[str, Any]] = []
+#     for vid in vids:
+#         ana = data.loc[data['Vid'] == vid]
+#         uniq = record_unique_groups(ana, col_name)
+#         for entry in uniq:
+#             rows.append({
+#                 'participants': entry['participants'],
+#                 'timestamps': entry['timestamps'],
+#                 'timestamps_all': entry['timestamps'],
+#                 'Cam': entry['Cam'],
+#                 'Vid': vid,
+#             })
+#     if not rows:
+#         return pd.DataFrame(columns=['participants', 'timestamps', 'timestamps_all', 'Cam', 'Vid', 'cardinality', 'id', 'avg_speaker'])
+#     formations = pd.DataFrame(rows)
+#     formations['cardinality'] = formations['participants'].apply(lambda x: len(x))
+#     formations['id'] = np.arange(1, len(formations) + 1)
+#     # Filter basic constraints
+#     formations = formations[formations['cardinality'] >= 1]
+#     # Optional: compute avg_speaker if speaking_status provided as dict per vid: array with first row IDs, following rows status
+#     def _avg_speaker(row):
+#         if speaking_status is None:
+#             return np.nan
+#         vid = int(row['Vid'])
+#         actions = speaking_status.get(vid)
+#         if actions is None:
+#             return np.nan
+#         ids = actions[0, :]
+#         ts = np.asarray(row['timestamps_all'], dtype=int)
+#         cols = []
+#         for p in row['participants']:
+#             loc = np.where(ids == p)[0]
+#             if loc.size:
+#                 cols.append(int(loc[0]))
+#         if not cols or ts.size == 0:
+#             return np.nan
+#         sp = actions[1:, :]
+#         ts = np.clip(ts, 1, sp.shape[0])
+#         vals = sp[ts - 1][:, cols]
+#         return float(np.sum(vals) / max(vals.size, 1))
+
+#     formations['avg_speaker'] = formations.apply(_avg_speaker, axis=1)
+#     return formations
 
 
 def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = None):
@@ -72,7 +76,7 @@ def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = N
     - Returns a DataFrame window_table with columns: id, Vid, Cam, time, length, speaking_all_time
     """
     if clues is None:
-        clues = ['headRes', 'shoulderRes', 'hipRes', 'footRes']
+        clues = FEATURE_COLS
     videos = sorted(pd.unique(data['Vid']))
     cameras = sorted(pd.unique(data['Cam']))
     rows: List[Dict[str, Any]] = []
@@ -139,7 +143,7 @@ def _equal_groups(a, b):
     
 def groups_speaker_belongs_clues(row, speakers: List):
     group_nums = {}
-    for clue in ['headRes', 'shoulderRes', 'hipRes', 'footRes']:
+    for clue in FEATURE_COLS:
         detection = row.get(clue, 0)
         group_nums[clue] = groups_speaker_belongs(detection, speakers)
     return group_nums
@@ -286,7 +290,7 @@ def filter_windows(windows: pd.DataFrame) -> pd.DataFrame:
     if windows is None:
         raise ValueError("windows dataframe must not be None")
 
-    result_cols = ['headRes', 'shoulderRes', 'hipRes', 'footRes']
+    result_cols = FEATURE_COLS
     if windows.empty:
         return windows.copy()
 
@@ -335,45 +339,139 @@ def filter_windows(windows: pd.DataFrame) -> pd.DataFrame:
     keep_mask = non_empty_mask & ~identical_mask & speaking_mask
     return windows.loc[keep_mask].copy()
 
+def speaker_group_diff_plot(windows: pd.DataFrame, feature_cols: Optional[List[str]] = None) -> None:
+    if feature_cols is None:
+        feature_cols = FEATURE_COLS
+
+    if windows.empty:
+        return
+
+    diff_df = pd.DataFrame({
+        feature: windows['num_speaking_in_scene'] - windows['num_groups_speaker_belong'].apply(
+            lambda entry: (entry if isinstance(entry, dict) else {}).get(feature, 0)
+        ) for feature in feature_cols
+    })
+
+    diff_values = sorted({
+        int(val)
+        for val in diff_df.to_numpy().ravel()
+        if pd.notna(val)
+    })
+    if not diff_values:
+        return
+
+    x = np.arange(len(diff_values))
+    width = 0.2
+    offsets = np.linspace(-width * (len(feature_cols) - 1) / 2,
+                          width * (len(feature_cols) - 1) / 2,
+                          len(feature_cols))
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for offset, feature in zip(offsets, feature_cols):
+        counts = diff_df[feature].value_counts().reindex(diff_values, fill_value=0)
+        ax.bar(x + offset, counts.values, width=width, label=feature)
+
+    ax.set_xlabel('num_groups_speaker_belong - num_speaking_in_scene')
+    ax.set_ylabel('Count')
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(v) for v in diff_values])
+    ax.legend(title='Feature set')
+    ax.set_title('Distribution of group memberships minus in-scene speakers')
+    ax.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.6)
+    fig.tight_layout()
+    plt.show()
+
+
+def speaker_group_bubble_plot(windows: pd.DataFrame, feature_cols: Optional[List[str]] = None) -> None:
+    if feature_cols is None:
+        feature_cols = FEATURE_COLS
+
+    if windows.empty:
+        return
+
+    colors = plt.cm.get_cmap('tab10', len(feature_cols))
+    overall_points: List[Tuple[int, int]] = []
+    width = 0.15
+    offsets = np.linspace(
+        -width * (len(feature_cols) - 1) / 2,
+        width * (len(feature_cols) - 1) / 2,
+        len(feature_cols),
+    )
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for idx, (feature, offset) in enumerate(zip(feature_cols, offsets)):
+        data_points: List[Tuple[int, int]] = []
+        for _, row in windows.iterrows():
+            detection_result = row.get(feature, [])
+            if detection_result is None:
+                continue
+            filtered_speakers = row.get('speaking_in_scene', []) or []
+
+            for group in detection_result:
+                if group is None:
+                    continue
+                if isinstance(group, np.ndarray):
+                    members = group.tolist()
+                elif isinstance(group, (list, tuple)):
+                    members = list(group)
+                else:
+                    continue
+
+                group_size = len(members)
+                if group_size <= 1:
+                    continue
+
+                filtered_count = sum(member in filtered_speakers for member in members)
+                data_points.append((group_size, filtered_count))
+
+        if not data_points:
+            continue
+
+        counts = Counter(data_points)
+        unique_combinations = np.array(list(counts.keys()))
+        if unique_combinations.ndim == 1:
+            unique_combinations = unique_combinations.reshape(1, -1)
+
+        sizes = np.array(list(counts.values()))
+        ax.scatter(
+            unique_combinations[:, 0] + offset,
+            unique_combinations[:, 1],
+            s=sizes * 60,
+            c=[colors(idx)],
+            label=feature,
+            alpha=0.7,
+            edgecolors='k',
+            linewidths=1.5,
+        )
+        overall_points.extend(data_points)
+
+    if not overall_points:
+        plt.close(fig)
+        return
+
+    ax.set_xlabel('Detected Group Size')
+    ax.set_ylabel('Number of Simultaneous Speakers in Group')
+    ax.set_title('Group Size vs. Speakers in Scene by Feature')
+    ax.legend(title='Feature set')
+    ax.grid(axis='both', linestyle='--', linewidth=0.5, alpha=0.6)
+
+    group_sizes = [pt[0] for pt in overall_points]
+    speaker_counts = [pt[1] for pt in overall_points]
+    max_group_size = max(group_sizes, default=2)
+    max_speakers = max(speaker_counts, default=1)
+    ax.set_xlim(1, max_group_size + 1)
+    ax.set_ylim(-0.5, max_speakers + 1)
+
+    fig.tight_layout()
+    plt.show()
+
 
 def cross_modal_analysis(data):
     windows = detect_group_num_breakpoints(data=data)
     windows = count_speaker_groups(windows)
     windows = filter_windows(windows)
-    feature_cols = ['headRes', 'shoulderRes', 'hipRes', 'footRes']
-
-    if not windows.empty:
-        diff_df = pd.DataFrame({
-            feature: windows['num_groups_speaker_belong'].apply(
-                lambda entry: (entry if isinstance(entry, dict) else {}).get(feature, 0)
-            ) - windows['num_speaking_in_scene']
-            for feature in feature_cols
-        })
-
-        diff_values = sorted({
-            int(val)
-            for val in diff_df.to_numpy().ravel()
-            if pd.notna(val)
-        })
-        if diff_values:
-            x = np.arange(len(diff_values))
-            width = 0.2
-            offsets = np.linspace(-width * (len(feature_cols) - 1) / 2,
-                                  width * (len(feature_cols) - 1) / 2,
-                                  len(feature_cols))
-            fig, ax = plt.subplots(figsize=(10, 6))
-            for offset, feature in zip(offsets, feature_cols):
-                counts = diff_df[feature].value_counts().reindex(diff_values, fill_value=0)
-                ax.bar(x + offset, counts.values, width=width, label=feature)
-
-            ax.set_xlabel('num_groups_speaker_belong - num_speaking_in_scene')
-            ax.set_ylabel('Count')
-            ax.set_xticks(x)
-            ax.set_xticklabels([str(v) for v in diff_values])
-            ax.legend(title='Feature set')
-            ax.set_title('Distribution of group memberships minus in-scene speakers')
-            ax.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.6)
-            fig.tight_layout()
-            plt.show()
-
+    
+    speaker_group_diff_plot(windows, FEATURE_COLS)
+    speaker_group_bubble_plot(windows, FEATURE_COLS)
+    spatial_analysis_plot(windows)
     return windows
