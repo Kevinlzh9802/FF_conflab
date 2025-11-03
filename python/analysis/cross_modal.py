@@ -273,3 +273,55 @@ def count_speaker_groups(
     df["num_groups_speaker_belong"] = num_groups_sp_belong_col
 
     return df
+
+
+def filter_windows(windows: pd.DataFrame) -> pd.DataFrame:
+    """Apply post-processing filters to the GCFF window table."""
+    if windows is None:
+        raise ValueError("windows dataframe must not be None")
+
+    result_cols = ['headRes', 'shoulderRes', 'hipRes', 'footRes']
+    if windows.empty:
+        return windows.copy()
+
+    def _is_empty(value: Any) -> bool:
+        if value is None:
+            return True
+        try:
+            if pd.isna(value):
+                return True
+        except Exception:
+            pass
+        if isinstance(value, (pd.Series, pd.DataFrame)) and value.empty:
+            return True
+        try:
+            if len(value) == 0:  # type: ignore[arg-type]
+                return True
+        except TypeError:
+            pass
+        return False
+
+    def _to_comparable(value: Any) -> Any:
+        if isinstance(value, pd.DataFrame):
+            return value.values.tolist()
+        if isinstance(value, pd.Series):
+            return value.tolist()
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+        return value
+
+    def _all_identical(values: List[Any]) -> bool:
+        if not values:
+            return True
+        first = values[0]
+        return all(val == first for val in values[1:])
+
+    non_empty_mask = ~windows[result_cols].applymap(_is_empty).any(axis=1)
+    identical_mask = windows[result_cols].apply(
+        lambda row: _all_identical([_to_comparable(v) for v in row]),
+        axis=1
+    )
+    speaking_mask = windows['num_speaking_in_scene'] > 1
+
+    keep_mask = non_empty_mask & ~identical_mask & speaking_mask
+    return windows.loc[keep_mask].copy()
