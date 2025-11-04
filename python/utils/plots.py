@@ -4,7 +4,7 @@ import math
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -60,6 +60,7 @@ class PersonSkeleton:
     mid_hip: np.ndarray
     foot_center: np.ndarray
     foot_vector: Optional[np.ndarray]
+    exp_head_pose: float
 
 
 def _normalize_show_flags(flags) -> Tuple[bool, bool, bool, bool]:
@@ -121,9 +122,9 @@ def _compute_foot_properties(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> Tup
     return center, foot_vector
 
 
-def _iter_person_skeletons(A: np.ndarray, rows: Sequence[int], base_height: float) -> Iterable[PersonSkeleton]:
+def _iter_person_skeletons(Coords: np.ndarray, Feats: dict, rows: Sequence[int], base_height: float) -> Iterable[PersonSkeleton]:
     for r in rows:
-        pts2 = _extract_xy_from_headfeat_A(A[r, :])  # (10, 2)
+        pts2 = _extract_xy_from_headfeat(Coords[r, :])  # (10, 2)
         points_xy = pts2.astype(float)
         X_all = points_xy[:, 0]
         Y_all = points_xy[:, 1]
@@ -137,17 +138,18 @@ def _iter_person_skeletons(A: np.ndarray, rows: Sequence[int], base_height: floa
         foot_center, foot_vector = _compute_foot_properties(X_all, Y_all, Z_all)
         points = np.column_stack((X_all, Y_all, Z_all))
 
-        pid = None
-        if A.shape[1] > 0:
-            pid_raw = A[r, 0]
-            try:
-                if not np.isnan(pid_raw):
-                    pid = int(pid_raw)
-            except TypeError:
-                if isinstance(pid_raw, (int, np.integer)):
-                    pid = int(pid_raw)
-            except ValueError:
-                pass
+        try:
+            # if not np.isnan(pid_raw):
+            pid = int(Feats['head'][r, 0])
+        except TypeError or ValueError:
+            # if isinstance(pid_raw, (int, np.integer)):
+            #     pid = int(pid_raw)
+            pid = -1000
+        
+        try:
+            exp_head_pose = float(Feats['head'][r, 3])
+        except (TypeError, ValueError, IndexError):
+            exp_head_pose = float('nan')
 
         yield PersonSkeleton(
             row_index=r,
@@ -157,6 +159,7 @@ def _iter_person_skeletons(A: np.ndarray, rows: Sequence[int], base_height: floa
             mid_hip=mid_hip,
             foot_center=foot_center,
             foot_vector=foot_vector,
+            exp_head_pose=exp_head_pose
         )
 
 
@@ -264,42 +267,56 @@ def _draw_group_polygons(ax,
             ax.scatter(hull[:, 0], hull[:, 1], color=color, s=60, marker='o')
 
 
-def _get_pose_arrow(person: PersonSkeleton, pose: str) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+def _get_pose_arrow(person: PersonSkeleton, pose: str) -> List[Tuple[np.ndarray, np.ndarray]]:
+    arrows: List[Tuple[np.ndarray, np.ndarray]] = []
     pts = person.points
     if pose == 'head':
-        if np.any(np.isnan(pts[[0, 1], :2])):
-            return None, None
-        start = pts[0]
-        vec = np.array([pts[1, 0] - pts[0, 0], pts[1, 1] - pts[0, 1]], dtype=float)
-        if np.any(np.isnan(vec)) or np.allclose(vec, 0.0):
-            return None, None
-        return start, vec
+        if not np.any(np.isnan(pts[[0, 1], :2])):
+            start = pts[0]
+            vec = np.array([pts[1, 0] - pts[0, 0], pts[1, 1] - pts[0, 1]], dtype=float)
+            if not (np.any(np.isnan(vec)) or np.allclose(vec, 0.0)):
+                arrows.append((start, vec))
+        angle = getattr(person, 'exp_head_pose', float('nan'))
+        if angle is not None and not np.isnan(angle) and not np.any(np.isnan(pts[0, :2])):
+            base_start = pts[0]
+            base_length = None
+            if arrows:
+                base_length = float(np.linalg.norm(arrows[0][1]))
+            if not base_length or base_length <= 0 or np.isnan(base_length):
+                base_length = 1.0
+            vec_manual = np.array([math.cos(angle), math.sin(angle)], dtype=float) * base_length
+            if not (np.any(np.isnan(vec_manual)) or np.allclose(vec_manual, 0.0)):
+                arrows.append((base_start, vec_manual))
+        return arrows
     if pose == 'shoulder':
         if np.any(np.isnan(person.mid_shoulder)) or np.any(np.isnan(pts[[2, 3], :2])):
-            return None, None
+            return arrows
         vx = pts[3, 0] - pts[2, 0]
         vy = pts[3, 1] - pts[2, 1]
         vec = np.array([-vy, vx], dtype=float)
         if np.any(np.isnan(vec)) or np.allclose(vec, 0.0):
-            return None, None
-        return person.mid_shoulder, vec
+            return arrows
+        arrows.append((person.mid_shoulder, vec))
+        return arrows
     if pose == 'hip':
         if np.any(np.isnan(person.mid_hip)) or np.any(np.isnan(pts[[4, 5], :2])):
-            return None, None
+            return arrows
         vx = pts[5, 0] - pts[4, 0]
         vy = pts[5, 1] - pts[4, 1]
         vec = np.array([-vy, vx], dtype=float)
         if np.any(np.isnan(vec)) or np.allclose(vec, 0.0):
-            return None, None
-        return person.mid_hip, vec
+            return arrows
+        arrows.append((person.mid_hip, vec))
+        return arrows
     if pose == 'foot':
         if person.foot_vector is None or np.any(np.isnan(person.foot_center[:2])):
-            return None, None
+            return arrows
         vec = np.asarray(person.foot_vector, dtype=float)
         if np.any(np.isnan(vec)) or np.allclose(vec, 0.0):
-            return None, None
-        return person.foot_center, vec
-    return None, None
+            return arrows
+        arrows.append((person.foot_center, vec))
+        return arrows
+    return arrows
 
 
 def _draw_arrow(ax, start: Optional[np.ndarray], vec: Optional[np.ndarray], projection: str,
@@ -447,25 +464,25 @@ def _plot_person_skeleton(ax,
     id_anchor = None
     show_head, show_shoulder, show_hip, show_foot = show_flags
     if show_head:
-        start, vec = _get_pose_arrow(person, 'head')
-        anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
-        if anchor is not None:
-            id_anchor = anchor
+        for start, vec in _get_pose_arrow(person, 'head'):
+            anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+            if anchor is not None and id_anchor is None:
+                id_anchor = anchor
     if show_shoulder:
-        start, vec = _get_pose_arrow(person, 'shoulder')
-        anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
-        if anchor is not None and id_anchor is None:
-            id_anchor = anchor
+        for start, vec in _get_pose_arrow(person, 'shoulder'):
+            anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+            if anchor is not None and id_anchor is None:
+                id_anchor = anchor
     if show_hip:
-        start, vec = _get_pose_arrow(person, 'hip')
-        anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
-        if anchor is not None and id_anchor is None:
-            id_anchor = anchor
+        for start, vec in _get_pose_arrow(person, 'hip'):
+            anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+            if anchor is not None and id_anchor is None:
+                id_anchor = anchor
     if show_foot:
-        start, vec = _get_pose_arrow(person, 'foot')
-        anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
-        if anchor is not None and id_anchor is None:
-            id_anchor = anchor
+        for start, vec in _get_pose_arrow(person, 'foot'):
+            anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+            if anchor is not None and id_anchor is None:
+                id_anchor = anchor
 
     if id_anchor is None:
         if projection == '3d':
@@ -561,7 +578,7 @@ def plot_skeletons_3d_grid(data_kp: Any,
     return axes
 
 
-def _extract_xy_from_headfeat_A(A_row: np.ndarray) -> np.ndarray:
+def _extract_xy_from_headfeat(Coords: np.ndarray) -> np.ndarray:
     """Extract XY keypoints from a single row of A (right 24 cols of headFeat).
 
     MATLAB mapping (1-based) within A (m x 24):
@@ -574,23 +591,23 @@ def _extract_xy_from_headfeat_A(A_row: np.ndarray) -> np.ndarray:
     Returns array of shape (10, 2) in order:
       head, nose, lShoulder, rShoulder, lHip, rHip, lAnkle, rAnkle, lFoot, rFoot
     """
-    # zero-based indices in A
+    # zero-based indices in Coords
     idx_pairs = [
-        (4, 5),   # head
-        (6, 7),   # nose
-        (8, 9),   # left shoulder
-        (10, 11), # right shoulder
+        (0, 1),   # head
+        (2, 3),   # nose
+        (4, 5),   # left shoulder
+        (6, 7), # right shoulder
         (12, 13), # left hip
-        (14, 15), # right hip
-        (16, 17), # left ankle
-        (18, 19), # right ankle
-        (20, 21), # left foot
-        (22, 23), # right foot
+        (10, 11), # right hip
+        (12, 13), # left ankle
+        (14, 15), # right ankle
+        (16, 17), # left foot
+        (18, 19), # right foot
     ]
     pts = []
     for ix, iy in idx_pairs:
-        x = A_row[ix] if ix < A_row.shape[0] else np.nan
-        y = A_row[iy] if iy < A_row.shape[0] else np.nan
+        x = Coords[ix] if ix < Coords.shape[0] else np.nan
+        y = Coords[iy] if iy < Coords.shape[0] else np.nan
         pts.append((x, y))
     return np.asarray(pts, dtype=float)
 
@@ -598,7 +615,7 @@ def _extract_xy_from_headfeat_A(A_row: np.ndarray) -> np.ndarray:
 
 def plot_all_skeletons(data_kp: Any,
                        frame_idx: int,
-                       key: str = 'headFeat',
+                       source: str = 'space',
                        persons: Optional[Sequence[int]] = None,
                        ax=None,
                        title: Optional[str] = None,
@@ -621,17 +638,22 @@ def plot_all_skeletons(data_kp: Any,
     - axis_limits: optional ((xmin, xmax), (ymin, ymax)) tuple applied when projection='2d'.
     """
 
-    plot_title = title or f"HeadFeat (XY) - {key}[{frame_idx}]"
+    plot_title = title or f"HeadFeat (XY) - {source}[{frame_idx}]"
     projection = projection.lower()
     if projection not in ('2d', '3d'):
         raise ValueError(f"projection must be '2d' or '3d', got {projection}")
 
-    arr = np.asarray(data_kp[key][frame_idx])
-    if arr.ndim != 2 or arr.shape[1] < 48:
-        raise ValueError(f"Expected (m x 48) array for {key}[{frame_idx}], got {arr.shape}")
-    A = arr[:, 24:48]
-    B = arr[:, 0:24]
-    m = A.shape[0]
+    coords_key = source + "Coords"
+    feat_key = source + "Feat"
+    Coords = np.asarray(data_kp[coords_key][frame_idx])
+    Feats = data_kp[feat_key][frame_idx]
+
+    if Coords.ndim != 2 or Coords.shape[1] < 20:
+        Warning(f"Expected (m x 20) array for {coords_key}[{frame_idx}], got {Coords.shape}")
+        return fig, None
+    
+    # B = arr[:, 0:24]
+    m = Coords.shape[0]
     rows = list(range(m)) if persons is None else list(persons)
 
     if projection == '3d':
@@ -649,7 +671,7 @@ def plot_all_skeletons(data_kp: Any,
         y_vals = []
 
     show_flags = _normalize_show_flags(show_poses)
-    persons_data = list(_iter_person_skeletons(A, rows, base_height))
+    persons_data = list(_iter_person_skeletons(Coords, Feats, rows, base_height))
     colors = plt.cm.tab10(np.linspace(0, 1, max(len(rows), 1)))
     any_pts = False
 
@@ -756,15 +778,15 @@ def _plot_pose_panel(ax,
                 ax.scatter([center[0]], [center[1]], s=20, color=col)
                 x_vals.append(float(center[0]))
                 y_vals.append(float(center[1]))
-                any_content = True
+        any_content = True
         id_anchor = None
         if show_flag and arrow_key:
-            start, vec = _get_pose_arrow(person, arrow_key)
-            if start is not None and vec is not None:
+            for start, vec in _get_pose_arrow(person, arrow_key):
                 anchor = _draw_arrow(ax, start, vec, '2d', col, x_vals, y_vals)
-                if anchor is not None and show_ids:
-                    id_anchor = anchor
-                any_content = True
+                if anchor is not None:
+                    any_content = True
+                    if show_ids and id_anchor is None:
+                        id_anchor = anchor
         if show_ids and id_anchor is None:
             valid = ~np.isnan(person.points[:, :2]).any(axis=1)
             if np.any(valid):
@@ -797,7 +819,7 @@ def _plot_pose_panel(ax,
 
 def plot_pose_panels(data_kp: Any,
                      frame_idx: int,
-                     key: str = 'headFeat',
+                     source: str = 'space',
                      persons: Optional[Sequence[int]] = None,
                      show: bool = True,
                      show_poses: Sequence[bool] = (True, True, True, True),
@@ -809,14 +831,19 @@ def plot_pose_panels(data_kp: Any,
     c_y = 100 * data_kp['Cam'][frame_idx] with a +/- 250 span.
     """
 
-    arr = np.asarray(data_kp[key][frame_idx])
+    coords_key = source + "Coords"
+    feat_key = source + "Feat"
+    Coords = np.asarray(data_kp[coords_key][frame_idx])
+    Feats = data_kp[feat_key][frame_idx]
+
     fig = plt.figure(figsize=figsize)
-    if arr.ndim != 2 or arr.shape[1] < 48:
-        Warning(f"Expected (m x 48) array for {key}[{frame_idx}], got {arr.shape}")
+
+    if Coords.ndim != 2 or Coords.shape[1] < 20:
+        Warning(f"Expected (m x 20) array for {coords_key}[{frame_idx}], got {Coords.shape}")
         return fig, None
-    A = arr[:, 24:48]
-    B = arr[:, 0:24]
-    m = A.shape[0]
+    
+    # B = arr[:, 0:24]
+    m = Coords.shape[0]
     rows = list(range(m)) if persons is None else list(persons)
 
     try:
@@ -847,7 +874,7 @@ def plot_pose_panels(data_kp: Any,
     gt_groups = _normalize_groups(raw_gt)
 
     show_flags = _normalize_show_flags(show_poses)
-    persons_data = list(_iter_person_skeletons(A, rows, base_height))
+    persons_data = list(_iter_person_skeletons(Coords, Feats, rows, base_height))
     colors = plt.cm.tab10(np.linspace(0, 1, max(len(rows), 1)))
     person_lookup: Dict[int, PersonSkeleton] = {}
     for person in persons_data:
@@ -899,7 +926,7 @@ def plot_pose_panels(data_kp: Any,
     plot_all_skeletons(
         data_kp,
         frame_idx,
-        key=key,
+        source=source,
         persons=persons,
         ax=ax_all,
         title='All skeletons',
@@ -933,6 +960,8 @@ def plot_pose_panels(data_kp: Any,
     frame_name = f"frame_{cam_val}{vid_val}{seg_val}_{t_val}.png"
     frame_path = frames_dir / frame_name
 
+    PixelCoords = np.asarray(data_kp[coords_key][frame_idx])
+    PixelFeats = data_kp[feat_key][frame_idx]
     ax_image.set_title('Frame image')
     ax_image.axis('off')
     try:
@@ -941,9 +970,9 @@ def plot_pose_panels(data_kp: Any,
             ax_image.imshow(img)
             img_h, img_w = img.shape[0], img.shape[1]
             for idx_row, person in enumerate(persons_data):
-                if idx_row >= B.shape[0]:
+                if idx_row >= PixelCoords.shape[0]:
                     continue
-                head_xy = B[idx_row, 4:6].astype(float)
+                head_xy = PixelCoords[idx_row, 4:6].astype(float)
                 if head_xy.shape[0] < 2 or np.any(np.isnan(head_xy)):
                     continue
                 px = head_xy[0] * img_w
