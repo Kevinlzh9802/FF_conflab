@@ -147,7 +147,7 @@ def process_columns(df):
     df["spaceFeat"] = space_feats
 
     df.drop(columns=[f"{clue}Feat" for clue in ALL_CLUES], inplace=True)
-    df = df['row_id Cam Vid Seg concat_ts pixelCoords spaceCoords pixelFeat spaceFeat GT'.split()]
+    df = df['row_id Cam Vid Seg Timestamp concat_ts pixelCoords spaceCoords pixelFeat spaceFeat GT'.split()]
     return df
 
 def save_group_to_csv(T, path: str = 'f_formations.csv') -> None:
