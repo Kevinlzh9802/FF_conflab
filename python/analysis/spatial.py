@@ -72,7 +72,7 @@ def compute_split_score(G1: List[List[int]], G2: List[List[int]]) -> float:
             overlap = Aset.intersection(B)
             if len(overlap) > 1:
                 subgroup_count += 1
-        total += len(A) * max(0, subgroup_count - 1)
+        total += max(0, subgroup_count - 1)
     return total / max(len(G1), 1)
 
 
