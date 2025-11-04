@@ -63,6 +63,13 @@ class PersonSkeleton:
     exp_head_pose: float
 
 
+@dataclass
+class PoseArrow:
+    start: np.ndarray
+    vec: np.ndarray
+    kind: str
+
+
 def _normalize_show_flags(flags) -> Tuple[bool, bool, bool, bool]:
     try:
         if isinstance(flags, (bool, np.bool_)):
@@ -267,56 +274,75 @@ def _draw_group_polygons(ax,
             ax.scatter(hull[:, 0], hull[:, 1], color=color, s=60, marker='o')
 
 
-def _get_pose_arrow(person: PersonSkeleton, pose: str) -> List[Tuple[np.ndarray, np.ndarray]]:
-    arrows: List[Tuple[np.ndarray, np.ndarray]] = []
+def _vectors_aligned(vec_a: np.ndarray, vec_b: np.ndarray, tol: float = 0.99) -> bool:
+    if vec_a is None or vec_b is None:
+        return False
+    norm_a = np.linalg.norm(vec_a)
+    norm_b = np.linalg.norm(vec_b)
+    if norm_a == 0 or norm_b == 0 or np.isnan(norm_a) or np.isnan(norm_b):
+        return False
+    cos_sim = float(np.dot(vec_a, vec_b) / (norm_a * norm_b))
+    return cos_sim >= tol
+
+
+def _get_pose_arrow(person: PersonSkeleton, pose: str) -> Tuple[List[PoseArrow], bool]:
+    arrows: List[PoseArrow] = []
+    discrepancy = False
     pts = person.points
     if pose == 'head':
+        kp_arrow: Optional[PoseArrow] = None
         if not np.any(np.isnan(pts[[0, 1], :2])):
             start = pts[0]
             vec = np.array([pts[1, 0] - pts[0, 0], pts[1, 1] - pts[0, 1]], dtype=float)
             if not (np.any(np.isnan(vec)) or np.allclose(vec, 0.0)):
-                arrows.append((start, vec))
+                kp_arrow = PoseArrow(start=start, vec=vec, kind='head_kp')
         angle = getattr(person, 'exp_head_pose', float('nan'))
         if angle is not None and not np.isnan(angle) and not np.any(np.isnan(pts[0, :2])):
-            base_start = pts[0]
-            base_length = None
-            if arrows:
-                base_length = float(np.linalg.norm(arrows[0][1]))
-            if not base_length or base_length <= 0 or np.isnan(base_length):
-                base_length = 1.0
-            vec_manual = np.array([math.cos(angle), math.sin(angle)], dtype=float) * base_length
+            vec_manual = np.array([math.cos(angle), math.sin(angle)], dtype=float)
             if not (np.any(np.isnan(vec_manual)) or np.allclose(vec_manual, 0.0)):
-                arrows.append((base_start, vec_manual))
-        return arrows
+                manual_arrow = PoseArrow(start=pts[0], vec=vec_manual, kind='head_manual')
+                if kp_arrow is not None:
+                    if _vectors_aligned(kp_arrow.vec, manual_arrow.vec):
+                        arrows.append(kp_arrow)
+                    else:
+                        discrepancy = True
+                        # Only store manual arrow when there is discrepancy
+                        arrows.append(manual_arrow)
+            elif kp_arrow is not None:
+                arrows.append(kp_arrow)
+        else:
+            if kp_arrow is not None:
+                arrows.append(kp_arrow)
+        return arrows, discrepancy
     if pose == 'shoulder':
         if np.any(np.isnan(person.mid_shoulder)) or np.any(np.isnan(pts[[2, 3], :2])):
-            return arrows
+            return arrows, discrepancy
         vx = pts[3, 0] - pts[2, 0]
         vy = pts[3, 1] - pts[2, 1]
         vec = np.array([-vy, vx], dtype=float)
         if np.any(np.isnan(vec)) or np.allclose(vec, 0.0):
-            return arrows
-        arrows.append((person.mid_shoulder, vec))
-        return arrows
+            return arrows, discrepancy
+        arrows.append(PoseArrow(start=person.mid_shoulder, vec=vec, kind='shoulder'))
+        return arrows, discrepancy
     if pose == 'hip':
         if np.any(np.isnan(person.mid_hip)) or np.any(np.isnan(pts[[4, 5], :2])):
-            return arrows
+            return arrows, discrepancy
         vx = pts[5, 0] - pts[4, 0]
         vy = pts[5, 1] - pts[4, 1]
         vec = np.array([-vy, vx], dtype=float)
         if np.any(np.isnan(vec)) or np.allclose(vec, 0.0):
-            return arrows
-        arrows.append((person.mid_hip, vec))
-        return arrows
+            return arrows, discrepancy
+        arrows.append(PoseArrow(start=person.mid_hip, vec=vec, kind='hip'))
+        return arrows, discrepancy
     if pose == 'foot':
         if person.foot_vector is None or np.any(np.isnan(person.foot_center[:2])):
-            return arrows
+            return arrows, discrepancy
         vec = np.asarray(person.foot_vector, dtype=float)
         if np.any(np.isnan(vec)) or np.allclose(vec, 0.0):
-            return arrows
-        arrows.append((person.foot_center, vec))
-        return arrows
-    return arrows
+            return arrows, discrepancy
+        arrows.append(PoseArrow(start=person.foot_center, vec=vec, kind='foot'))
+        return arrows, discrepancy
+    return arrows, discrepancy
 
 
 def _draw_arrow(ax, start: Optional[np.ndarray], vec: Optional[np.ndarray], projection: str,
@@ -464,23 +490,28 @@ def _plot_person_skeleton(ax,
     id_anchor = None
     show_head, show_shoulder, show_hip, show_foot = show_flags
     if show_head:
-        for start, vec in _get_pose_arrow(person, 'head'):
-            anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        arrows, _ = _get_pose_arrow(person, 'head')
+        for arrow in arrows:
+            arrow_color = 'k' if arrow.kind == 'head_manual' else color
+            anchor = _draw_arrow(ax, arrow.start, arrow.vec, projection, arrow_color, x_vals, y_vals)
             if anchor is not None and id_anchor is None:
                 id_anchor = anchor
     if show_shoulder:
-        for start, vec in _get_pose_arrow(person, 'shoulder'):
-            anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        arrows, _ = _get_pose_arrow(person, 'shoulder')
+        for arrow in arrows:
+            anchor = _draw_arrow(ax, arrow.start, arrow.vec, projection, color, x_vals, y_vals)
             if anchor is not None and id_anchor is None:
                 id_anchor = anchor
     if show_hip:
-        for start, vec in _get_pose_arrow(person, 'hip'):
-            anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        arrows, _ = _get_pose_arrow(person, 'hip')
+        for arrow in arrows:
+            anchor = _draw_arrow(ax, arrow.start, arrow.vec, projection, color, x_vals, y_vals)
             if anchor is not None and id_anchor is None:
                 id_anchor = anchor
     if show_foot:
-        for start, vec in _get_pose_arrow(person, 'foot'):
-            anchor = _draw_arrow(ax, start, vec, projection, color, x_vals, y_vals)
+        arrows, _ = _get_pose_arrow(person, 'foot')
+        for arrow in arrows:
+            anchor = _draw_arrow(ax, arrow.start, arrow.vec, projection, color, x_vals, y_vals)
             if anchor is not None and id_anchor is None:
                 id_anchor = anchor
 
@@ -738,6 +769,7 @@ def _plot_pose_panel(ax,
     y_vals: list = []
     labels_added = set()
     any_content = False
+    panel_discrepancy = False
     label_lookup = LABEL_MAP.get(clue or '', {})
 
     for idx, person in enumerate(persons):
@@ -778,11 +810,15 @@ def _plot_pose_panel(ax,
                 ax.scatter([center[0]], [center[1]], s=20, color=col)
                 x_vals.append(float(center[0]))
                 y_vals.append(float(center[1]))
-        any_content = True
+                any_content = True
         id_anchor = None
         if show_flag and arrow_key:
-            for start, vec in _get_pose_arrow(person, arrow_key):
-                anchor = _draw_arrow(ax, start, vec, '2d', col, x_vals, y_vals)
+            arrows, mismatch = _get_pose_arrow(person, arrow_key)
+            if mismatch:
+                panel_discrepancy = True
+            for arrow in arrows:
+                draw_color = 'k' if arrow.kind == 'head_manual' else col
+                anchor = _draw_arrow(ax, arrow.start, arrow.vec, '2d', draw_color, x_vals, y_vals)
                 if anchor is not None:
                     any_content = True
                     if show_ids and id_anchor is None:
@@ -793,10 +829,13 @@ def _plot_pose_panel(ax,
                 id_anchor = person.points[valid][0][:2]
         if show_ids and id_anchor is not None:
             ax.text(float(id_anchor[0]) + 6.0, float(id_anchor[1]) + 6.0, _person_label(person), color=col, fontsize=8)
-
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
-    ax.set_title(title)
+    panel_title = title
+    if arrow_key == 'head' and panel_discrepancy:
+        if '[O]' not in panel_title:
+            panel_title = f"{panel_title} [O]"
+    ax.set_title(panel_title)
     if x_lim is not None and y_lim is not None:
         ax.set_xlim(x_lim[0], x_lim[1])
         ax.set_ylim(y_lim[0], y_lim[1])
@@ -815,6 +854,7 @@ def _plot_pose_panel(ax,
     if not any_content:
         ax.text(0.5, 0.5, "No data", transform=ax.transAxes, ha='center', va='center',
                 fontsize=10, color='0.5')
+    return panel_discrepancy
 
 
 def plot_pose_panels(data_kp: Any,
