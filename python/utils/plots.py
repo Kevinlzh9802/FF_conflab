@@ -960,8 +960,7 @@ def plot_pose_panels(data_kp: Any,
     frame_name = f"frame_{cam_val}{vid_val}{seg_val}_{t_val}.png"
     frame_path = frames_dir / frame_name
 
-    PixelCoords = np.asarray(data_kp[coords_key][frame_idx])
-    PixelFeats = data_kp[feat_key][frame_idx]
+    PixelCoords = np.asarray(data_kp['pixelCoords'][frame_idx])
     ax_image.set_title('Frame image')
     ax_image.axis('off')
     try:
@@ -972,7 +971,7 @@ def plot_pose_panels(data_kp: Any,
             for idx_row, person in enumerate(persons_data):
                 if idx_row >= PixelCoords.shape[0]:
                     continue
-                head_xy = PixelCoords[idx_row, 4:6].astype(float)
+                head_xy = PixelCoords[idx_row, :2].astype(float)
                 if head_xy.shape[0] < 2 or np.any(np.isnan(head_xy)):
                     continue
                 px = head_xy[0] * img_w
