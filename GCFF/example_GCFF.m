@@ -38,20 +38,20 @@ else
     params.mdl = 60000;
 end
 
-% params.used_parts = ["229", "429", "828", "829", ...
-%     "232", "233", "234", "235", "236", ...
-%     "431", "433", "434", ...
-%     "631", "632", "633", "634", "635", "636", ...
-%     "831", "832", "833", "834", "835"];
+params.used_parts = ["229", "429", "828", "829", ...
+    "232", "233", "234", "235", "236", ...
+    "431", "433", "434", ...
+    "631", "632", "633", "634", "635", "636", ...
+    "831", "832", "833", "834", "835"];
 
-params.used_parts = ["429"];
+% params.used_parts = ["429"];
 
 file_name = "../data/head.mat";
 load(file_name, 'all_data');
 data_results = all_data;
 data_results.Properties.VariableNames{1} = 'headFeat';
 
-for clue = ["head", "shoulder", "hip", "foot"]
+for clue = ["shoulder", "hip", "foot"]
     f_name = clue + "Feat";
     file_name = "../data/" + clue + ".mat";
     load(file_name, 'all_data');
@@ -107,7 +107,7 @@ recall = zeros(1,length(timestamp)) ;
 s_speaker = [];
 group_sizes = [];
 
-for idxFrame = 19:length(timestamp)
+for idxFrame = 1709:length(timestamp)
     % gg represents group_id
     feat = features{idxFrame}(:, [1:24] + 24 * use_real);
     gg = gc(feat(:, 1:4), stride, mdl);

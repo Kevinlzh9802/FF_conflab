@@ -71,10 +71,10 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
             data_kp.to_pickle(config.paths.kp_finished)
     
     # Cross modal analysis
-    cross_modal_analysis(data=data_kp)
+    # cross_modal_analysis(data=data_kp)
     
     # Save detection results as panels
-    # plot_panels_df(data_kp)
+    plot_panels_df(data_kp)
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):
