@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
+from utils.groups import equal_groups
 from matplotlib.patches import Polygon
 
 
@@ -759,6 +760,7 @@ def _plot_pose_panel(ax,
                      midpoint_attr: Optional[str] = None,
                      center_attr: Optional[str] = None,
                      groups: Optional[Sequence[Sequence[int]]] = None,
+                     prev_groups: Optional[Sequence[Sequence[int]]] = None,
                      person_lookup: Optional[Dict[int, PersonSkeleton]] = None,
                      point_selector=None,
                      clue: Optional[str] = None,
@@ -835,6 +837,13 @@ def _plot_pose_panel(ax,
     if arrow_key == 'head' and panel_discrepancy:
         if '[O]' not in panel_title:
             panel_title = f"{panel_title} [O]"
+    # Detect change vs previous frame's groups and mark with [C]
+    try:
+        if prev_groups is not None and not equal_groups(groups, prev_groups):
+            if '[C]' not in panel_title:
+                panel_title = f"{panel_title} [C]"
+    except Exception:
+        pass
     ax.set_title(panel_title)
     if x_lim is not None and y_lim is not None:
         ax.set_xlim(x_lim[0], x_lim[1])
@@ -907,6 +916,30 @@ def plot_pose_panels(data_kp: Any,
             raw_groups = None
         clue_groups[clue] = _normalize_groups(raw_groups)
 
+    # Previous-frame groups for change detection
+    prev_clue_groups: Dict[str, Optional[Sequence[Sequence[int]]]] = {}
+    if frame_idx > 0:
+        for clue in ('head', 'shoulder', 'hip', 'foot'):
+            col = f"{clue}Res"
+            try:
+                raw_prev = data_kp[col][frame_idx - 1]  # type: ignore[index]
+            except Exception:
+                raw_prev = None
+            prev_clue_groups[clue] = _normalize_groups(raw_prev)
+    else:
+        prev_clue_groups = {clue: None for clue in ('head', 'shoulder', 'hip', 'foot')}
+
+    # Determine changed flags per clue and overall to drive [C] markers
+    changed: Dict[str, bool] = {}
+    for clue in ('head', 'shoulder', 'hip', 'foot'):
+        prev = prev_clue_groups.get(clue)
+        cur = clue_groups.get(clue)
+        try:
+            changed[clue] = (prev is not None) and (not equal_groups(cur, prev))
+        except Exception:
+            changed[clue] = False
+    any_changed = any(changed.values())
+
     try:
         raw_gt = data_kp['GT'][frame_idx]  # type: ignore[index]
     except Exception:
@@ -935,41 +968,46 @@ def plot_pose_panels(data_kp: Any,
     ax_image = fig.add_subplot(gs[1, 2])
 
     head_flag, shoulder_flag, hip_flag, foot_flag = show_flags
-    _plot_pose_panel(ax_head, persons_data, colors, [0, 1], 'head', head_flag, 'Head pose',
-                     groups=clue_groups['head'], person_lookup=person_lookup,
+    title_head = 'Head pose' + (' [C]' if changed.get('head') else '')
+    _plot_pose_panel(ax_head, persons_data, colors, [0, 1], 'head', head_flag, title_head,
+                     groups=clue_groups['head'], prev_groups=None, person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.points[0]),
                      clue='head',
                      show_ids=False,
                      x_lim=x_limits, y_lim=y_limits)
+    title_shoulder = 'Shoulder pose' + (' [C]' if changed.get('shoulder') else '')
     _plot_pose_panel(ax_shoulder, persons_data, colors, [2, 3], 'shoulder', shoulder_flag,
-                     'Shoulder pose', midpoint_attr='mid_shoulder',
-                     groups=clue_groups['shoulder'], person_lookup=person_lookup,
+                     title_shoulder, midpoint_attr='mid_shoulder',
+                     groups=clue_groups['shoulder'], prev_groups=None, person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.mid_shoulder),
                      clue='shoulder',
                      show_ids=False,
                      x_lim=x_limits, y_lim=y_limits)
-    _plot_pose_panel(ax_hip, persons_data, colors, [4, 5], 'hip', hip_flag, 'Hip pose',
+    title_hip = 'Hip pose' + (' [C]' if changed.get('hip') else '')
+    _plot_pose_panel(ax_hip, persons_data, colors, [4, 5], 'hip', hip_flag, title_hip,
                      midpoint_attr='mid_hip',
-                     groups=clue_groups['hip'], person_lookup=person_lookup,
+                     groups=clue_groups['hip'], prev_groups=None, person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.mid_hip),
                      clue='hip',
                      show_ids=False,
                      x_lim=x_limits, y_lim=y_limits)
+    title_foot = 'Foot pose' + (' [C]' if changed.get('foot') else '')
     _plot_pose_panel(ax_foot, persons_data, colors, [6, 7, 8, 9], 'foot', foot_flag,
-                     'Foot pose', center_attr='foot_center',
-                     groups=clue_groups['foot'], person_lookup=person_lookup,
+                     title_foot, center_attr='foot_center',
+                     groups=clue_groups['foot'], prev_groups=None, person_lookup=person_lookup,
                      point_selector=lambda p: _safe_xy(p.foot_center),
                      clue='foot',
                      show_ids=False,
                      x_lim=x_limits, y_lim=y_limits)
 
+    title_all = 'All skeletons' + (' [C]' if any_changed else '')
     plot_all_skeletons(
         data_kp,
         frame_idx,
         source=source,
         persons=persons,
         ax=ax_all,
-        title='All skeletons',
+        title=title_all,
         show=False,
         show_poses=show_poses,
         base_height=base_height,

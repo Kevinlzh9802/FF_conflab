@@ -5,7 +5,7 @@ all_clues:
   - foot
 
 used_segs:
-  # - "433"
+  - "433"
 
 force_rerun: False
 use_space: True
