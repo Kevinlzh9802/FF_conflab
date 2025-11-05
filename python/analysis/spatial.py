@@ -5,7 +5,11 @@ from typing import List
 import math
 import numpy as np
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+FEATURE_COLS = ['headRes', 'shoulderRes', 'hipRes', 'footRes']
 
 def compute_homogeneity(G1: List[List[int]], G2: List[List[int]]) -> float:
     def as_col(groups):
@@ -114,3 +118,77 @@ def getHIC(used_data: pd.DataFrame) -> pd.DataFrame:
     for idx, row in df.iterrows():
         df.at[idx, 'HIC'] = compute_hic_matrix(row.get('GT'), row.get('headRes'))
     return df
+
+
+def spatial_scores_df(df: pd.DataFrame, feature_cols: Optional[List[str]] = None) -> Tuple[np.ndarray, np.ndarray]:
+    if feature_cols is None:
+        feature_cols = FEATURE_COLS
+    if df.empty:
+        return np.array([]), np.array([])
+    
+    n = len(feature_cols)
+    hom_sums = np.zeros((n, n), dtype=float)
+    split_sums = np.zeros((n, n), dtype=float)
+    counts = np.zeros((n, n), dtype=int)
+    for idx, row in df.iterrows():
+        groups_cache = {feature: row.get(feature, []) for feature in feature_cols}
+        for i, fa in enumerate(feature_cols):
+            groups_a = groups_cache[fa]
+            if not groups_a:
+                continue
+            for j, fb in enumerate(feature_cols):
+                groups_b = groups_cache[fb]
+                if not groups_b:
+                    continue
+                h_score = compute_homogeneity(groups_a, groups_b)
+                s_score = compute_split_score(groups_a, groups_b)
+                if np.isnan(h_score) or np.isnan(s_score):
+                    continue
+                length_coeff = (row.get('length', []) - 1) / 60
+                hom_sums[i, j] += h_score * length_coeff
+                split_sums[i, j] += s_score * length_coeff
+                counts[i, j] += length_coeff
+        c = 9
+    with np.errstate(divide='ignore', invalid='ignore'):
+        hom_matrix = np.divide(
+            hom_sums,
+            counts,
+            out=np.full_like(hom_sums, np.nan, dtype=float),
+            where=counts > 0
+        )
+        split_matrix = np.divide(
+            split_sums,
+            counts,
+            out=np.full_like(split_sums, np.nan, dtype=float),
+            where=counts > 0
+        )
+    if np.all(np.isnan(hom_matrix)) and np.all(np.isnan(split_matrix)):
+        return hom_matrix, split_matrix
+    fig_h, ax_h = plt.subplots(figsize=(6, 5))
+    sns.heatmap(
+        hom_matrix,
+        ax=ax_h,
+        annot=True,
+        fmt=".3f",
+        cmap="viridis",
+        xticklabels=feature_cols,
+        yticklabels=feature_cols,
+        cbar_kws={"label": "Homogeneity"}
+    )
+    ax_h.set_title("Average Homogeneity Scores")
+    fig_h.tight_layout()
+    fig_s, ax_s = plt.subplots(figsize=(6, 5))
+    sns.heatmap(
+        split_matrix,
+        ax=ax_s,
+        annot=True,
+        fmt=".3f",
+        cmap="magma",
+        xticklabels=feature_cols,
+        yticklabels=feature_cols,
+        cbar_kws={"label": "Split Score"}
+    )
+    ax_s.set_title("Average Split Scores")
+    fig_s.tight_layout()
+    plt.show()
+    return hom_matrix, split_matrix
