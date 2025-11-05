@@ -9,6 +9,7 @@ import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
 from analysis.spatial import compute_homogeneity, compute_split_score
+from utils.groups import equal_groups
 
 FEATURE_COLS = ['headRes', 'shoulderRes', 'hipRes', 'footRes']
 
@@ -102,7 +103,7 @@ def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = N
                     else:
                         current_groups.append([])
                 groups_by_timestamp[int(t)] = current_groups
-                if prev_groups is None or any(not _equal_groups(a, b) for a, b in zip(current_groups, prev_groups)):
+                if prev_groups is None or any(not equal_groups(a, b) for a, b in zip(current_groups, prev_groups)):
                     breakpoints.append(t)
                 prev_groups = current_groups
             # ensure first and last
@@ -127,21 +128,6 @@ def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = N
                     row_dict[clue_name] = groups_val
                 rows.append(row_dict)
     return pd.DataFrame(rows)
-
-
-def _equal_groups(a, b):
-    try:
-        if a is None and b is None:
-            return True
-        if isinstance(a, list) and isinstance(b, list):
-            if len(a) != len(b):
-                return False
-            norm_a = sorted(sorted(x) for x in a)
-            norm_b = sorted(sorted(x) for x in b)
-            return norm_a == norm_b
-        return a == b
-    except Exception:
-        return False
     
 def groups_speaker_belongs_clues(row, speakers: List):
     group_nums = {}
@@ -330,7 +316,7 @@ def filter_windows(windows: pd.DataFrame) -> pd.DataFrame:
             return True
         first = values[0]
         for other in values[1:]:
-            if not _equal_groups(first, other):
+            if not equal_groups(first, other):
                 return False
         return True
 

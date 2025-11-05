@@ -102,3 +102,18 @@ def turn_singletons_to_groups(groups: List) -> List[List[int]]:
         if isinstance(groups[idx], int):
             groups_copy[idx] = [groups[idx]]
     return groups_copy
+
+
+def equal_groups(a, b):
+    try:
+        if a is None and b is None:
+            return True
+        if isinstance(a, list) and isinstance(b, list):
+            if len(a) != len(b):
+                return False
+            norm_a = sorted(sorted(x) for x in a)
+            norm_b = sorted(sorted(x) for x in b)
+            return norm_a == norm_b
+        return a == b
+    except Exception:
+        return False
