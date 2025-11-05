@@ -101,12 +101,3 @@ def process_foot_data(T):
             M2[j, 3] = theta2
         T['footFeat'][i] = np.hstack([M1, M2])
     return T
-
-
-# def read_pose_info(info: Dict[str, Any], person: Sequence[int]):  # pragma: no cover - project specific I/O
-#     """Placeholder for reading pose info from JSON.
-
-#     TODO: implement if/when input format is defined in Python environment.
-#     """
-#     raise NotImplementedError("read_pose_info depends on external JSON files; implement in your environment.")
-
