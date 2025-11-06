@@ -5,11 +5,19 @@ all_clues:
   - foot
 
 used_segs:
-  - "433"
+  # - "433"
 
 force_rerun: False
 use_space: True
 replace_df: False
+
+analysis:
+  spatial: False
+  temporal: False
+  cross_modal: False
+
+plots:
+  panels: True
 
 params:
   stride: 40.0
