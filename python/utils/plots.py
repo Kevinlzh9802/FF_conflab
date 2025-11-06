@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 from utils.groups import equal_groups
+from utils.pose import PersonSkeleton, PoseArrow, mid_point, compute_foot_properties
 from matplotlib.patches import Polygon
 
 
@@ -52,25 +53,6 @@ LABEL_MAP = {
 SKELETON_Z_COEFS = np.array([1.0, 0.95, 0.85, 0.85, 0.5, 0.5, 0.02, 0.02, 0.02, 0.02], dtype=float)
 
 
-@dataclass
-class PersonSkeleton:
-    row_index: int
-    pid: Optional[int]
-    points: np.ndarray
-    mid_shoulder: np.ndarray
-    mid_hip: np.ndarray
-    foot_center: np.ndarray
-    foot_vector: Optional[np.ndarray]
-    exp_head_pose: float
-
-
-@dataclass
-class PoseArrow:
-    start: np.ndarray
-    vec: np.ndarray
-    kind: str
-
-
 def _normalize_show_flags(flags) -> Tuple[bool, bool, bool, bool]:
     try:
         if isinstance(flags, (bool, np.bool_)):
@@ -87,49 +69,6 @@ def _normalize_show_flags(flags) -> Tuple[bool, bool, bool, bool]:
         return (True, True, True, True)
 
 
-def _mid_point(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, idx_a: int, idx_b: int) -> np.ndarray:
-    if any(np.isnan([X[idx_a], Y[idx_a], Z[idx_a], X[idx_b], Y[idx_b], Z[idx_b]])):
-        return np.array([np.nan, np.nan, np.nan], dtype=float)
-    return np.array([
-        (X[idx_a] + X[idx_b]) / 2.0,
-        (Y[idx_a] + Y[idx_b]) / 2.0,
-        (Z[idx_a] + Z[idx_b]) / 2.0,
-    ], dtype=float)
-
-
-def _compute_foot_properties(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-    idxs_center = [6, 7, 8, 9]
-    valid_center = [i for i in idxs_center if not (np.isnan(X[i]) or np.isnan(Y[i]) or np.isnan(Z[i]))]
-    if valid_center:
-        cx = float(np.nanmean([X[i] for i in valid_center]))
-        cy = float(np.nanmean([Y[i] for i in valid_center]))
-        cz = float(np.nanmean([Z[i] for i in valid_center]))
-        center = np.array([cx, cy, cz], dtype=float)
-    else:
-        center = np.array([np.nan, np.nan, np.nan], dtype=float)
-
-    def valid_xy(idx: int) -> bool:
-        return not (np.isnan(X[idx]) or np.isnan(Y[idx]))
-
-    vecs = []
-    if valid_xy(6) and valid_xy(7):
-        ax_vx = X[7] - X[6]
-        ax_vy = Y[7] - Y[6]
-        vecs.append(np.array([-ax_vy, ax_vx], dtype=float))
-    if valid_xy(8) and valid_xy(9):
-        ft_vx = X[9] - X[8]
-        ft_vy = Y[9] - Y[8]
-        vecs.append(np.array([-ft_vy, ft_vx], dtype=float))
-
-    foot_vector = None
-    if vecs:
-        stack = np.stack(vecs, axis=0)
-        v_avg = np.nanmean(stack, axis=0)
-        if not np.any(np.isnan(v_avg)) and not np.allclose(v_avg, 0.0):
-            foot_vector = v_avg.astype(float)
-    return center, foot_vector
-
-
 def _iter_person_skeletons(Coords: np.ndarray, Feats: dict, rows: Sequence[int], base_height: float) -> Iterable[PersonSkeleton]:
     for r in rows:
         pts2 = _extract_xy_from_headfeat(Coords[r, :])  # (10, 2)
@@ -141,9 +80,9 @@ def _iter_person_skeletons(Coords: np.ndarray, Feats: dict, rows: Sequence[int],
         Z_all[missing] = np.nan
         if np.all(missing):
             continue
-        mid_shoulder = _mid_point(X_all, Y_all, Z_all, 2, 3)
-        mid_hip = _mid_point(X_all, Y_all, Z_all, 4, 5)
-        foot_center, foot_vector = _compute_foot_properties(X_all, Y_all, Z_all)
+        mid_shoulder = mid_point(X_all, Y_all, Z_all, 2, 3)
+        mid_hip = mid_point(X_all, Y_all, Z_all, 4, 5)
+        foot_center, foot_vector = compute_foot_properties(X_all, Y_all, Z_all)
         points = np.column_stack((X_all, Y_all, Z_all))
 
         try:
