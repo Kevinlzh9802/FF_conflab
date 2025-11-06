@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence, Tuple, Optional
+from typing import Any, ClassVar, Dict, Iterable, List, Sequence, Tuple, Optional, Union
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 # pd.options.mode.copy_on_write = True
+
+SKELETON_THRES = 100
+SKELETON_Z_COEFS = np.array([1.0, 0.95, 0.85, 0.85, 0.5, 0.5, 0.02, 0.02, 0.02, 0.02], dtype=float)
 
 @dataclass
 class PersonSkeleton:
@@ -16,6 +19,76 @@ class PersonSkeleton:
     foot_center: np.ndarray
     foot_vector: Optional[np.ndarray]
     exp_head_pose: float
+    is_missing: Optional[List[bool]] = None
+    is_illed: Optional[List[bool]] = None
+
+    FEATURE_ORDER: ClassVar[Tuple[str, ...]] = ('head', 'shoulder', 'hip', 'foot')
+    FEATURE_KEYPOINTS: ClassVar[Dict[str, Tuple[int, ...]]] = {
+        'head': (0, 1),
+        'shoulder': (2, 3),
+        'hip': (4, 5),
+        'foot': (6, 7, 8, 9),
+    }
+
+    def _get_xy(self, idx: int) -> np.ndarray:
+        try:
+            xy = np.asarray(self.points[idx, :2], dtype=float)
+        except (IndexError, TypeError, ValueError):
+            return np.array([np.nan, np.nan], dtype=float)
+        return xy
+
+    def _is_keypoint_missing(self, idx: int) -> bool:
+        xy = self._get_xy(idx)
+        return bool(np.any(np.vstack([np.isnan(xy), xy==0])))
+
+    # @property
+    def missing_features(self) -> List[bool]:
+        flags: List[bool] = []
+        for feature in self.FEATURE_ORDER:
+            indices = self.FEATURE_KEYPOINTS[feature]
+            flags.append(any(self._is_keypoint_missing(i) for i in indices))
+        self.is_missing = flags
+        return flags
+
+    def _pair_length(self, idx_a: int, idx_b: int) -> float:
+        a_xy = self._get_xy(idx_a)
+        b_xy = self._get_xy(idx_b)
+        if np.any(np.isnan(a_xy)) or np.any(np.isnan(b_xy)):
+            return float('nan')
+        return float(np.linalg.norm(b_xy - a_xy))
+
+    def feature_lengths(self) -> np.ndarray:
+        head_len = self._pair_length(0, 1)
+        shoulder_len = self._pair_length(2, 3)
+        hip_len = self._pair_length(4, 5)
+        ankle_len = self._pair_length(6, 7)
+        foot_len = self._pair_length(8, 9)
+        if np.isnan(ankle_len) and np.isnan(foot_len):
+            combined_foot = float('nan')
+        elif np.isnan(ankle_len):
+            combined_foot = foot_len
+        elif np.isnan(foot_len):
+            combined_foot = ankle_len
+        else:
+            combined_foot = max(ankle_len, foot_len)
+        return np.array([head_len, shoulder_len, hip_len, combined_foot], dtype=float)
+
+    def illed_features(self, thresholds: Union[Sequence[float], float]) -> List[bool]:
+        lengths = self.feature_lengths()
+        if np.isscalar(thresholds):
+            thresh_arr = np.full(len(self.FEATURE_ORDER), float(thresholds), dtype=float)
+        else:
+            thresh_arr = np.asarray(thresholds, dtype=float)
+            if thresh_arr.shape[0] != len(self.FEATURE_ORDER):
+                raise ValueError(f"thresholds must have length {len(self.FEATURE_ORDER)}")
+        flags: List[bool] = []
+        for length, limit in zip(lengths, thresh_arr):
+            if np.isnan(length) or np.isnan(limit):
+                flags.append(False)
+            else:
+                flags.append(length > limit)
+        self.is_illed = flags
+        return flags
 
 @dataclass
 class PoseArrow:
@@ -160,3 +233,99 @@ def compute_foot_properties(X: np.ndarray, Y: np.ndarray, Z: np.ndarray) -> Tupl
         if not np.any(np.isnan(v_avg)) and not np.allclose(v_avg, 0.0):
             foot_vector = v_avg.astype(float)
     return center, foot_vector
+
+
+def _safe_int(value: Any) -> Optional[int]:
+    try:
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def build_person_skeletons(coords_entries: Iterable[Any],
+                           base_height: float = 170.0,
+                           head_feats: Optional[Any] = None,
+                           row_indices: Optional[Sequence[int]] = None) -> List[PersonSkeleton]:
+    skeletons: List[PersonSkeleton] = []
+    if coords_entries is None:
+        return skeletons
+
+    coords_list = list(coords_entries)
+    if row_indices is None:
+        row_index_list = list(range(len(coords_list)))
+    else:
+        row_index_list = list(row_indices)
+
+    head_array: Optional[np.ndarray]
+    if head_feats is None:
+        head_array = None
+    else:
+        try:
+            head_array = np.asarray(head_feats, dtype=float)
+            if head_array.ndim != 2:
+                head_array = None
+        except Exception:
+            head_array = None
+
+    for idx, entry in enumerate(coords_list):
+        if entry is None:
+            continue
+        arr = np.asarray(entry, dtype=float)
+        if arr.size == 0:
+            continue
+        if arr.ndim == 1:
+            if arr.size % 2 != 0:
+                continue
+            arr = arr.reshape(-1, 2)
+        else:
+            arr = arr.reshape(arr.shape[0], -1)
+        if arr.shape[1] < 2:
+            continue
+        xy = arr[:, :2]
+        if xy.shape[0] < 10:
+            pad = np.full((10 - xy.shape[0], 2), np.nan)
+            xy = np.vstack([xy, pad])
+        elif xy.shape[0] > 10:
+            xy = xy[:10]
+
+        X = xy[:, 0]
+        Y = xy[:, 1]
+        Z = base_height * SKELETON_Z_COEFS.copy()
+        missing_mask = np.isnan(X) | np.isnan(Y)
+        Z[missing_mask] = np.nan
+        if np.all(missing_mask):
+            continue
+
+        mid_shoulder = mid_point(X, Y, Z, 2, 3)
+        mid_hip = mid_point(X, Y, Z, 4, 5)
+        foot_center, foot_vector = compute_foot_properties(X, Y, Z)
+        points = np.column_stack((X, Y, Z))
+
+        pid = None
+        exp_head_pose = float('nan')
+        if head_array is not None and idx < head_array.shape[0]:
+            pid = _safe_int(head_array[idx, 0])
+            if head_array.shape[1] > 3:
+                try:
+                    exp_head_pose = float(head_array[idx, 3])
+                except (TypeError, ValueError):
+                    exp_head_pose = float('nan')
+
+        row_index = row_index_list[idx] if idx < len(row_index_list) else idx
+
+        skeletons.append(
+            PersonSkeleton(
+                row_index=row_index,
+                pid=pid,
+                points=points,
+                mid_shoulder=mid_shoulder,
+                mid_hip=mid_hip,
+                foot_center=foot_center,
+                foot_vector=foot_vector,
+                exp_head_pose=exp_head_pose,
+            )
+        )
+
+    return skeletons

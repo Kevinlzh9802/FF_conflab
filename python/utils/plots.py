@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import math
 import textwrap
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.groups import equal_groups
-from utils.pose import PersonSkeleton, PoseArrow, mid_point, compute_foot_properties
 from matplotlib.patches import Polygon
+from utils.groups import equal_groups
+from utils.pose import PersonSkeleton, PoseArrow, build_person_skeletons
 
 
 def _setup_3d(ax=None, title: Optional[str] = None):
@@ -50,9 +49,6 @@ LABEL_MAP = {
     'foot': {6: 'LA', 7: 'RA', 8: 'LF', 9: 'RF'},
 }
 
-SKELETON_Z_COEFS = np.array([1.0, 0.95, 0.85, 0.85, 0.5, 0.5, 0.02, 0.02, 0.02, 0.02], dtype=float)
-
-
 def _normalize_show_flags(flags) -> Tuple[bool, bool, bool, bool]:
     try:
         if isinstance(flags, (bool, np.bool_)):
@@ -70,44 +66,19 @@ def _normalize_show_flags(flags) -> Tuple[bool, bool, bool, bool]:
 
 
 def _iter_person_skeletons(Coords: np.ndarray, Feats: dict, rows: Sequence[int], base_height: float) -> Iterable[PersonSkeleton]:
+    head_feats = None
+    if isinstance(Feats, dict):
+        head_feats = Feats.get('head')
     for r in rows:
         pts2 = _extract_xy_from_headfeat(Coords[r, :])  # (10, 2)
-        points_xy = pts2.astype(float)
-        X_all = points_xy[:, 0]
-        Y_all = points_xy[:, 1]
-        Z_all = base_height * SKELETON_Z_COEFS.copy()
-        missing = np.isnan(X_all) | np.isnan(Y_all)
-        Z_all[missing] = np.nan
-        if np.all(missing):
-            continue
-        mid_shoulder = mid_point(X_all, Y_all, Z_all, 2, 3)
-        mid_hip = mid_point(X_all, Y_all, Z_all, 4, 5)
-        foot_center, foot_vector = compute_foot_properties(X_all, Y_all, Z_all)
-        points = np.column_stack((X_all, Y_all, Z_all))
-
-        try:
-            # if not np.isnan(pid_raw):
-            pid = int(Feats['head'][r, 0])
-        except TypeError or ValueError:
-            # if isinstance(pid_raw, (int, np.integer)):
-            #     pid = int(pid_raw)
-            pid = -1000
-        
-        try:
-            exp_head_pose = float(Feats['head'][r, 3])
-        except (TypeError, ValueError, IndexError):
-            exp_head_pose = float('nan')
-
-        yield PersonSkeleton(
-            row_index=r,
-            pid=pid,
-            points=points,
-            mid_shoulder=mid_shoulder,
-            mid_hip=mid_hip,
-            foot_center=foot_center,
-            foot_vector=foot_vector,
-            exp_head_pose=exp_head_pose
+        skeletons = build_person_skeletons(
+            [pts2],
+            base_height=base_height,
+            head_feats=head_feats,
+            row_indices=[r],
         )
+        for skel in skeletons:
+            yield skel
 
 
 def _person_label(person: PersonSkeleton) -> str:

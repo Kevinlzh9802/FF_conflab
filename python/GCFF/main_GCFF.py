@@ -76,7 +76,8 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
     
     # Save detection results as panels
     if config.plots.panels:
-        plot_panels_df(data_kp)
+        # plot_panels_df(data_kp)
+        plot_all_skeletons(data_kp=data_kp, frame_idx=341, show=True)
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):
