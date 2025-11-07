@@ -5,6 +5,8 @@ import textwrap
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
+import pandas as pd
+import json
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from utils.groups import equal_groups
@@ -1014,3 +1016,133 @@ def plot_panels_df(data_kp):
             plt.close(fig)
         else:
             print(f"File {fig_path} already exists")
+
+
+def _extract_raw_keypoints(skeletons: List[Dict[str, Any]], frame_idx: int) -> Optional[np.ndarray]:
+    try:
+        skeletons_frame = skeletons[frame_idx]
+    except (IndexError, TypeError):
+        return None
+
+    keypoint_names = [
+        ("head", 0), ("nose", 2),
+        ("leftShoulder", 12), ("rightShoulder", 6),
+        ("leftHip", 24), ("rightHip", 18),
+        ("leftAnkle", 28), ("rightAnkle", 22),
+        ("leftFoot", 32), ("rightFoot", 30),
+    ]
+    coords = []
+    for person_id, kps in skeletons_frame.items():
+        kp = kps.get("keypoints")
+        if kp is None:
+            coords.append(np.full((10, 2), np.nan))
+            continue
+        xy = []
+        for _, idx in keypoint_names:
+            xy.append(kp[idx])  # add x coord
+            xy.append(kp[idx + 1])  # add y coord
+        coords.append(np.asarray(xy, dtype=float))
+    return np.asarray(coords, dtype=float)
+
+
+def save_pixelcoords_overlay(data_kp: Any,
+                             output_dir: Optional[Path] = None,
+                             show: bool = False,
+                             mode: str = "raw",
+                            #  raw_annotations: Optional[List[Dict[str, Any]]] = None
+    ) -> List[Path]:
+    """Overlay skeleton keypoints for every frame, organized by (Cam, Vid, Seg)."""
+    frames_dir = Path(__file__).resolve().parents[2] / 'data' / 'export' / 'frames'
+    if output_dir is None:
+        output_dir = Path(__file__).resolve().parents[2] / 'data' / 'results' / 'pixel_overlays'
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_paths: List[Path] = []
+
+    df = data_kp if isinstance(data_kp, pd.DataFrame) else pd.DataFrame(data_kp)
+    required_cols = {'Cam', 'Vid', 'Seg', 'Timestamp'}
+    missing_cols = required_cols - set(df.columns)
+    if missing_cols:
+        raise ValueError(f"data_kp missing required columns: {missing_cols}")
+
+    raw_json_dir = Path("/home/zonghuan/tudelft/projects/datasets/conflab/annotations/pose/coco/")
+    grouped = df.groupby(['Vid', 'Cam', 'Seg'], sort=False)
+    for (vid, cam, seg), group in grouped:
+        segment_dir = output_dir / f"Vid{vid}_Cam{cam}_Seg{seg}"
+        segment_dir.mkdir(parents=True, exist_ok=True)
+
+        for frame_idx, row in group.iterrows():
+            t_val = row.get('Timestamp', frame_idx)
+            cam_int = int(cam)
+            vid_int = int(vid)
+            seg_int = int(seg)
+            t_int = int(t_val)
+
+            frame_name = f"frame_{cam_int}{vid_int}{seg_int}_{t_int}.png"
+            frame_path = frames_dir / frame_name
+            if not frame_path.exists():
+                continue
+
+            if mode == "raw":
+                # if raw_annotations is None:
+                #     continue
+                with open(raw_json_dir / f"cam{cam}_vid{vid}_seg{seg}_coco.json", 'r') as file:
+                    raw_annotation = json.load(file)
+                skeletons = raw_annotation['annotations']['skeletons']
+                frame_coords = _extract_raw_keypoints(skeletons, frame_idx)
+            elif mode == "extracted":
+                frame_coords = np.asarray(row.get('pixelCoords'))
+            else:
+                raise ValueError
+
+            # if frame_coords is None or frame_coords.ndim != 2 or frame_coords.shape[1] < 2:
+            #     continue
+
+            # how many kps are containing at least one None in XY coordinates
+            none_kps = []
+            for person_coords in frame_coords:
+                x = np.reshape(person_coords, [10, 2])
+                none_kps.append(int(np.sum(np.any(np.isnan(x), axis=1))))
+
+            fig, ax = plt.subplots(figsize=(8, 6))
+            img = plt.imread(frame_path)
+            ax.imshow(img)
+            img_h, img_w = img.shape[0], img.shape[1]
+
+            colors = plt.cm.tab10(np.linspace(0, 1, max(frame_coords.shape[0], 1)))
+            labels_added: set = set()
+            for idx, person_row in enumerate(frame_coords):
+                pts = _extract_xy_from_headfeat(person_row)
+                pts = np.asarray(pts, dtype=float)
+                if pts.size == 0:
+                    continue
+                xs = pts[:, 0] * img_w
+                ys = pts[:, 1] * img_h
+                valid = ~np.isnan(xs) & ~np.isnan(ys)
+                if not np.any(valid):
+                    continue
+                label = f"person_{idx}-{none_kps[idx]}KPs with None"
+                if label in labels_added:
+                    label = None
+                ax.scatter(xs[valid], ys[valid], s=20, color=colors[idx % len(colors)], label=label)
+                if label:
+                    labels_added.add(label)
+
+            ax.set_axis_off()
+            ax.set_title(f"Pixel keypoints - Cam {cam_int}, Vid {vid_int}, Seg {seg_int}, T {t_int}")
+            if labels_added:
+                ax.legend(loc='upper right', fontsize=6)
+
+            save_name = f"pxcoords_{cam_int}{vid_int}{seg_int}_{t_int}_{frame_idx}.png"
+            save_path = segment_dir / save_name
+            fig.savefig(save_path, dpi=150, bbox_inches='tight')
+
+            plt.close(fig)
+            saved_paths.append(save_path)
+
+    return saved_paths
+
+
+if __name__ == '__main__': 
+    df = pd.read_pickle("../data/export/data.pkl")
+    save_pixelcoords_overlay(df, mode="raw")
