@@ -37,6 +37,7 @@ from utils.table import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_panels_df
 from utils.exp_logging import display_frame_results, start_logging, stop_logging, log_only, get_log_path
+from tests.data_quality import annotate_frame_quality
 
 
 def gcff_experiments(config: Munch) -> pd.DataFrame:
@@ -70,6 +71,10 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
         if config.replace_df:
             data_kp.to_pickle(config.paths.kp_finished)
     
+    # filter illed frames
+    data_kp = annotate_frame_quality(data_kp, thresholds=100, base_height=170.0)
+    data_kp = data_kp[data_kp['frame_good']].reset_index(drop=True)
+
     # Cross modal analysis
     if config.analysis.cross_modal:
         cross_modal_analysis(data=data_kp)

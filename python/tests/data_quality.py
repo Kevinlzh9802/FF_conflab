@@ -55,7 +55,7 @@ def evaluate_frame_skeletons(frame: pd.Series,
 
 
 def annotate_frame_quality(df: pd.DataFrame,
-                           thresholds: Union[Sequence[float], float],
+                           thresholds: Union[Sequence[float], float] = 100,
                            base_height: float = 170.0) -> pd.DataFrame:
     records: List[List[PersonSummary]] = []
     frame_missing: List[List[bool]] = []

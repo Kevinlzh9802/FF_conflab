@@ -313,9 +313,13 @@ def filter_windows(windows: pd.DataFrame) -> pd.DataFrame:
         values = [_normalize_groups(row[col]) for col in result_cols]
         if not values:
             return True
-        first = values[0]
+        # first = values[0]
+        # for other in values[1:]:
+        #     if not equal_groups(first, other):
+        #         return False
+        first = len(values[0])
         for other in values[1:]:
-            if not equal_groups(first, other):
+            if len(other) != first:
                 return False
         return True
 
@@ -458,7 +462,7 @@ def cross_modal_analysis(data):
     windows = count_speaker_groups(windows)
     windows = filter_windows(windows)
     
-    # speaker_group_diff_plot(windows, FEATURE_COLS)
-    # speaker_group_bubble_plot(windows, FEATURE_COLS)
+    speaker_group_diff_plot(windows, FEATURE_COLS)
+    speaker_group_bubble_plot(windows, FEATURE_COLS)
     spatial_scores_df(windows, FEATURE_COLS)
     return windows

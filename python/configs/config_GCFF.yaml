@@ -14,10 +14,10 @@ replace_df: False
 analysis:
   spatial: False
   temporal: False
-  cross_modal: False
+  cross_modal: True
 
 plots:
-  panels: True
+  panels: False
 
 params:
   stride: 40.0
