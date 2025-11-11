@@ -93,12 +93,14 @@ def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = N
             breakpoints: List[int] = []
             prev_groups = None
             groups_by_timestamp: Dict[int, List[Any]] = {}
+            has_frame_good = 'frame_good' in cam_data.columns
             for t in ts:
+                row_idx = cam_data.index[cam_data['concat_ts'] == t]
+                row_series = cam_data.loc[row_idx[0]] if len(row_idx) > 0 else None
                 current_groups = []
                 for clue in clues:
-                    row_idx = cam_data.index[cam_data['concat_ts'] == t]
-                    if len(row_idx) > 0 and clue in cam_data.columns:
-                        current_groups.append(cam_data.loc[row_idx[0], clue])
+                    if row_series is not None and clue in cam_data.columns:
+                        current_groups.append(row_series[clue])
                     else:
                         current_groups.append([])
                 groups_by_timestamp[int(t)] = current_groups
@@ -123,6 +125,17 @@ def detect_group_num_breakpoints(data: pd.DataFrame, clues: List[str] | None = N
                     'length': end - start + 1,
                     'speaking_all_time': [],
                 }
+                if has_frame_good:
+                    is_last_window = i == len(breakpoints) - 2
+                    if is_last_window:
+                        window_mask = (cam_data['concat_ts'] >= start) & (cam_data['concat_ts'] <= end)
+                    else:
+                        window_mask = (cam_data['concat_ts'] >= start) & (cam_data['concat_ts'] < end)
+                    window_rows = cam_data.loc[window_mask]
+                    frames_good = window_rows['frame_good'].tolist()
+                else:
+                    frames_good = []
+                row_dict['frames_good'] = frames_good
                 for clue_name, groups_val in zip(clues, window_groups):
                     row_dict[clue_name] = groups_val
                 rows.append(row_dict)
@@ -313,14 +326,14 @@ def filter_windows(windows: pd.DataFrame) -> pd.DataFrame:
         values = [_normalize_groups(row[col]) for col in result_cols]
         if not values:
             return True
-        # first = values[0]
-        # for other in values[1:]:
-        #     if not equal_groups(first, other):
-        #         return False
-        first = len(values[0])
+        first = values[0]
         for other in values[1:]:
-            if len(other) != first:
+            if not equal_groups(first, other):
                 return False
+        # first = len(values[0])
+        # for other in values[1:]:
+        #     if len(other) != first:
+        #         return False
         return True
 
     non_empty_mask = ~windows[result_cols].applymap(_is_empty).any(axis=1)
@@ -462,7 +475,7 @@ def cross_modal_analysis(data):
     windows = count_speaker_groups(windows)
     windows = filter_windows(windows)
     
-    speaker_group_diff_plot(windows, FEATURE_COLS)
-    speaker_group_bubble_plot(windows, FEATURE_COLS)
-    spatial_scores_df(windows, FEATURE_COLS)
+    # speaker_group_diff_plot(windows, FEATURE_COLS)
+    # speaker_group_bubble_plot(windows, FEATURE_COLS)
+    # spatial_scores_df(windows, FEATURE_COLS)
     return windows
