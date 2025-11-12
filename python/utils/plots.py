@@ -4,6 +4,7 @@ import math
 import textwrap
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from matplotlib.cbook import pts_to_midstep
 import numpy as np
 import pandas as pd
 import json
@@ -1031,19 +1032,51 @@ def _extract_raw_keypoints(skeletons: List[Dict[str, Any]], frame_idx: int) -> O
         ("leftAnkle", 28), ("rightAnkle", 22),
         ("leftFoot", 32), ("rightFoot", 30),
     ]
-    coords = []
+    coords = {}
     for person_id, kps in skeletons_frame.items():
         kp = kps.get("keypoints")
         if kp is None:
-            coords.append(np.full((10, 2), np.nan))
+            coords[person_id] = np.full((10, 2), np.nan)
             continue
         xy = []
         for _, idx in keypoint_names:
             xy.append(kp[idx])  # add x coord
             xy.append(kp[idx + 1])  # add y coord
-        coords.append(np.asarray(xy, dtype=float))
-    return np.asarray(coords, dtype=float)
+        coords[person_id] = np.asarray(xy, dtype=float).reshape(10, 2)
+    return coords
 
+
+def search_nearby_keypoints(skeletons: Any, frame_idx: int, time_step: int = 15) -> Tuple[Dict[int, np.ndarray], Dict[int, bool]]:
+    """Given a person, can we interpolate None values in nearby timestamps?"""
+    time_start = frame_idx - time_step
+    time_end = frame_idx + time_step + 1
+    kp_raw = [_extract_raw_keypoints(skeletons, t) for t in range(time_start, time_end)]
+
+    frame_coords = _extract_raw_keypoints(skeletons, frame_idx)
+    person_ids = frame_coords.keys()
+    kp_matrix = {}
+    interpolatable = {}
+    for pid in person_ids:
+        kp_concatenated = np.stack([kp_raw[t][pid] for t in range(len(kp_raw))])
+        kp_matrix[pid] = kp_concatenated
+        interpolatable[pid] = ~np.isnan(kp_matrix[pid]).all(axis=0)
+    return kp_matrix, interpolatable
+
+def interpolate_none_values(kp_matrix: List[Dict[str, Any]]) -> Optional[np.ndarray]:
+    for pid, kps in kp_matrix.items():
+        x = kps[:, 0]
+        y = kps[:, 1]
+        valid = ~np.isnan(x) & ~np.isnan(y)
+        if not np.any(valid):
+            return None
+        x = x[valid]
+        y = y[valid]
+        if x.size < 2 or y.size < 2:
+            return None
+        x_interp = np.interp(np.arange(len(kps)), np.where(valid)[0], x)
+        y_interp = np.interp(np.arange(len(kps)), np.where(valid)[0], y)
+        kps[:, 0] = x_interp
+        kps[:, 1] = y_interp
 
 def save_pixelcoords_overlay(data_kp: Any,
                              output_dir: Optional[Path] = None,
@@ -1089,8 +1122,9 @@ def save_pixelcoords_overlay(data_kp: Any,
                 with open(raw_json_dir / f"cam{cam}_vid{vid}_seg{seg}_coco.json", 'r') as file:
                     raw_annotation = json.load(file)
                 skeletons = raw_annotation['annotations']['skeletons']
-                frame_coords = _extract_raw_keypoints(skeletons, frame_idx)
+                frame_coords = _extract_raw_keypoints(skeletons, t_int)
             elif mode == "extracted":
+                skeletons = None
                 frame_coords = np.asarray(row.get('pixelCoords'))
             else:
                 raise ValueError
@@ -1099,21 +1133,24 @@ def save_pixelcoords_overlay(data_kp: Any,
             #     continue
 
             # how many kps are containing at least one None in XY coordinates
-            none_kps = []
-            for person_coords in frame_coords:
-                x = np.reshape(person_coords, [10, 2])
-                none_kps.append(int(np.sum(np.any(np.isnan(x), axis=1))))
+            none_kps, not_interp, illed = {}, {}, {}
+            kp_matrix, interpolatable = search_nearby_keypoints(skeletons, t_int, time_step=15)
 
+            for person_id, kps in frame_coords.items():
+                none_kps[person_id] = np.any(np.isnan(kps), axis=1)
+                not_interp[person_id] = ~np.all(interpolatable[person_id], axis=1)
+                illed[person_id] = int(np.sum(none_kps[person_id] & not_interp[person_id]))
+                
             fig, ax = plt.subplots(figsize=(8, 6))
             img = plt.imread(frame_path)
             ax.imshow(img)
             img_h, img_w = img.shape[0], img.shape[1]
 
-            colors = plt.cm.tab10(np.linspace(0, 1, max(frame_coords.shape[0], 1)))
+            colors = plt.cm.tab10(np.linspace(0, 1, max(len(frame_coords), 1)))
             labels_added: set = set()
-            for idx, person_row in enumerate(frame_coords):
-                pts = _extract_xy_from_headfeat(person_row)
-                pts = np.asarray(pts, dtype=float)
+            for idx, pts in frame_coords.items():
+                # pts = _extract_xy_from_headfeat(person_row)
+                # pts = np.asarray(pts, dtype=float)
                 if pts.size == 0:
                     continue
                 xs = pts[:, 0] * img_w
@@ -1121,10 +1158,10 @@ def save_pixelcoords_overlay(data_kp: Any,
                 valid = ~np.isnan(xs) & ~np.isnan(ys)
                 if not np.any(valid):
                     continue
-                label = f"person_{idx}-{none_kps[idx]}KPs with None"
+                label = f"person_{idx}-{illed[idx]}ILLED"
                 if label in labels_added:
                     label = None
-                ax.scatter(xs[valid], ys[valid], s=20, color=colors[idx % len(colors)], label=label)
+                ax.scatter(xs[valid], ys[valid], s=20, color=colors[int(idx) % len(colors)], label=label)
                 if label:
                     labels_added.add(label)
 
@@ -1133,9 +1170,13 @@ def save_pixelcoords_overlay(data_kp: Any,
             if labels_added:
                 ax.legend(loc='upper right', fontsize=6)
 
+            # save the figure
             save_name = f"pxcoords_{cam_int}{vid_int}{seg_int}_{t_int}_{frame_idx}.png"
             save_path = segment_dir / save_name
-            fig.savefig(save_path, dpi=150, bbox_inches='tight')
+            if save_path.exists():
+                print(f"File {save_path} already exists")
+            else:
+                fig.savefig(save_path, dpi=150, bbox_inches='tight')
 
             plt.close(fig)
             saved_paths.append(save_path)

@@ -158,5 +158,5 @@ if __name__ == "__main__":
     df = pd.read_pickle("../data/export/data.pkl")
     df_quality = annotate_frame_quality(df, thresholds=100)
     fig, axes, stats_df = plot_segment_quality(df_quality, ordering_column="Timestamp")
-    plt.show()
+    # plt.show()
     c = 9
