@@ -1056,10 +1056,17 @@ def search_nearby_keypoints(skeletons: Any, frame_idx: int, time_step: int = 15)
     person_ids = frame_coords.keys()
     kp_matrix = {}
     interpolatable = {}
+    # TODO: handle the case where the person is not in the frame at all
     for pid in person_ids:
-        kp_concatenated = np.stack([kp_raw[t][pid] for t in range(len(kp_raw))])
+        kp_concatenated = []
+        for t in range(len(kp_raw)):
+            if kp_raw[t] is None:
+                continue
+            kp_concatenated.append(kp_raw[t][pid])
+
+        kp_concatenated = np.stack(kp_concatenated)
         kp_matrix[pid] = kp_concatenated
-        interpolatable[pid] = ~np.isnan(kp_matrix[pid]).all(axis=0)
+        interpolatable[pid] = ~np.isnan(kp_concatenated).all(axis=0)
     return kp_matrix, interpolatable
 
 def interpolate_none_values(kp_matrix: List[Dict[str, Any]]) -> Optional[np.ndarray]:
