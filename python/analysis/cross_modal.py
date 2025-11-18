@@ -6,6 +6,7 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 import pickle
+import os
 import matplotlib.pyplot as plt
 from analysis.spatial import spatial_scores_df
 from utils.groups import equal_groups
@@ -383,6 +384,7 @@ def speaker_group_diff_plot(windows: pd.DataFrame, feature_cols: Optional[List[s
     ax.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.6)
     fig.tight_layout()
     plt.show()
+    return fig
 
 
 def speaker_group_bubble_plot(windows: pd.DataFrame, feature_cols: Optional[List[str]] = None) -> None:
@@ -451,7 +453,7 @@ def speaker_group_bubble_plot(windows: pd.DataFrame, feature_cols: Optional[List
 
     if not overall_points:
         plt.close(fig)
-        return
+        return fig
 
     ax.set_xlabel('Detected Group Size')
     ax.set_ylabel('Number of Simultaneous Speakers in Group')
@@ -468,14 +470,20 @@ def speaker_group_bubble_plot(windows: pd.DataFrame, feature_cols: Optional[List
 
     fig.tight_layout()
     plt.show()
+    return fig
 
 
-def cross_modal_analysis(data):
+def cross_modal_analysis(data, save_path: Optional[str] = None):
     windows = detect_group_num_breakpoints(data=data)
     windows = count_speaker_groups(windows)
     windows = filter_windows(windows)
     
-    speaker_group_diff_plot(windows, FEATURE_COLS)
-    speaker_group_bubble_plot(windows, FEATURE_COLS)
-    spatial_scores_df(windows, FEATURE_COLS)
+    fig_diff = speaker_group_diff_plot(windows, FEATURE_COLS)
+    fig_bubble = speaker_group_bubble_plot(windows, FEATURE_COLS)
+    fig_h, fig_s = spatial_scores_df(windows, FEATURE_COLS)
+    if save_path is not None:
+        fig_diff.savefig(os.path.join(save_path, "speaker_group_diff_plot.png"))
+        fig_bubble.savefig(os.path.join(save_path, "speaker_group_bubble_plot.png"))
+        fig_h.savefig(os.path.join(save_path, "spatial_scores_df_homogeneity.png"))
+        fig_s.savefig(os.path.join(save_path, "spatial_scores_df_split.png"))
     return windows

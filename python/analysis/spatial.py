@@ -191,4 +191,4 @@ def spatial_scores_df(df: pd.DataFrame, feature_cols: Optional[List[str]] = None
     ax_s.set_title("Average Split Scores")
     fig_s.tight_layout()
     plt.show()
-    return hom_matrix, split_matrix
+    return fig_h, fig_s

@@ -77,7 +77,7 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
 
     # Cross modal analysis
     if config.analysis.cross_modal:
-        windows = cross_modal_analysis(data=data_kp)
+        windows = cross_modal_analysis(data=data_kp, save_path=config.paths.results)
         # x = [all(y) for y in windows.frames_good]
         # sum(x)
     # Save detection results as panels

@@ -30,3 +30,4 @@ paths:
   frames: ../data/export/frames/
   panel_plots: ../data/results/panel_plots/
   log: ./experiments/logs/
+  results: ../data/results/
