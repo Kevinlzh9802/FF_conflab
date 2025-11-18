@@ -475,7 +475,7 @@ def cross_modal_analysis(data):
     windows = count_speaker_groups(windows)
     windows = filter_windows(windows)
     
-    # speaker_group_diff_plot(windows, FEATURE_COLS)
-    # speaker_group_bubble_plot(windows, FEATURE_COLS)
-    # spatial_scores_df(windows, FEATURE_COLS)
+    speaker_group_diff_plot(windows, FEATURE_COLS)
+    speaker_group_bubble_plot(windows, FEATURE_COLS)
+    spatial_scores_df(windows, FEATURE_COLS)
     return windows
