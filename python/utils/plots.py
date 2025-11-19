@@ -11,7 +11,7 @@ import json
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from utils.groups import equal_groups
-from utils.pose import PersonSkeleton, PoseArrow, build_person_skeletons
+from utils.pose import PersonSkeleton, PoseArrow, build_person_skeletons, extract_raw_keypoints
 
 
 def _setup_3d(ax=None, title: Optional[str] = None):
@@ -1019,40 +1019,13 @@ def plot_panels_df(data_kp):
             print(f"File {fig_path} already exists")
 
 
-def _extract_raw_keypoints(skeletons: List[Dict[str, Any]], frame_idx: int) -> Optional[np.ndarray]:
-    try:
-        skeletons_frame = skeletons[frame_idx]
-    except (IndexError, TypeError):
-        return None
-
-    keypoint_names = [
-        ("head", 0), ("nose", 2),
-        ("leftShoulder", 12), ("rightShoulder", 6),
-        ("leftHip", 24), ("rightHip", 18),
-        ("leftAnkle", 28), ("rightAnkle", 22),
-        ("leftFoot", 32), ("rightFoot", 30),
-    ]
-    coords = {}
-    for person_id, kps in skeletons_frame.items():
-        kp = kps.get("keypoints")
-        if kp is None:
-            coords[person_id] = np.full((10, 2), np.nan)
-            continue
-        xy = []
-        for _, idx in keypoint_names:
-            xy.append(kp[idx])  # add x coord
-            xy.append(kp[idx + 1])  # add y coord
-        coords[person_id] = np.asarray(xy, dtype=float).reshape(10, 2)
-    return coords
-
-
 def search_nearby_keypoints(skeletons: Any, frame_idx: int, time_step: int = 15) -> Tuple[Dict[int, np.ndarray], Dict[int, bool]]:
     """Given a person, can we interpolate None values in nearby timestamps?"""
     time_start = frame_idx - time_step
     time_end = frame_idx + time_step + 1
-    kp_raw = [_extract_raw_keypoints(skeletons, t) for t in range(time_start, time_end)]
+    kp_raw = [extract_raw_keypoints(skeletons, t) for t in range(time_start, time_end)]
 
-    frame_coords = _extract_raw_keypoints(skeletons, frame_idx)
+    frame_coords = extract_raw_keypoints(skeletons, frame_idx)
     person_ids = frame_coords.keys()
     kp_matrix = {}
     interpolatable = {}
@@ -1129,7 +1102,7 @@ def save_pixelcoords_overlay(data_kp: Any,
                 with open(raw_json_dir / f"cam{cam}_vid{vid}_seg{seg}_coco.json", 'r') as file:
                     raw_annotation = json.load(file)
                 skeletons = raw_annotation['annotations']['skeletons']
-                frame_coords = _extract_raw_keypoints(skeletons, t_int)
+                frame_coords = extract_raw_keypoints(skeletons, t_int)
             elif mode == "extracted":
                 skeletons = None
                 frame_coords = np.asarray(row.get('pixelCoords'))

@@ -4,10 +4,12 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import json
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+from pathlib import Path
 
-from utils.pose import PersonSkeleton, build_person_skeletons
+from utils.pose import PersonSkeleton, build_person_skeletons, extract_raw_keypoints
 
 PersonSummary = Dict[str, Any]
 
@@ -148,6 +150,106 @@ def plot_segment_quality(df: pd.DataFrame,
     stats_df = pd.DataFrame(stats_rows)
     return fig, axes, stats_df
 
+def skeleton_sanity(img_size=[960, 540]):
+    return 1
+
+
+def plot_all_segments_dense(json_parent: Path,
+                            output_dir: Path,
+                            segment_length: int = 600,
+                            columns: int = 2)-> List[Path]:
+    """
+    Iterate over pose JSON files and render dense 600-frame spectrum plots per file.
+    Each JSON source produces its own saved image so the output count matches the
+    number of iterated files.
+    """
+    if segment_length <= 0:
+        raise ValueError("segment_length must be positive.")
+    if columns <= 0:
+        raise ValueError("columns must be positive.")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    json_files = sorted(json_parent.glob("*.json"))
+    if not json_files:
+        raise FileNotFoundError(f"No JSON files found under {json_parent}")
+
+    generated_paths: List[Path] = []
+    cmap = ListedColormap(["lightgray", "crimson", "forestgreen"])
+
+    for json_path in json_files:
+        with open(json_path, "r") as file:
+            raw_annotation = json.load(file)
+        skeletons = raw_annotation.get("annotations", {}).get("skeletons", [])
+
+        frame_good_flags: List[int] = []
+        for idx in range(len(skeletons)):
+            frame_coords = extract_raw_keypoints(skeletons, idx)
+            if frame_coords is None:
+                raise ValueError
+            else:
+                kp_good: List[bool] = []
+                for person_kps in frame_coords.values():
+                    if person_kps is None:
+                        kp_good.append(False)
+                        continue
+                    not_nan = np.all(~np.isnan(person_kps))
+                    not_illed = skeleton_sanity(person_kps)
+                    kp_good.append(bool(not_nan and not_illed))
+                frame_good = all(kp_good)
+            frame_good_flags.append(1 if frame_good else 0)
+
+        if not frame_good_flags:
+            fig, ax = plt.subplots(figsize=(8, 2))
+            ax.text(0.5, 0.5, "No frame data available", ha="center", va="center")
+            ax.axis("off")
+            fig_path = output_dir / f"{json_path.stem}_segments.png"
+            fig.savefig(fig_path, dpi=150)
+            plt.close(fig)
+            generated_paths.append(fig_path)
+            continue
+
+        segments = [
+            frame_good_flags[i:i + segment_length]
+            for i in range(0, len(frame_good_flags), segment_length)
+        ]
+        num_segments = len(segments)
+        num_columns = max(1, columns)
+        rows = (num_segments + num_columns - 1) // num_columns
+        fig_width = max(6, num_columns * 5)
+        fig_height = max(2, rows * 1.5)
+        fig, axes = plt.subplots(rows, num_columns, figsize=(fig_width, fig_height), squeeze=False)
+        axes_list = axes.flatten()
+
+        for seg_idx, (segment, ax) in enumerate(zip(segments, axes_list)):
+            arr = np.asarray(segment, dtype=int)
+            data = arr.reshape(1, -1)
+            start = seg_idx * segment_length
+            end = min(len(frame_good_flags), start + segment_length)
+            good_count = int(arr.sum())
+            bad_count = int(arr.size - good_count)
+            label = f"{json_path.stem}-S{seg_idx + 1}"
+            ax.imshow(data, aspect="auto", cmap=cmap, vmin=-1, vmax=1)
+            ax.set_yticks([])
+            ax.set_xticks([])
+            ax.set_title(
+                f"{label}\nFrames {start}-{end - 1}\nG:{good_count} B:{bad_count}",
+                fontsize=8,
+            )
+
+        for idx in range(num_segments, len(axes_list)):
+            axes_list[idx].axis("off")
+
+        fig.suptitle(f"{json_path.stem} Frame Quality Spectrum", fontsize=12)
+        fig.tight_layout(rect=[0, 0, 1, 0.97])
+
+        fig_path = output_dir / f"{json_path.stem}_segments.png"
+        fig.savefig(fig_path, dpi=150)
+        plt.close(fig)
+        generated_paths.append(fig_path)
+
+    return generated_paths
+
 __all__ = [
     "evaluate_frame_skeletons",
     "annotate_frame_quality",
@@ -155,8 +257,12 @@ __all__ = [
 ]
 
 if __name__ == "__main__":
-    df = pd.read_pickle("../data/export/data.pkl")
-    df_quality = annotate_frame_quality(df, thresholds=100)
-    fig, axes, stats_df = plot_segment_quality(df_quality, ordering_column="Timestamp")
-    # plt.show()
+    # df = pd.read_pickle("../data/export/data.pkl")
+    # df_quality = annotate_frame_quality(df, thresholds=100)
+    # fig, axes, stats_df = plot_segment_quality(df_quality, ordering_column="Timestamp")
+    # # plt.show()
+    # c = 9
+    raw_json_path = Path("/home/zonghuan/tudelft/projects/datasets/conflab/annotations/pose/coco/")
+    write_path = Path("../data/results/segment_quality_dense/")
+    plot_all_segments_dense(json_parent=raw_json_path, output_dir=write_path)
     c = 9

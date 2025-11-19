@@ -329,3 +329,29 @@ def build_person_skeletons(coords_entries: Iterable[Any],
         )
 
     return skeletons
+
+def extract_raw_keypoints(skeletons: List[Dict[str, Any]], frame_idx: int) -> Optional[np.ndarray]:
+    try:
+        skeletons_frame = skeletons[frame_idx]
+    except (IndexError, TypeError):
+        return None
+
+    keypoint_names = [
+        ("head", 0), ("nose", 2),
+        ("leftShoulder", 12), ("rightShoulder", 6),
+        ("leftHip", 24), ("rightHip", 18),
+        ("leftAnkle", 28), ("rightAnkle", 22),
+        ("leftFoot", 32), ("rightFoot", 30),
+    ]
+    coords = {}
+    for person_id, kps in skeletons_frame.items():
+        kp = kps.get("keypoints")
+        if kp is None:
+            coords[person_id] = np.full((10, 2), np.nan)
+            continue
+        xy = []
+        for _, idx in keypoint_names:
+            xy.append(kp[idx])  # add x coord
+            xy.append(kp[idx + 1])  # add y coord
+        coords[person_id] = np.asarray(xy, dtype=float).reshape(10, 2)
+    return coords
