@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, Dict, Iterable, List, Sequence, Tuple, Optional, Union
 from dataclasses import dataclass
+from pathlib import Path
+import json
 import numpy as np
 import pandas as pd
 # pd.options.mode.copy_on_write = True
@@ -96,6 +98,7 @@ class PoseArrow:
     vec: np.ndarray
     kind: str
 
+
 def back_project(frame_data: np.ndarray,
                  K: np.ndarray,
                  R: np.ndarray,
@@ -103,39 +106,57 @@ def back_project(frame_data: np.ndarray,
                  dist_coeffs: Sequence[float],
                  body_height: float,
                  img_size: Sequence[float],
-                 height_ratios_map: Dict[str, float],
-                 part_column_map: Dict[str, Sequence[int]]):
-    """Backproject pixel points onto a horizontal plane at specified height.
+                 height_ratios_map: Dict[str, float]):
+    """Backproject pixel points onto a horizontal plane at specified heights.
 
-    Returns array of shape (num_people, 2, num_parts) with X,Y per part.
+    Args:
+        frame_data: Mapping or array containing normalized X/Y per keypoint.
+            Expects shape (num_people, num_parts, 2) after conversion.
+        height_ratios_map: Mapping of part names -> height ratios relative to ``body_height``.
+
+    Returns:
+        Array of shape (num_people, num_parts, 3) with world XYZ coordinates per part.
     """
-    num_people = frame_data.shape[0]
+    pids, frame_arr = [], []
+    for pid, person_pixels in frame_data.items():
+        pids.append(pid)
+        frame_arr.append(person_pixels)
+    frame_arr = np.array(frame_arr)
+    assert frame_arr.shape == (len(frame_data), len(height_ratios_map), 2)
+
+    K = np.asarray(K, dtype=float)
+    R = np.asarray(R, dtype=float)
+    t = np.asarray(t, dtype=float).reshape(3, 1)
+
+    # construct heights as a matrix
     parts = list(height_ratios_map.keys())
     num_parts = len(parts)
-    worldXY_all = np.zeros((num_people, 2, num_parts), dtype=float)
-    Rinv = R.T
-    camCenter = -Rinv @ t.reshape(3, 1)
+    heights = body_height * np.asarray([height_ratios_map[name] for name in parts], dtype=float)
+
     fx, fy = K[0, 0], K[1, 1]
     cx, cy = K[0, 2], K[1, 2]
     img_w, img_h = float(img_size[0]), float(img_size[1])
     k1, k2, p1, p2, k3 = dist_coeffs
-    for p in range(num_people):
-        for pi, name in enumerate(parts):
-            cols = part_column_map[name]
-            u = frame_data[p, cols[0]] * img_w
-            v = frame_data[p, cols[1]] * img_h
-            x = (u - cx) / fx
-            y = (v - cy) / fy
-            r2 = x * x + y * y
-            x_dist = x * (1 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2) + 2 * p1 * x * y + p2 * (r2 + 2 * x * x)
-            y_dist = y * (1 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2) + p1 * (r2 + 2 * y * y) + 2 * p2 * x * y
-            dir_cam = np.array([x_dist, y_dist, 1.0])
-            dir_world = Rinv @ dir_cam.reshape(3, 1)
-            Z = float(height_ratios_map[name]) * float(body_height)
-            lam = (Z - camCenter[2, 0]) / dir_world[2, 0]
-            world_point = camCenter[:, 0] + lam * dir_world[:, 0]
-            worldXY_all[p, :, pi] = world_point[0:2]
-    return worldXY_all
+
+    u = frame_arr[:, :, 0] * img_w
+    v = frame_arr[:, :, 1] * img_h
+    x = (u - cx) / fx
+    y = (v - cy) / fy
+    r2 = x * x + y * y
+    x_dist = x * (1 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2) + 2 * p1 * x * y + p2 * (r2 + 2 * x * x)
+    y_dist = y * (1 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2) + p1 * (r2 + 2 * y * y) + 2 * p2 * x * y
+
+    dir_cam = np.stack([x_dist, y_dist, np.ones_like(x_dist)], axis=-1)  # (P, N, 3)
+    Rinv = R.T
+    cam_center = (-Rinv @ t).ravel()
+
+    # Rotate rays into world coordinates.
+    dir_world = np.einsum("ij,pnj->pni", Rinv, dir_cam)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        lam = (heights.reshape(1, num_parts) - cam_center[2]) / dir_world[..., 2]
+    world_points = cam_center.reshape(1, 1, 3) + lam[..., None] * dir_world
+
+    return pids, world_points
 
 def get_foot_orientation(coords: Sequence[float], is_left_handed: bool) -> Tuple[float, Tuple[float, float]]:
     arr = np.asarray(coords, dtype=float).copy()
@@ -355,3 +376,21 @@ def extract_raw_keypoints(skeletons: List[Dict[str, Any]], frame_idx: int) -> Op
             xy.append(kp[idx + 1])  # add y coord
         coords[person_id] = np.asarray(xy, dtype=float).reshape(10, 2)
     return coords
+
+
+def construct_space_coords(frame_coords, camera_params):
+    # TODO: improve argument passing
+    pids, coords_3d = back_project(
+        frame_coords,
+        camera_params['K'],
+        camera_params['R'],
+        camera_params['t'],
+        camera_params['distCoeff'],
+        camera_params['bodyHeight'],
+        camera_params['img_size'],
+        camera_params['height_ratios_map'],
+    )
+    space_coords = {}
+    for k in range(len(pids)):
+        space_coords[pids[k]] = coords_3d[k, :, :2]  # drop height information
+    return space_coords

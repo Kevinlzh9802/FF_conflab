@@ -2,10 +2,76 @@ import os
 import pandas as pd
 import numpy as np
 import json
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from utils.pose import process_foot_data
+from utils.pose import process_foot_data, extract_raw_keypoints, construct_space_coords
+
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
+RAW_jSON_PATH = Path("/home/zonghuan/tudelft/projects/datasets/conflab/annotations/pose/coco/")
+SEGS = ["429", "431", "631", "634", "636", "831", "832", "833", "833", "834", "835"]
+
+def load_cam_params(cam: Union[int, str],
+                    params_dir: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
+    """
+    Load camera intrinsic/extrinsic parameters and metadata for the given camera id.
+
+    Args:
+        cam: Camera identifier (e.g., ``2`` or ``"2"``) matching the JSON filenames.
+        params_dir: Optional override for the directory containing the JSON files.
+
+    Returns:
+        Dictionary containing intrinsic matrix ``K``, distortion coefficients, rotation ``R``,
+        translation ``t``, plus height ratio and part-column maps.
+    """
+    cam_str = str(cam)
+    if params_dir is None:
+        params_dir = Path(__file__).resolve().parents[2] / "data" / "camera_params"
+    base_path = Path(params_dir)
+    intrinsic_path = base_path / f"intrinsic_{cam_str}.json"
+    extrinsic_path = base_path / f"extrinsic_{cam_str}_zh.json"
+
+    with open(intrinsic_path, "r", encoding="utf-8") as f:
+        intrinsics = json.load(f)
+    with open(extrinsic_path, "r", encoding="utf-8") as f:
+        extrinsics = json.load(f)
+
+    height_ratios_map = {
+        "head": 1.0,
+        "nose": 0.95,
+        "leftShoulder": 0.85,
+        "rightShoulder": 0.85,
+        "leftHip": 0.5,
+        "rightHip": 0.5,
+        "leftAnkle": 0.02,
+        "rightAnkle": 0.02,
+        "leftFoot": 0.02,
+        "rightFoot": 0.02,
+    }
+    # part_column_map = {
+    #     "head": (5, 6),
+    #     "nose": (7, 8),
+    #     "leftShoulder": (9, 10),
+    #     "rightShoulder": (11, 12),
+    #     "leftHip": (13, 14),
+    #     "rightHip": (15, 16),
+    #     "leftAnkle": (17, 18),
+    #     "rightAnkle": (19, 20),
+    #     "leftFoot": (21, 22),
+    #     "rightFoot": (23, 24),
+    # }
+
+    return {
+        "K": np.asarray(intrinsics.get("intrinsic"), dtype=float),
+        "distCoeff": np.asarray(intrinsics.get("distortion_coefficients"), dtype=float),
+        "R": np.asarray(extrinsics.get("rotation"), dtype=float),
+        "t": np.asarray(extrinsics.get("translation"), dtype=float),
+        "height_ratios_map": height_ratios_map,
+        # "part_column_map": part_column_map,
+        "bodyHeight": 170,
+        "img_size": (1920, 1080),
+    }
 
 def process_data(base_dir):
     data = load_all_data(base_dir)
@@ -164,6 +230,85 @@ def save_group_to_csv(T, path: str = 'f_formations.csv') -> None:
         w.writeheader()
         w.writerows(rows)
 
+def save_dense_df(filter_segs: bool) -> pd.DataFrame:
+    """
+    Parse raw pose JSON files and produce a frame-level DataFrame.
 
+    Each frame in every skeleton JSON is represented as a row with the columns
+    listed in the comment at the bottom of this module. Cam, Vid, and Seg are
+    inferred from the JSON filename pattern.
+    """
+    records: List[Dict[str, Any]] = []
+    row_id = 1
+    json_files = sorted(RAW_jSON_PATH.glob("*.json"))
+    
+    for json_path in json_files:
+
+        stem_parts = json_path.stem.split("_")
+        cam = vid = seg = None
+        for part in stem_parts:
+            if part.startswith("cam"):
+                cam = int(part.replace("cam", ""))
+            elif part.startswith("vid"):
+                vid = int(part.replace("vid", ""))
+            elif part.startswith("seg"):
+                seg = int(part.replace("seg", ""))
+        seg_name = f"{cam}{vid}{seg}"
+        if filter_segs and (not seg_name in SEGS):
+            continue
+
+        with open(json_path, "r") as file:
+            raw_annotation = json.load(file)
+        skeletons = raw_annotation.get("annotations", {}).get("skeletons", [])
+        camera_params = load_cam_params(cam=cam)
+
+        for idx in range(len(skeletons)):
+            frame_coords = extract_raw_keypoints(skeletons, idx)
+            space_coords = construct_space_coords(frame_coords, camera_params)
+            records.append(
+                {
+                    "row_id": row_id,
+                    "Cam": cam,
+                    "Vid": vid,
+                    "Seg": seg,
+                    "Timestamp": idx,
+                    "concat_ts": idx,
+                    "pixelCoords": frame_coords,
+                    "spaceCoords": space_coords,
+                    "pixelFeat": None,
+                    "spaceFeat": None,
+                    "headRes": None,
+                    "shoulderRes": None,
+                    "hipRes": None,
+                    "footRes": None,
+                }
+            )
+            row_id += 1
+
+    columns = [
+        "row_id",
+        "Cam",
+        "Vid",
+        "Seg",
+        "Timestamp",
+        "concat_ts",
+        "pixelCoords",
+        "spaceCoords",
+        "pixelFeat",
+        "spaceFeat",
+        "headRes",
+        "shoulderRes",
+        "hipRes",
+        "footRes",
+    ]
+    data_kp = pd.DataFrame.from_records(records, columns=columns)
+    data_kp.to_pickle("../data/export/data_dense.pkl")
+
+
+# Index(['row_id', 'Cam', 'Vid', 'Seg', 'Timestamp', 'concat_ts', 'pixelCoords',
+#        'spaceCoords', 'pixelFeat', 'spaceFeat', 'GT', 'headRes', 'shoulderRes',
+#        'hipRes', 'footRes'],
+#       dtype='object')
 if __name__ == '__main__': 
-    process_data("../data/export/")
+    # process_data("../data/export/")
+    df = save_dense_df(filter_segs=True)
