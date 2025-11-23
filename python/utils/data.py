@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from utils.pose import process_foot_data, extract_raw_keypoints, construct_space_coords
+from utils.pose import process_foot_data, extract_raw_keypoints, construct_space_coords, process_orient
 
 
 ALL_CLUES = ["head", "shoulder", "hip", "foot"]
@@ -304,6 +304,23 @@ def save_dense_df(filter_segs: bool) -> pd.DataFrame:
     data_kp = pd.DataFrame.from_records(records, columns=columns)
     data_kp.to_pickle("../data/export/data_dense.pkl")
 
+def generate_dense_feats(data: pd.DataFrame) -> pd.DataFrame:
+    for _, row in data.iterrows():
+        person_ids, pixel_coords, space_coords = [], [], []
+        pixel_info = row.get("pixelCoords", None)
+        space_info = row.get("spaceCoords", None)
+        for person_id in pixel_info.keys():
+            person_ids.append(person_id)
+            pixel_coords.append(pixel_info[person_id])
+            space_coords.append(space_info[person_id])
+        pixel_coords = np.stack(pixel_coords)
+        space_coords = np.stack(space_coords)
+        pixel_feat = process_orient(np.array(pixel_coords), [1920, 1080], True)
+        space_feat = process_orient(np.array(space_coords), [1,1], False)
+        row["pixelFeat"] = pixel_feat
+        row["spaceFeat"] = space_feat
+    return data
+
 
 # Index(['row_id', 'Cam', 'Vid', 'Seg', 'Timestamp', 'concat_ts', 'pixelCoords',
 #        'spaceCoords', 'pixelFeat', 'spaceFeat', 'GT', 'headRes', 'shoulderRes',
@@ -311,4 +328,7 @@ def save_dense_df(filter_segs: bool) -> pd.DataFrame:
 #       dtype='object')
 if __name__ == '__main__': 
     # process_data("../data/export/")
-    df = save_dense_df(filter_segs=True)
+    # df = save_dense_df(filter_segs=True)
+    df = pd.read_pickle("../data/export/data_dense.pkl")
+    df = generate_dense_feats(df)
+    df.to_pickle("../data/export/data_dense_feats.pkl")

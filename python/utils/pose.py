@@ -394,3 +394,47 @@ def construct_space_coords(frame_coords, camera_params):
     for k in range(len(pids)):
         space_coords[pids[k]] = coords_3d[k, :, :2]  # drop height information
     return space_coords
+
+def get_orientation(coords: np.ndarray, left_handed: bool = False) -> np.ndarray:
+    # rotate the coords 90 degrees counterclockwise
+    # return in radians between 0 and 2*pi
+    if left_handed:
+        coords = np.array([-coords[:, 0], coords[:, 1]])
+    normal_vector = np.column_stack([-coords[:, 1], coords[:, 0]])
+    return normal_vector, np.mod(np.arctan2(normal_vector[:, 0], normal_vector[:, 1]), 2*np.pi)
+
+def process_orient(coords: np.ndarray, img_size: Sequence[float], in_ratio: bool) -> np.ndarray:
+    assert coords.shape[1] == 10
+    if in_ratio:
+        coords = coords * img_size
+
+    # get position of each part
+    head_pos = coords[:, 0, :]
+    shoulder_pos = np.mean(coords[:, 2:4, :], axis=1)
+    hip_pos = np.mean(coords[:, 4:6, :], axis=1)
+    foot_pos = np.mean(coords[:, 6:10, :], axis=1)
+
+    # get orientation of each part
+    head_vec = coords[:, 1, :] - coords[:, 0, :]  # nose - head
+    head_orient = np.mod(head_vec, 2*np.pi)
+
+    shoulder_vec, shoulder_orient = get_orientation(coords[:, 3, :] - coords[:, 2, :])  # left shoulder - right shoulder
+    hip_vec, hip_orient = get_orientation(coords[:, 5, :] - coords[:, 4, :]) 
+    ankle_vec, ankle_orient = get_orientation(coords[:, 7, :] - coords[:, 6, :])  # left ankle - right ankle
+    toe_vec, toe_orient = get_orientation(coords[:, 9, :] - coords[:, 8, :])  # left foot - right foot
+    foot_vec = np.mean(np.array([ankle_vec, toe_vec]), axis=0)
+    foot_orient, _ = get_orientation(foot_vec)
+
+    foot_invert_mask = np.sum(foot_vec * ankle_vec, axis=1) < 0
+    foot_orient[foot_invert_mask] = -foot_orient[foot_invert_mask]
+
+    head_check_shoulder = np.int16(np.sum(head_vec * shoulder_vec, axis=1) < 0)
+    head_check_hip = np.int16(np.sum(head_vec * hip_vec, axis=1) < 0)
+    head_check_foot = np.int16(np.sum(head_vec * foot_vec, axis=1) < 0)
+
+    head_invert_mask = (head_check_shoulder + head_check_hip + head_check_foot) >= 2
+    head_orient[head_invert_mask] = -head_orient[head_invert_mask]
+
+    #TODO: determine what to return
+
+    return np.hstack([head_pos, shoulder_pos, hip_pos, foot_pos, head_orient, shoulder_orient, hip_orient, foot_orient])
