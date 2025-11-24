@@ -10,6 +10,7 @@ from matplotlib.colors import ListedColormap
 from pathlib import Path
 
 from utils.pose import PersonSkeleton, build_person_skeletons, extract_raw_keypoints
+RAW_jSON_PATH = Path("/home/zonghuan/tudelft/projects/datasets/conflab/annotations/pose/coco/")
 
 PersonSummary = Dict[str, Any]
 
@@ -250,6 +251,81 @@ def plot_all_segments_dense(json_parent: Path,
 
     return generated_paths
 
+def frame_quality_person():
+    data = {}
+    json_files = sorted(RAW_jSON_PATH.glob("*.json"))
+    
+    for json_path in json_files:
+
+        stem_parts = json_path.stem.split("_")
+        cam = vid = seg = None
+        for part in stem_parts:
+            if part.startswith("cam"):
+                cam = int(part.replace("cam", ""))
+            elif part.startswith("vid"):
+                vid = int(part.replace("vid", ""))
+            elif part.startswith("seg"):
+                seg = int(part.replace("seg", ""))
+        seg_name = f"{cam}{vid}{seg}"
+
+        with open(json_path, "r") as file:
+            raw_annotation = json.load(file)
+        skeletons = raw_annotation.get("annotations", {}).get("skeletons", [])
+
+        segment_data = {}
+        num_frames = len(skeletons)
+
+        for idx in range(num_frames):
+            frame_coords = extract_raw_keypoints(skeletons, idx)
+            if frame_coords is None:
+                continue
+            for person_id, keypoints in frame_coords.items():
+                if person_id not in segment_data:
+                    segment_data[person_id] = np.zeros(num_frames, dtype=int)
+                person_quality = not np.isnan(keypoints).any()
+                if person_quality:
+                    segment_data[person_id][idx] = 1
+                else:
+                    segment_data[person_id][idx] = -1
+        data[seg_name] = segment_data
+    return data
+
+def plot_frame_quality_per_person(data: Dict[str, Dict[str, np.ndarray]], output_dir: Path):
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    cmap = ListedColormap(["crimson", "lightgray", "forestgreen"])
+    cmap.set_bad("white")
+
+    for seg_name, persons in data.items():
+        if not persons:
+            continue
+        person_ids = list(persons.keys())
+        quality_matrix = np.array([persons[pid] for pid in person_ids], dtype=float)
+        num_people, num_frames = quality_matrix.shape
+        gap = 1 if num_people > 1 else 0
+        rows_with_gaps = num_people * (gap + 1) - gap
+        expanded = np.full((rows_with_gaps, num_frames), np.nan, dtype=float)
+        for idx, row in enumerate(quality_matrix):
+            expanded[idx * (gap + 1), :] = row
+        masked = np.ma.masked_invalid(expanded)
+
+        fig_height = max(3, num_people * 0.6)
+        fig, ax = plt.subplots(figsize=(12, fig_height))
+        ax.imshow(masked, aspect="auto", cmap=cmap, vmin=-1, vmax=1, interpolation="nearest")
+        yticks = [i * (gap + 1) for i in range(num_people)]
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(person_ids)
+        ax.set_title(f"Segment {seg_name} - Person Frame Quality")
+        ax.set_xlabel("Frame")
+        ax.set_ylabel("Person ID")
+        ax.set_xlim(0, num_frames)
+        ax.set_ylim(rows_with_gaps - 0.5, -0.5)
+        fig.tight_layout()
+
+        fig_path = output_dir / f"{seg_name}_person_quality.png"
+        fig.savefig(fig_path, dpi=150)
+        plt.close(fig)
+
 __all__ = [
     "evaluate_frame_skeletons",
     "annotate_frame_quality",
@@ -262,7 +338,12 @@ if __name__ == "__main__":
     # fig, axes, stats_df = plot_segment_quality(df_quality, ordering_column="Timestamp")
     # # plt.show()
     # c = 9
-    raw_json_path = Path("/home/zonghuan/tudelft/projects/datasets/conflab/annotations/pose/coco/")
-    write_path = Path("../data/results/segment_quality_dense/")
-    plot_all_segments_dense(json_parent=raw_json_path, output_dir=write_path)
+
+
+    # raw_json_path = Path("/home/zonghuan/tudelft/projects/datasets/conflab/annotations/pose/coco/")
+    # write_path = Path("../data/results/segment_quality_dense/")
+    # plot_all_segments_dense(json_parent=raw_json_path, output_dir=write_path)
+
+    frame_quality = frame_quality_person()
+    plot_frame_quality_per_person(frame_quality, Path("../data/results/segment_quality_person/"))
     c = 9
