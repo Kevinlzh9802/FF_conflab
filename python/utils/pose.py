@@ -401,7 +401,7 @@ def get_orientation(coords: np.ndarray, left_handed: bool = False) -> np.ndarray
     if left_handed:
         coords = np.array([-coords[:, 0], coords[:, 1]])
     normal_vector = np.column_stack([-coords[:, 1], coords[:, 0]])
-    return normal_vector, np.mod(np.arctan2(normal_vector[:, 0], normal_vector[:, 1]), 2*np.pi)
+    return normal_vector, np.mod(np.arctan2(normal_vector[:, 1], normal_vector[:, 0]), 2*np.pi)  # np.arctan2 requires y, x
 
 def process_orient(coords: np.ndarray, img_size: Sequence[float], in_ratio: bool) -> np.ndarray:
     assert coords.shape[1] == 10
@@ -416,7 +416,7 @@ def process_orient(coords: np.ndarray, img_size: Sequence[float], in_ratio: bool
 
     # get orientation of each part
     head_vec = coords[:, 1, :] - coords[:, 0, :]  # nose - head
-    head_orient = np.mod(head_vec, 2*np.pi)
+    head_orient = np.mod(np.arctan2(head_vec[:, 1], head_vec[:, 0]), 2*np.pi)  # np.arctan2 requires y, x
 
     shoulder_vec, shoulder_orient = get_orientation(coords[:, 3, :] - coords[:, 2, :])  # left shoulder - right shoulder
     hip_vec, hip_orient = get_orientation(coords[:, 5, :] - coords[:, 4, :]) 
@@ -436,5 +436,9 @@ def process_orient(coords: np.ndarray, img_size: Sequence[float], in_ratio: bool
     head_orient[head_invert_mask] = -head_orient[head_invert_mask]
 
     #TODO: determine what to return
-
-    return np.hstack([head_pos, shoulder_pos, hip_pos, foot_pos, head_orient, shoulder_orient, hip_orient, foot_orient])
+    return {
+        'head': np.column_stack([head_pos, head_orient]),
+        'shoulder': np.column_stack([shoulder_pos, shoulder_orient]),
+        'hip': np.column_stack([hip_pos, hip_orient]),
+        'foot': np.column_stack([foot_pos, foot_orient]),
+    }

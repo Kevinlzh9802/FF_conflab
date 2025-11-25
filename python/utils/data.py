@@ -310,15 +310,16 @@ def generate_dense_feats(data: pd.DataFrame) -> pd.DataFrame:
         pixel_info = row.get("pixelCoords", None)
         space_info = row.get("spaceCoords", None)
         for person_id in pixel_info.keys():
-            person_ids.append(person_id)
+            person_ids.append(int(person_id))
             pixel_coords.append(pixel_info[person_id])
             space_coords.append(space_info[person_id])
         pixel_coords = np.stack(pixel_coords)
         space_coords = np.stack(space_coords)
         pixel_feat = process_orient(np.array(pixel_coords), [1920, 1080], True)
         space_feat = process_orient(np.array(space_coords), [1,1], False)
-        row["pixelFeat"] = pixel_feat
-        row["spaceFeat"] = space_feat
+
+        row["pixelFeat"] = {clue: np.column_stack([person_ids, feat]) for clue, feat in pixel_feat.items()}
+        row["spaceFeat"] = {clue: np.column_stack([person_ids, feat]) for clue, feat in space_feat.items()}
     return data
 
 
