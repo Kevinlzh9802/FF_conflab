@@ -2,8 +2,11 @@ import os
 import pandas as pd
 import numpy as np
 import json
+import csv
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from collections import defaultdict
 
 from utils.pose import process_foot_data, extract_raw_keypoints, construct_space_coords, process_orient
 
@@ -230,7 +233,7 @@ def save_group_to_csv(T, path: str = 'f_formations.csv') -> None:
         w.writeheader()
         w.writerows(rows)
 
-def save_dense_df(filter_segs: bool) -> pd.DataFrame:
+def read_dense_df(filter_segs: bool) -> pd.DataFrame:
     """
     Parse raw pose JSON files and produce a frame-level DataFrame.
 
@@ -302,7 +305,8 @@ def save_dense_df(filter_segs: bool) -> pd.DataFrame:
         "footRes",
     ]
     data_kp = pd.DataFrame.from_records(records, columns=columns)
-    data_kp.to_pickle("../data/export/data_dense.pkl")
+    
+    return data_kp
 
 def generate_dense_feats(data: pd.DataFrame) -> pd.DataFrame:
     for _, row in data.iterrows():
@@ -322,23 +326,74 @@ def generate_dense_feats(data: pd.DataFrame) -> pd.DataFrame:
         row["spaceFeat"] = {clue: np.column_stack([person_ids, feat]) for clue, feat in space_feat.items()}
     return data
 
-def extract_groups_row(row: dict) -> dict:
-    return {
-        'row_id': row['row_id'],
-        'Cam': row['Cam'],
-        'Vid': row['Vid'],
-        'Seg': row['Seg'],
-        'Timestamp': row['Timestamp'],
-    }
-    
-def extract_group_annotations(data_path: str) -> pd.DataFrame:
-    for files in data_path.glob("*.json"):
-        with open(files, "r") as file:
-            data = json.load(file)
-            for row in data:
-                group_info = extract_groups_row(row)
 
-    return data
+_GROUP_PATTERN = re.compile(r"\(<\s*([^>]+?)\s*>,\s*cam(\d+)\)", re.IGNORECASE)
+_SEG_PATTERN = re.compile(r"seg(\d)\.csv", re.IGNORECASE)
+
+def _sequential_timestamp(idx: int) -> str:
+    """Format a zero-based row index as HH:MM, starting from 00:00 and stepping by one minute."""
+    hours, minutes = divmod(idx, 60)
+    return f"{hours:02d}:{minutes:02d}"
+
+def _parse_group_cell(cell: str) -> Dict[int, List[List[int]]]:
+    """Parse a single CSV cell and split it into per-camera group lists."""
+    groups_by_cam: Dict[int, List[List[int]]] = defaultdict(list)
+    if pd.isna(cell):
+        return groups_by_cam
+
+    for match in _GROUP_PATTERN.finditer(str(cell)):
+        members_raw, cam_raw = match.groups()
+        members = [int(p.strip()) for p in members_raw.split(",") if p.strip()]
+        if members:
+            groups_by_cam[int(cam_raw)].append(members)
+    return groups_by_cam
+
+def extract_group_annotations(data_path: Union[str, Path]) -> Dict[int, Dict[int, Dict[str, List[List[int]]]]]:
+    """
+    Extract group annotations keyed by video (seg), then camera, then timestamp.
+
+    Timestamps are normalized to start at 00:00 for each seg file and increase
+    sequentially by one minute per row.
+
+    Returns a mapping of the form:
+        {
+            seg_id: {
+                cam_id: {
+                    "00:00": [[2, 3], [4, 5, 6]],
+                    "00:01": [[...], ...],
+                },
+            },
+            ...
+        }
+    """
+    data_path = Path(data_path)
+    seg_groups: Dict[int, Dict[int, Dict[str, List[List[int]]]]] = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(list))
+    )
+
+    for csv_path in sorted(data_path.glob("seg*.csv")):
+        seg_match = _SEG_PATTERN.match(csv_path.name)
+        if not seg_match:
+            continue  # skip non-seg files and multi-digit seg ids
+        seg_id = int(seg_match.group(1))
+
+        df = pd.read_csv(csv_path, header=None, names=["timestamp", "groups"])
+        for idx, row in df.iterrows():
+            # timestamp = _sequential_timestamp(idx)
+            parsed_groups = _parse_group_cell(row["groups"])
+            for cam_id, groups in parsed_groups.items():
+                seg_groups[seg_id][cam_id][idx].extend(groups)
+
+    # Convert nested defaultdicts to plain dicts for safer downstream use.
+    return {
+        seg: {cam: dict(ts_groups) for cam, ts_groups in cam_map.items()}
+        for seg, cam_map in seg_groups.items()
+    }
+
+def filter_people_dense(df):
+    group_annotaion_path = Path("/home/zonghuan/tudelft/projects/datasets/conflab/annotations/f_formations")
+    group_annotations = extract_group_annotations(group_annotaion_path)
+    pass
 
 # Index(['row_id', 'Cam', 'Vid', 'Seg', 'Timestamp', 'concat_ts', 'pixelCoords',
 #        'spaceCoords', 'pixelFeat', 'spaceFeat', 'GT', 'headRes', 'shoulderRes',
@@ -346,7 +401,12 @@ def extract_group_annotations(data_path: str) -> pd.DataFrame:
 #       dtype='object')
 if __name__ == '__main__': 
     # process_data("../data/export/")
-    # df = save_dense_df(filter_segs=True)
-    df = pd.read_pickle("../data/export/data_dense.pkl")
+    df = read_dense_df(filter_segs=False)
+
+    df.to_pickle("../data/export/data_dense_all.pkl")
+    # df = pd.read_pickle("../data/export/data_dense.pkl")
     df = generate_dense_feats(df)
-    df.to_pickle("../data/export/data_dense_feats.pkl")
+    df = filter_people_dense(df)
+
+    # extract_group_annotations(Path("/home/zonghuan/tudelft/projects/datasets/conflab/annotations/f_formations"))
+    # df.to_pickle("../data/export/data_dense_feats.pkl")
