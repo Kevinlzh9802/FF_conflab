@@ -382,7 +382,7 @@ def extract_group_annotations(data_path: Union[str, Path]) -> Dict[int, Dict[int
             # timestamp = _sequential_timestamp(idx)
             parsed_groups = _parse_group_cell(row["groups"])
             for cam_id, groups in parsed_groups.items():
-                seg_groups[seg_id][cam_id][idx].extend(groups)
+                seg_groups[seg_id][cam_id][row["timestamp"]].extend(groups)
 
     # Convert nested defaultdicts to plain dicts for safer downstream use.
     return {
