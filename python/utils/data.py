@@ -322,6 +322,23 @@ def generate_dense_feats(data: pd.DataFrame) -> pd.DataFrame:
         row["spaceFeat"] = {clue: np.column_stack([person_ids, feat]) for clue, feat in space_feat.items()}
     return data
 
+def extract_groups_row(row: dict) -> dict:
+    return {
+        'row_id': row['row_id'],
+        'Cam': row['Cam'],
+        'Vid': row['Vid'],
+        'Seg': row['Seg'],
+        'Timestamp': row['Timestamp'],
+    }
+    
+def extract_group_annotations(data_path: str) -> pd.DataFrame:
+    for files in data_path.glob("*.json"):
+        with open(files, "r") as file:
+            data = json.load(file)
+            for row in data:
+                group_info = extract_groups_row(row)
+
+    return data
 
 # Index(['row_id', 'Cam', 'Vid', 'Seg', 'Timestamp', 'concat_ts', 'pixelCoords',
 #        'spaceCoords', 'pixelFeat', 'spaceFeat', 'GT', 'headRes', 'shoulderRes',
