@@ -5,12 +5,15 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 import pandas as pd
 import json
+import pickle
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from pathlib import Path
 
 from utils.pose import PersonSkeleton, build_person_skeletons, extract_raw_keypoints
-RAW_jSON_PATH = Path("/home/zonghuan/tudelft/projects/datasets/conflab/annotations/pose/coco/")
+from utils.data import extract_group_annotations
+from utils.constants import RAW_jSON_PATH, GROUP_ANNOTATIONS_PATH
+
 
 PersonSummary = Dict[str, Any]
 
@@ -326,6 +329,45 @@ def plot_frame_quality_per_person(data: Dict[str, Dict[str, np.ndarray]], output
         fig.savefig(fig_path, dpi=150)
         plt.close(fig)
 
+def valid_person_mask(frequency: int=60) -> Dict[str, Dict[str, np.ndarray]]:
+    frame_quality = pd.read_pickle("../data/export/intermediate/frame_quality.pkl")
+    groups_annotations = extract_group_annotations(GROUP_ANNOTATIONS_PATH)
+
+    # get annotation for each segment
+    for seg_name, persons in frame_quality.items():
+        cam, vid, seg = int(seg_name[0]), int(seg_name[1]), int(seg_name[2])
+        # Annotations keyed by seg -> cam -> "mm:ss"
+        annotations = groups_annotations[vid][cam]
+        if not annotations:
+            continue
+
+        person_ids = list(persons.keys())
+        quality_all = np.vstack([persons[pid] for pid in person_ids])
+        num_people, num_frames = quality_all.shape
+        num_seconds = (num_frames + frequency - 1) // frequency
+
+        # Convert per-second annotations into a frame-level mask.
+        for sec_idx in range(num_seconds):
+            start = sec_idx * frequency
+            end = min(num_frames, start + frequency)
+            # Offset each segment by 2 minutes; example: seg=3, sec=5 -> 04:05
+            total_seconds = ((seg - 1) * 120) + sec_idx
+            minutes, seconds = divmod(total_seconds, 60)
+            ts_key = f"{minutes:02d}:{seconds:02d}"
+            groups = annotations.get(ts_key)
+            if not groups:
+                continue
+
+            allowed_people = set(pid for group in groups for pid in group)
+            for p_idx, pid in enumerate(person_ids):
+                if int(pid) not in allowed_people:
+                    quality_all[p_idx, start:end] = 0  # mask out frames for unannotated person
+
+        # Write masked arrays back into dict
+        for p_idx, pid in enumerate(person_ids):
+            persons[pid] = quality_all[p_idx]
+    return frame_quality
+
 __all__ = [
     "evaluate_frame_skeletons",
     "annotate_frame_quality",
@@ -344,6 +386,10 @@ if __name__ == "__main__":
     # write_path = Path("../data/results/segment_quality_dense/")
     # plot_all_segments_dense(json_parent=raw_json_path, output_dir=write_path)
 
-    frame_quality = frame_quality_person()
+    # frame_quality = frame_quality_person()
+    # filehandler = open("../data/export/intermediate/frame_quality.pkl", 'wb')
+    # pickle.dump(frame_quality, filehandler)
+    all_kps = pd.read_pickle("../data/export/data_dense_all.pkl")
+    frame_quality = valid_person_mask()
     plot_frame_quality_per_person(frame_quality, Path("../data/results/segment_quality_person/"))
     c = 9
