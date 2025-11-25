@@ -12,7 +12,7 @@ from pathlib import Path
 
 from utils.pose import PersonSkeleton, build_person_skeletons, extract_raw_keypoints
 from utils.data import extract_group_annotations
-from utils.constants import RAW_jSON_PATH, GROUP_ANNOTATIONS_PATH
+from utils.constants import RAW_jSON_PATH, GROUP_ANNOTATIONS_PATH, SEGS
 
 
 PersonSummary = Dict[str, Any]
@@ -337,7 +337,7 @@ def valid_person_mask(frequency: int=60) -> Dict[str, Dict[str, np.ndarray]]:
     for seg_name, persons in frame_quality.items():
         cam, vid, seg = int(seg_name[0]), int(seg_name[1]), int(seg_name[2])
         # Annotations keyed by seg -> cam -> "mm:ss"
-        annotations = groups_annotations[vid][cam]
+        annotations = groups_annotations.get(seg, {}).get(cam, {})
         if not annotations:
             continue
 
@@ -352,6 +352,8 @@ def valid_person_mask(frequency: int=60) -> Dict[str, Dict[str, np.ndarray]]:
             end = min(num_frames, start + frequency)
             # Offset each segment by 2 minutes; example: seg=3, sec=5 -> 04:05
             total_seconds = ((seg - 1) * 120) + sec_idx
+            if vid == 3:  # video 3 starts from 00:01
+                total_seconds += 1
             minutes, seconds = divmod(total_seconds, 60)
             ts_key = f"{minutes:02d}:{seconds:02d}"
             groups = annotations.get(ts_key)
@@ -367,6 +369,38 @@ def valid_person_mask(frequency: int=60) -> Dict[str, Dict[str, np.ndarray]]:
         for p_idx, pid in enumerate(person_ids):
             persons[pid] = quality_all[p_idx]
     return frame_quality
+
+def filter_people_dense() -> pd.DataFrame:
+    all_kps = pd.read_pickle("../data/export/data_dense_all.pkl")
+    frame_quality = valid_person_mask()
+    all_kps['quality'] = 0
+    for seg_name, persons in frame_quality.items():
+        cam, vid, seg = int(seg_name[0]), int(seg_name[1]), int(seg_name[2])
+        seg_name = f"{cam}{vid}{seg}"
+        if not seg_name in SEGS:
+            print(f"seg {seg_name} not in SEGS, skipping...")
+            continue
+        seg_kps_idx = (all_kps['Cam'] == cam) & (all_kps['Vid'] == vid) & (all_kps['Seg'] == seg)
+        seg_rows = all_kps.loc[seg_kps_idx].sort_values("Timestamp")
+        
+        for person_id, quality in persons.items():
+            
+            if len(seg_rows) != len(quality):
+                raise ValueError(f"Quality length mismatch for seg {seg_name}, person {person_id}: "
+                                 f"{len(seg_rows)} rows vs {len(quality)} quality entries")
+
+            # Iterate frame-by-frame; drop person key if quality != 1
+            for frame_idx, row_idx in enumerate(seg_rows.index):
+                if quality[frame_idx] != 1:
+                    coords = all_kps.at[row_idx, "pixelCoords"]
+                    if isinstance(coords, dict) and str(person_id) in coords:
+                        new_coords = coords.copy()
+                        new_coords.pop(str(person_id), None)
+                        all_kps.at[row_idx, "pixelCoords"] = new_coords
+                else:
+                    all_kps.at[row_idx, "quality"] = 1
+
+    return all_kps
 
 __all__ = [
     "evaluate_frame_skeletons",
@@ -389,7 +423,7 @@ if __name__ == "__main__":
     # frame_quality = frame_quality_person()
     # filehandler = open("../data/export/intermediate/frame_quality.pkl", 'wb')
     # pickle.dump(frame_quality, filehandler)
-    all_kps = pd.read_pickle("../data/export/data_dense_all.pkl")
-    frame_quality = valid_person_mask()
-    plot_frame_quality_per_person(frame_quality, Path("../data/results/segment_quality_person/"))
+    
+    # plot_frame_quality_per_person(frame_quality, Path("../data/results/segment_quality_person/"))
+    filtered_kps = filter_people_dense()
     c = 9
