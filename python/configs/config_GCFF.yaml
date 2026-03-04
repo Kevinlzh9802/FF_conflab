@@ -7,7 +7,8 @@ all_clues:
 used_segs:
   # - "433"
 
-force_rerun: False
+force_rerun: True
+test: True
 use_space: True
 replace_df: False
 
@@ -17,7 +18,7 @@ analysis:
   cross_modal: True
 
 plots:
-  panels: False
+  panels: True
 
 params:
   stride: 40.0
@@ -26,6 +27,7 @@ params:
 paths:
   kp: ../data/export/data.pkl
   kp_finished: ../data/export/data_finished.pkl
+  ground_csv: ../data/mesh/ground_plane_info.csv
   sp: ../data/export/sp_merged.pkl
   frames: ../data/export/frames/
   panel_plots: ../data/results/panel_plots/
