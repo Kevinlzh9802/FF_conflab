@@ -119,8 +119,8 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
             data_kp.to_pickle(config.paths.kp_finished)
     
     # filter illed frames
-    data_kp = annotate_frame_quality(data_kp, thresholds=100, base_height=170.0)
-    data_kp = data_kp[data_kp['frame_good']].reset_index(drop=True)
+    # data_kp = annotate_frame_quality(data_kp, thresholds=100, base_height=170.0)
+    # data_kp = data_kp[data_kp['frame_good']].reset_index(drop=True)
 
     # Cross modal analysis
     # if config.analysis.cross_modal:
@@ -226,9 +226,9 @@ if __name__ == '__main__':  # pragma: no cover
     args = parser.parse_args()
     config = set_config(args)
 
-    # info_pkl = Path("../data/mesh/ground_plane_info.pkl")
+    # info_pkl = Path("../data/results.pkl")
     # with open(info_pkl, "rb") as f:
-    #     info_pkl = pickle.load(f)
+    #     info = pickle.load(f)
 
     ts_display, log_path = get_log_path(config)
     # Start tee logging

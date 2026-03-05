@@ -1,14 +1,39 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, Iterator, List
 
 import numpy as np
 import pandas as pd
 
 
 CLUES = ("head", "shoulder", "hip", "foot")
+
+
+class FeatureBundle(Mapping[str, np.ndarray]):
+    """Mapping wrapper for per-clue features used in GCFF.
+
+    It behaves like a read-only dict for indexing (`bundle['head']`) used by the
+    GCFF pipeline, while avoiding dict-specific plotting branches that assume
+    head feature alignment by row.
+    """
+
+    def __init__(self, data: Dict[str, np.ndarray]):
+        self._data = {k: np.asarray(v, dtype=float) for k, v in data.items()}
+
+    def __getitem__(self, key: str) -> np.ndarray:
+        return self._data[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def to_dict(self) -> Dict[str, np.ndarray]:
+        return {k: v.copy() for k, v in self._data.items()}
 
 
 def _coerce_person_ids(series: pd.Series) -> np.ndarray:
@@ -25,6 +50,11 @@ def _pack_feat(person_ids: np.ndarray, xy: np.ndarray, orient: np.ndarray) -> np
     if xy.size == 0:
         return np.zeros((0, 4), dtype=float)
     return np.column_stack([person_ids, xy[:, 0], xy[:, 1], orient]).astype(float)
+
+
+def _local_person_ids(count: int) -> np.ndarray:
+    # Use per-frame sequential IDs so group member IDs align with plotted row order.
+    return np.arange(1, int(count) + 1, dtype=np.int64)
 
 
 def build_data_kp_from_ground_csv(
@@ -77,6 +107,7 @@ def build_data_kp_from_ground_csv(
                 "spaceCoords",
                 "pixelFeat",
                 "spaceFeat",
+                "obj_ids",
                 "GT",
             ]
         )
@@ -85,7 +116,8 @@ def build_data_kp_from_ground_csv(
     grouped = df.groupby("frame_name", sort=False)
 
     for frame_idx, (frame_name, g) in enumerate(grouped, start=1):
-        person_ids = _coerce_person_ids(g["obj_id"])
+        obj_ids = _coerce_person_ids(g["obj_id"])
+        person_ids = _local_person_ids(len(g))
 
         head_xy = g[["head_x", "head_y"]].to_numpy(dtype=float)
         head_o = g["head_orient_rad"].to_numpy(dtype=float)
@@ -134,12 +166,13 @@ def build_data_kp_from_ground_csv(
         space_coords[:, 18] = g["foot_right_x"].to_numpy(dtype=float)
         space_coords[:, 19] = g["foot_right_y"].to_numpy(dtype=float)
 
-        space_feat = {
+        space_feat_dict = {
             "head": _pack_feat(person_ids, head_xy, head_o),
             "shoulder": _pack_feat(person_ids, shoulder_xy, shoulder_o),
             "hip": _pack_feat(person_ids, hip_xy, hip_o),
             "foot": _pack_feat(person_ids, foot_xy, foot_o),
         }
+        pixel_feat_dict = {k: v.copy() for k, v in space_feat_dict.items()}
 
         frame_rows.append(
             {
@@ -151,8 +184,9 @@ def build_data_kp_from_ground_csv(
                 "concat_ts": frame_idx,
                 "pixelCoords": None,
                 "spaceCoords": space_coords,
-                "pixelFeat": {k: v.copy() for k, v in space_feat.items()},
-                "spaceFeat": space_feat,
+                "pixelFeat": FeatureBundle(pixel_feat_dict),
+                "spaceFeat": FeatureBundle(space_feat_dict),
+                "obj_ids": obj_ids,
                 "GT": None,
                 "frame_name": frame_name,
             }
