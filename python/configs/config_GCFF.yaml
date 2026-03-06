@@ -7,8 +7,8 @@ all_clues:
 used_segs:
   # - "433"
 
-force_rerun: True
-test: True
+force_rerun: False
+test: False
 use_space: True
 replace_df: True
 

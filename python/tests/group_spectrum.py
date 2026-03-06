@@ -108,6 +108,17 @@ def _state_label(state: GroupState) -> str:
     return " | ".join("[" + ",".join(str(member) for member in group) + "]" for group in state)
 
 
+def _state_hash_unit(state: GroupState) -> float:
+    digest = hashlib.md5(repr(state).encode("utf-8")).hexdigest()[:8]
+    return int(digest, 16) / float(0xFFFFFFFF)
+
+
+def _circular_blend(hue: float, anchor: float, weight: float) -> float:
+    # Blend on a hue circle to avoid jump artifacts around 0/1 wrap.
+    diff = ((anchor - hue + 0.5) % 1.0) - 0.5
+    return (hue + weight * diff) % 1.0
+
+
 def _state_color_map(states: Iterable[GroupState]) -> Dict[GroupState, Tuple[float, float, float]]:
     unique_states = sorted(set(states), key=lambda state: (len(state), state))
     if not unique_states:
@@ -118,21 +129,39 @@ def _state_color_map(states: Iterable[GroupState]) -> Dict[GroupState, Tuple[flo
     max_groups = max(group_counts)
     group_span = max(1, max_groups - min_groups)
 
-    color_map: Dict[GroupState, Tuple[float, float, float]] = {}
+    # Separate by number of groups first so same-cardinality states can still
+    # get highly distinct hues.
+    by_group_count: Dict[int, List[GroupState]] = {}
     for state in unique_states:
-        n_groups = len(state)
+        by_group_count.setdefault(len(state), []).append(state)
+
+    color_map: Dict[GroupState, Tuple[float, float, float]] = {}
+    golden = 0.6180339887498949
+    sat_offsets = np.array([0.20, -0.08, 0.06, -0.18, 0.12, -0.03], dtype=float)
+    val_offsets = np.array([0.18, -0.06, 0.00, -0.14, 0.10, -0.02], dtype=float)
+
+    for n_groups in sorted(by_group_count.keys()):
+        bucket = by_group_count[n_groups]
+        # Stable but pseudo-random order to avoid neighboring similar hues.
+        ordered = sorted(bucket, key=_state_hash_unit)
+        m = max(1, len(ordered))
         ratio = (n_groups - min_groups) / group_span
 
-        seed_hex = hashlib.md5(repr(state).encode("utf-8")).hexdigest()[:8]
-        seed_val = int(seed_hex, 16) / float(0xFFFFFFFF)
+        # Keep the old "cool->warm, dark->bright" trend as a soft bias only.
+        anchor_hue = 0.62 + (0.06 - 0.62) * ratio
+        base_sat = 0.55 + 0.28 * ratio
+        base_val = 0.40 + 0.52 * ratio
 
-        # Low group count: dark/cool. High group count: bright/warm.
-        base_hue = 0.62 - (0.56 * ratio)
-        hue = (base_hue + (seed_val - 0.5) * 0.08) % 1.0
-        saturation = float(np.clip(0.45 + (0.35 * ratio) + (seed_val - 0.5) * 0.08, 0.35, 0.95))
-        value = float(np.clip(0.35 + (0.6 * ratio), 0.25, 1.0))
-        rgb = tuple(float(x) for x in hsv_to_rgb([hue, saturation, value]))
-        color_map[state] = rgb
+        for idx, state in enumerate(ordered):
+            seed = _state_hash_unit(state)
+            # Wide hue spread for separation, then gently pull toward anchor_hue.
+            hue = (seed + idx * golden) % 1.0
+            hue = _circular_blend(hue, anchor_hue, weight=0.22)
+
+            sat = float(np.clip(base_sat + sat_offsets[idx % len(sat_offsets)], 0.30, 1.0))
+            val = float(np.clip(base_val + val_offsets[(idx // len(sat_offsets)) % len(val_offsets)], 0.25, 1.0))
+            rgb = tuple(float(x) for x in hsv_to_rgb([hue, sat, val]))
+            color_map[state] = rgb
 
     return color_map
 
