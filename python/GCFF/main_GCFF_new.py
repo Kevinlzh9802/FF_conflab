@@ -81,7 +81,7 @@ def maybe_convert_ground_csv(config: Munch) -> None:
 
 
 def gcff_experiments(config: Munch) -> pd.DataFrame:
-    maybe_convert_ground_csv(config)
+    # maybe_convert_ground_csv(config)
 
     # read keypoint data, prioritize finished data with detections
     if config.force_rerun:
@@ -148,7 +148,7 @@ def gcff_sequence(features, GTgroups, params):
     s_speaker: List[float] = []
     group_sizes: List[int] = []
 
-    for idx in range(35, T):
+    for idx in range(T):
         feat = features[idx]
         if feat is None or len(feat) == 0 or feat.shape[1] == 0:
             groups_out[idx] = []
@@ -207,8 +207,6 @@ def set_config(args):
         config.use_space = args.use_space
     if args.force_rerun is not None:
         config.force_rerun = args.force_rerun
-    if args.ground_csv is not None:
-        config.paths.ground_csv = args.ground_csv
     config.test = bool(args.test)
 
     return config
@@ -220,7 +218,6 @@ if __name__ == '__main__':  # pragma: no cover
     parser.add_argument('--mdl', type=float, default=None)
     parser.add_argument('--use-space', type=bool, default=None)
     parser.add_argument('--force-rerun', type=bool, default=None)
-    parser.add_argument('--ground-csv', type=str, default=None, help='Optional ground_plane_info.csv for data_kp conversion')
     parser.add_argument('-test', '--test', action='store_true', help='If set, sample every 100th row in data_kp before running gcff_sequence')
     
     args = parser.parse_args()

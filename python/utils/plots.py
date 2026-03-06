@@ -8,6 +8,8 @@ from matplotlib.cbook import pts_to_midstep
 import numpy as np
 import pandas as pd
 import json
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend: never opens a window
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from utils.groups import equal_groups
@@ -70,14 +72,36 @@ def _normalize_show_flags(flags) -> Tuple[bool, bool, bool, bool]:
 
 def _iter_person_skeletons(Coords: np.ndarray, Feats: dict, rows: Sequence[int], base_height: float) -> Iterable[PersonSkeleton]:
     head_feats = None
-    if isinstance(Feats, dict):
-        head_feats = Feats.get('head')
+    if Feats is not None:
+        if hasattr(Feats, 'get'):
+            try:
+                head_feats = Feats.get('head')
+            except Exception:
+                head_feats = None
+        if head_feats is None:
+            try:
+                head_feats = Feats['head']
+            except Exception:
+                head_feats = None
+
+    head_array = None
+    if head_feats is not None:
+        try:
+            arr = np.asarray(head_feats, dtype=float)
+            if arr.ndim == 2:
+                head_array = arr
+        except Exception:
+            head_array = None
+
     for r in rows:
         pts2 = _extract_xy_from_headfeat(Coords[r, :])  # (10, 2)
+        row_head_feats = None
+        if head_array is not None and 0 <= int(r) < head_array.shape[0]:
+            row_head_feats = head_array[int(r):int(r) + 1]
         skeletons = build_person_skeletons(
             [pts2],
             base_height=base_height,
-            head_feats=head_feats,
+            head_feats=row_head_feats,
             row_indices=[r],
         )
         for skel in skeletons:
@@ -205,6 +229,7 @@ def _get_pose_arrow(person: PersonSkeleton, pose: str) -> Tuple[List[PoseArrow],
     pts = person.points
     if pose == 'head':
         kp_arrow: Optional[PoseArrow] = None
+        manual_arrow: Optional[PoseArrow] = None
         if not np.any(np.isnan(pts[[0, 1], :2])):
             start = pts[0]
             vec = np.array([pts[1, 0] - pts[0, 0], pts[1, 1] - pts[0, 1]], dtype=float)
@@ -215,18 +240,19 @@ def _get_pose_arrow(person: PersonSkeleton, pose: str) -> Tuple[List[PoseArrow],
             vec_manual = np.array([math.cos(angle), math.sin(angle)], dtype=float)
             if not (np.any(np.isnan(vec_manual)) or np.allclose(vec_manual, 0.0)):
                 manual_arrow = PoseArrow(start=pts[0], vec=vec_manual, kind='head_manual')
-                if kp_arrow is not None:
-                    if _vectors_aligned(kp_arrow.vec, manual_arrow.vec):
-                        arrows.append(kp_arrow)
-                    else:
-                        discrepancy = True
-                        # Only store manual arrow when there is discrepancy
-                        arrows.append(manual_arrow)
-            elif kp_arrow is not None:
+
+        if kp_arrow is not None and manual_arrow is not None:
+            if _vectors_aligned(kp_arrow.vec, manual_arrow.vec):
                 arrows.append(kp_arrow)
-        else:
-            if kp_arrow is not None:
-                arrows.append(kp_arrow)
+            else:
+                discrepancy = True
+                # Mark mismatch arrows so only true discrepancies are highlighted in black.
+                arrows.append(PoseArrow(start=manual_arrow.start, vec=manual_arrow.vec, kind='head_manual_discrepancy'))
+        elif manual_arrow is not None:
+            # Ground-CSV-derived data may not contain a valid nose vector; use explicit head orientation.
+            arrows.append(manual_arrow)
+        elif kp_arrow is not None:
+            arrows.append(kp_arrow)
         return arrows, discrepancy
     if pose == 'shoulder':
         if np.any(np.isnan(person.mid_shoulder)) or np.any(np.isnan(pts[[2, 3], :2])):
@@ -406,7 +432,7 @@ def _plot_person_skeleton(ax,
     if show_head:
         arrows, _ = _get_pose_arrow(person, 'head')
         for arrow in arrows:
-            arrow_color = 'k' if arrow.kind == 'head_manual' else color
+            arrow_color = 'k' if arrow.kind == 'head_manual_discrepancy' else color
             anchor = _draw_arrow(ax, arrow.start, arrow.vec, projection, arrow_color, x_vals, y_vals)
             if anchor is not None and id_anchor is None:
                 id_anchor = anchor
@@ -732,7 +758,7 @@ def _plot_pose_panel(ax,
             if mismatch:
                 panel_discrepancy = True
             for arrow in arrows:
-                draw_color = 'k' if arrow.kind == 'head_manual' else col
+                draw_color = 'k' if arrow.kind == 'head_manual_discrepancy' else col
                 anchor = _draw_arrow(ax, arrow.start, arrow.vec, '2d', draw_color, x_vals, y_vals)
                 if anchor is not None:
                     any_content = True
@@ -991,6 +1017,7 @@ def plot_panels_df(data_kp):
     results_dir.mkdir(parents=True, exist_ok=True)
 
     total_frames = len(data_kp)
+    # plt.ioff()
     for frame_idx in range(total_frames):
         try:
             cam_val = int(data_kp['Cam'].iloc[frame_idx])

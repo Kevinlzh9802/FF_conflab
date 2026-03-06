@@ -10,7 +10,7 @@ used_segs:
 force_rerun: True
 test: True
 use_space: True
-replace_df: False
+replace_df: True
 
 analysis:
   spatial: False
@@ -25,9 +25,9 @@ params:
   mdl: 6000.0
 
 paths:
-  kp: ../data/export/data.pkl
-  kp_finished: ../data/export/data_finished.pkl
-  ground_csv: ../data/mesh/ground_plane_info.csv
+  kp: ../data/sam4d/data.pkl
+  kp_finished: ../data/sam4d/data_finished.pkl
+  ground_csv: ../data/sam4d/ground_plane_info.csv
   sp: ../data/export/sp_merged.pkl
   frames: ../data/export/frames/
   panel_plots: ../data/results/panel_plots/
