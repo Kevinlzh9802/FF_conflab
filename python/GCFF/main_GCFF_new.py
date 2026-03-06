@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Tuple, Optional
 from pathlib import Path
 
 import os
+import sys
 import numpy as np
 import argparse
 import pandas as pd
@@ -40,6 +41,7 @@ from utils.plots import plot_all_skeletons, plot_panels_df
 from utils.exp_logging import display_frame_results, start_logging, stop_logging, log_only, get_log_path
 from utils.ground_csv_to_data_kp import convert_ground_csv_to_data_kp
 from tests.data_quality import annotate_frame_quality
+from tests.group_spectrum import plot_target_grouping_spectrum
 
 
 def maybe_convert_ground_csv(config: Munch) -> None:
@@ -81,7 +83,7 @@ def maybe_convert_ground_csv(config: Munch) -> None:
 
 
 def gcff_experiments(config: Munch) -> pd.DataFrame:
-    # maybe_convert_ground_csv(config)
+    maybe_convert_ground_csv(config)
 
     # read keypoint data, prioritize finished data with detections
     if config.force_rerun:
@@ -128,9 +130,11 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
         # x = [all(y) for y in windows.frames_good]
         # sum(x)
     # Save detection results as panels
+    # [7,8,13,14,18]
     if config.plots.panels:
-        plot_panels_df(data_kp)
+        # plot_panels_df(data_kp)
         # plot_all_skeletons(data_kp=data_kp, frame_idx=341, show=True)
+        plot_target_grouping_spectrum(data_kp=data_kp, target_ids=[7,8,13,14,18], save_path=Path(config.paths.results) / "grouping_spectrum.png")
     return data_kp
 
 def gcff_sequence(features, GTgroups, params):
