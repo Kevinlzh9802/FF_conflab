@@ -1,0 +1,34 @@
+all_clues:
+  - head
+  - shoulder
+  - hip
+  - foot
+
+used_segs:
+  # - "433"
+
+force_rerun: True
+test: False
+use_space: True
+replace_df: True
+
+analysis:
+  spatial: False
+  temporal: False
+  cross_modal: False
+
+plots:
+  panels: True
+
+params:
+  stride: 40.0
+  mdl: 6000.0
+
+paths:
+  kp: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/data.pkl
+  kp_finished: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/data_finished.pkl
+  sp: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/sp_merged.pkl
+  frames: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/frames/
+  panel_plots: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/panel_plots
+  log: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/logs/
+  results: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/results/
