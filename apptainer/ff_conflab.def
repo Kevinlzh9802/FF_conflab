@@ -1,0 +1,62 @@
+Bootstrap: docker
+From: python:3.11-slim-bookworm
+
+%labels
+    Author zonghuan
+    Application FF_conflab
+    Description GCFF runtime container for FF_conflab
+
+%help
+    Build from the repository root:
+        apptainer build apptainer/ff_conflab.sif apptainer/ff_conflab.def
+
+    Run the default entrypoint:
+        apptainer run --bind $(pwd)/data:/opt/ff_conflab/data apptainer/ff_conflab.sif --config configs/config_GCFF.yaml
+
+    Or execute commands manually inside the container:
+        apptainer exec --bind $(pwd)/data:/opt/ff_conflab/data apptainer/ff_conflab.sif \
+            bash -lc 'cd /opt/ff_conflab/python && python3 GCFF/main_GCFF_new.py --config configs/config_GCFF.yaml'
+
+    Notes:
+        - This recipe copies only the source tree under python/ into the image.
+        - Bind your project data directory to /opt/ff_conflab/data at runtime.
+        - The default runscript executes python/GCFF/main_GCFF_new.py from /opt/ff_conflab/python.
+
+%files
+    python /opt/ff_conflab/python
+    apptainer/requirements.txt /opt/ff_conflab/apptainer/requirements.txt
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        gcc \
+        g++ \
+        libgl1 \
+        libglib2.0-0 \
+        ca-certificates
+    rm -rf /var/lib/apt/lists/*
+
+    python3 -m pip install --upgrade pip setuptools wheel
+    python3 -m pip install --no-cache-dir -r /opt/ff_conflab/apptainer/requirements.txt
+
+    mkdir -p /opt/ff_conflab/data
+    mkdir -p /opt/ff_conflab/logs
+
+%environment
+    export FF_CONFLAB_ROOT=/opt/ff_conflab
+    export PYTHONPATH=/opt/ff_conflab/python:/opt/ff_conflab/python/GCFF
+    export MPLBACKEND=Agg
+    export PYTHONUNBUFFERED=1
+    export PYTHONNOUSERSITE=1
+
+%runscript
+    cd /opt/ff_conflab/python
+    exec python3 GCFF/main_GCFF_new.py "$@"
+
+%test
+    export PYTHONPATH=/opt/ff_conflab/python:/opt/ff_conflab/python/GCFF
+    cd /opt/ff_conflab/python
+    python3 -c "import numpy, pandas, yaml, munch, scipy, seaborn, matplotlib"
+    python3 -c "from GCFF.gcff_core import graph_cut; from analysis.cross_modal import cross_modal_analysis; print('apptainer import test passed')"
