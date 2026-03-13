@@ -38,46 +38,46 @@ from utils.table import filter_and_concat_table
 from utils.groups import turn_singletons_to_groups
 from utils.plots import plot_all_skeletons, plot_panels_df
 from utils.exp_logging import display_frame_results, start_logging, stop_logging, log_only, get_log_path
-from utils.ground_csv_to_data_kp import convert_ground_csv_to_data_kp
+# from utils.ground_csv_to_data_kp import convert_ground_csv_to_data_kp
 from tests.data_quality import annotate_frame_quality
 
 
-def maybe_convert_ground_csv(config: Munch) -> None:
-    paths = getattr(config, "paths", None)
-    if paths is None:
-        return
-    ground_csv = getattr(paths, "ground_csv", None)
-    out_kp = getattr(paths, "kp", None)
-    if not ground_csv or not out_kp:
-        return
+# def maybe_convert_ground_csv(config: Munch) -> None:
+#     paths = getattr(config, "paths", None)
+#     if paths is None:
+#         return
+#     ground_csv = getattr(paths, "ground_csv", None)
+#     out_kp = getattr(paths, "kp", None)
+#     if not ground_csv or not out_kp:
+#         return
 
-    need_convert = bool(config.force_rerun) or (not os.path.exists(out_kp))
-    if (not need_convert) and os.path.exists(out_kp):
-        try:
-            existing = pd.read_pickle(out_kp)
-            if "spaceCoords" not in existing.columns:
-                need_convert = True
-            else:
-                sample = None
-                for value in existing["spaceCoords"]:
-                    if value is None:
-                        continue
-                    sample = np.asarray(value)
-                    break
-                need_convert = (
-                    sample is None or
-                    sample.ndim != 2 or
-                    sample.shape[1] < 20
-                )
-        except Exception:
-            need_convert = True
-    if not need_convert:
-        return
-    if not os.path.exists(ground_csv):
-        raise FileNotFoundError(f"ground_csv not found: {ground_csv}")
+#     need_convert = bool(config.force_rerun) or (not os.path.exists(out_kp))
+#     if (not need_convert) and os.path.exists(out_kp):
+#         try:
+#             existing = pd.read_pickle(out_kp)
+#             if "spaceCoords" not in existing.columns:
+#                 need_convert = True
+#             else:
+#                 sample = None
+#                 for value in existing["spaceCoords"]:
+#                     if value is None:
+#                         continue
+#                     sample = np.asarray(value)
+#                     break
+#                 need_convert = (
+#                     sample is None or
+#                     sample.ndim != 2 or
+#                     sample.shape[1] < 20
+#                 )
+#         except Exception:
+#             need_convert = True
+#     if not need_convert:
+#         return
+#     if not os.path.exists(ground_csv):
+#         raise FileNotFoundError(f"ground_csv not found: {ground_csv}")
 
-    convert_ground_csv_to_data_kp(csv_path=ground_csv, output_pkl=out_kp, cam=4, vid=2, seg=8)
-    print(f"Converted ground CSV -> data_kp: {ground_csv} -> {out_kp}")
+#     convert_ground_csv_to_data_kp(csv_path=ground_csv, output_pkl=out_kp, cam=4, vid=2, seg=8)
+#     print(f"Converted ground CSV -> data_kp: {ground_csv} -> {out_kp}")
 
 
 def gcff_experiments(config: Munch) -> pd.DataFrame:
@@ -111,8 +111,9 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
             else:
                 features = [data_kp["pixelFeat"][k][clue] for k in range(len(data_kp))]
             GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
+            frame_contexts = [_build_frame_debug_context(data_kp, k, clue=clue) for k in range(len(data_kp))]
 
-            results = gcff_sequence(features, GTgroups, config.params)
+            results = gcff_sequence(features, GTgroups, config.params, frame_contexts=frame_contexts)
             data_kp[f"{clue}Res"] = results['groups']
 
         if config.replace_df:
@@ -133,7 +134,27 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
         # plot_all_skeletons(data_kp=data_kp, frame_idx=341, show=True)
     return data_kp
 
-def gcff_sequence(features, GTgroups, params):
+def _build_frame_debug_context(data_kp: pd.DataFrame,
+                               frame_idx: int,
+                               clue: Optional[str] = None) -> Dict[str, Any]:
+    context: Dict[str, Any] = {"frame_idx": int(frame_idx)}
+    if clue is not None:
+        context["clue"] = clue
+    for key in ("row_id", "Cam", "Vid", "Seg", "Timestamp"):
+        try:
+            value = data_kp[key].iloc[frame_idx]
+        except Exception:
+            continue
+        if hasattr(value, "item"):
+            try:
+                value = value.item()
+            except Exception:
+                pass
+        context[key] = value
+    return context
+
+
+def gcff_sequence(features, GTgroups, params, frame_contexts: Optional[List[Dict[str, Any]]] = None):
     """High-level pipeline adapted from example_GCFF.m.
 
     Returns (results_dict, data_out)
@@ -154,7 +175,8 @@ def gcff_sequence(features, GTgroups, params):
             groups_out[idx] = []
             continue
 
-        labels = graph_cut(feat, params.stride, params.mdl)
+        debug_context = frame_contexts[idx] if frame_contexts is not None and idx < len(frame_contexts) else None
+        labels = graph_cut(feat, params.stride, params.mdl, debug_context=debug_context)
         groups = []
         for lab in range(int(labels.max()) + 1 if labels.size else 0):
             members = feat[labels == lab, 0].astype(int).tolist()

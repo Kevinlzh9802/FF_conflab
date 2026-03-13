@@ -1,9 +1,53 @@
 import math
-from typing import List, Sequence, Tuple, Union
+import os
+import warnings
+from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
 from graphopt.graphcut import expand as expand_mex
+
+
+_DEBUG_OVERFLOW = os.environ.get("GCFF_DEBUG_OVERFLOW", "").lower() not in ("", "0", "false", "no")
+_MAX_PENALTY_EXPONENT = math.log(np.finfo(float).max) / math.log(100.0)
+_overflow_debug_count = 0
+_MAX_DEBUG_MESSAGES = 20
+
+
+def _report_penalty_overflow(feat: np.ndarray,
+                             debug_context: Optional[Mapping[str, Any]],
+                             lab: int,
+                             cluster_idx: int,
+                             j: int,
+                             k: int,
+                             distj: float,
+                             distk: float,
+                             cosine: float,
+                             exponent: float) -> None:
+    global _overflow_debug_count
+    if not _DEBUG_OVERFLOW or _overflow_debug_count >= _MAX_DEBUG_MESSAGES:
+        return
+    _overflow_debug_count += 1
+    context_parts = []
+    if debug_context:
+        for key in ("clue", "frame_idx", "row_id", "Cam", "Vid", "Seg", "Timestamp"):
+            if key in debug_context:
+                context_parts.append(f"{key}={debug_context[key]}")
+    context_text = ", ".join(context_parts)
+    if context_text:
+        context_text = context_text + ", "
+    warnings.warn(
+        "GCFF penalty overflow risk: "
+        f"{context_text}cluster_label={lab}, cluster_index={cluster_idx}, "
+        f"j={j}, k={k}, id_j={feat[j, 0]:.0f}, id_k={feat[k, 0]:.0f}, "
+        f"distj={distj:.6g}, distk={distk:.6g}, cosine={cosine:.6g}, "
+        f"ratio={distk / distj:.6g}, exponent={exponent:.6g}, "
+        f"threshold={_MAX_PENALTY_EXPONENT:.6g}. "
+        "This usually means one point is extremely close to the cluster mean, "
+        "so distk/distj becomes very large.",
+        RuntimeWarning,
+        stacklevel=3,
+    )
 
 
 def ff_deletesingletons(groups: List[Sequence[int]]) -> List[List[int]]:
@@ -227,7 +271,10 @@ def ff_plot_person_tv(xx_feat, yy_feat=None, alpha_feat=None, col="b", scale=1.0
     return ax
 
 
-def graph_cut(f: np.ndarray, stride: float, MDL_in: float) -> np.ndarray:
+def graph_cut(f: np.ndarray,
+              stride: float,
+              MDL_in: float,
+              debug_context: Optional[Mapping[str, Any]] = None) -> np.ndarray:
     """Runs graph-cuts clustering as in GCFF/gc.m.
 
     f: Nx4 array where columns are [ID, x, y, alpha]
@@ -259,8 +306,25 @@ def graph_cut(f: np.ndarray, stride: float, MDL_in: float) -> np.ndarray:
                     if distk > distj and distj > 0:
                         inner = float(disp[k].dot(disp[j]))
                         norma = distk * distj
-                        if (inner / norma) > 0.75:
-                            distmat[k, ii] += 100 ** (inner / norma * distk / distj)
+                        cosine = inner / norma
+                        if cosine > 0.75:
+                            exponent = cosine * distk / distj
+                            if not np.isfinite(exponent) or exponent > _MAX_PENALTY_EXPONENT:
+                                _report_penalty_overflow(
+                                    feat=feat,
+                                    debug_context=debug_context,
+                                    lab=int(lab),
+                                    cluster_idx=ii,
+                                    j=j,
+                                    k=k,
+                                    distj=float(distj),
+                                    distk=float(distk),
+                                    cosine=float(cosine),
+                                    exponent=float(exponent),
+                                )
+                                distmat[k, ii] += float("inf")
+                            else:
+                                distmat[k, ii] += 100 ** exponent
         return distmat, labels_out
 
     locs = find_locs(f, stride)
@@ -280,4 +344,3 @@ def graph_cut(f: np.ndarray, stride: float, MDL_in: float) -> np.ndarray:
         unary, seg = calc_distance(locs, f, seg_new.astype(int), MDL_in)
         numiter += 1
     return seg.astype(int)
-
