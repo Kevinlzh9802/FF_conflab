@@ -58,5 +58,5 @@ From: python:3.11-slim-bookworm
 %test
     export PYTHONPATH=/opt/ff_conflab/python:/opt/ff_conflab/python/GCFF
     cd /opt/ff_conflab/python
-    python3 -c "import numpy, pandas, yaml, munch, scipy, seaborn, matplotlib"
+    python3 -c "import numpy, pandas, yaml, munch, scipy, seaborn, matplotlib, tqdm"
     python3 -c "from GCFF.gcff_core import graph_cut; from analysis.cross_modal import cross_modal_analysis; print('apptainer import test passed')"
