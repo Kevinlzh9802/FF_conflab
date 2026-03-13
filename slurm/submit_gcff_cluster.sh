@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --ntasks=1          # Request number of parallel tasks per job. Default is 1
 #SBATCH --mem=48G
-#SBATCH --chdir=/home/zonghuan/tudelft/projects/FF_conflab
+#SBATCH --chdir=/home/nfs/zli33/projects/FF_conflab
 #SBATCH --mail-type=END     # Set mail type to 'END' to receive a mail when the job finishes. 
 #SBATCH --output=/home/nfs/zli33/slurm_outputs/gcff/slurm_%j.out # Set name of output log. %j is the Slurm jobId
 #SBATCH --error=/home/nfs/zli33/slurm_outputs/gcff/slurm_%j.err # Set name of error log. %j is the Slurm jobId
