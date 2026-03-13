@@ -36,13 +36,16 @@ class FeatureBundle(Mapping[str, np.ndarray]):
         return {k: v.copy() for k, v in self._data.items()}
 
 
-def _coerce_person_ids(series: pd.Series) -> np.ndarray:
+def _coerce_person_ids(series: pd.Series, global_categories: pd.Index | None = None) -> np.ndarray:
     numeric = pd.to_numeric(series, errors="coerce")
     if numeric.notna().all():
         return numeric.astype(np.int64).to_numpy()
 
     # Stable fallback when IDs are non-numeric.
-    cats = pd.Categorical(series.astype(str))
+    if global_categories is None:
+        cats = pd.Categorical(series.astype(str))
+    else:
+        cats = pd.Categorical(series.astype(str), categories=global_categories)
     return (cats.codes + 1).astype(np.int64)
 
 
@@ -50,11 +53,6 @@ def _pack_feat(person_ids: np.ndarray, xy: np.ndarray, orient: np.ndarray) -> np
     if xy.size == 0:
         return np.zeros((0, 4), dtype=float)
     return np.column_stack([person_ids, xy[:, 0], xy[:, 1], orient]).astype(float)
-
-
-def _local_person_ids(count: int) -> np.ndarray:
-    # Use per-frame sequential IDs so group member IDs align with plotted row order.
-    return np.arange(1, int(count) + 1, dtype=np.int64)
 
 
 def build_data_kp_from_ground_csv(
@@ -114,10 +112,13 @@ def build_data_kp_from_ground_csv(
 
     frame_rows: List[Dict[str, object]] = []
     grouped = df.groupby("frame_name", sort=False)
+    obj_id_numeric = pd.to_numeric(df["obj_id"], errors="coerce")
+    global_obj_categories = None
+    if not obj_id_numeric.notna().all():
+        global_obj_categories = pd.Categorical(df["obj_id"].astype(str)).categories
 
     for frame_idx, (frame_name, g) in enumerate(grouped, start=1):
-        obj_ids = _coerce_person_ids(g["obj_id"])
-        person_ids = _local_person_ids(len(g))
+        obj_ids = _coerce_person_ids(g["obj_id"], global_categories=global_obj_categories)
 
         head_xy = g[["head_x", "head_y"]].to_numpy(dtype=float)
         head_o = g["head_orient_rad"].to_numpy(dtype=float)
@@ -167,10 +168,10 @@ def build_data_kp_from_ground_csv(
         space_coords[:, 19] = g["foot_right_y"].to_numpy(dtype=float)
 
         space_feat_dict = {
-            "head": _pack_feat(person_ids, head_xy, head_o),
-            "shoulder": _pack_feat(person_ids, shoulder_xy, shoulder_o),
-            "hip": _pack_feat(person_ids, hip_xy, hip_o),
-            "foot": _pack_feat(person_ids, foot_xy, foot_o),
+            "head": _pack_feat(obj_ids, head_xy, head_o),
+            "shoulder": _pack_feat(obj_ids, shoulder_xy, shoulder_o),
+            "hip": _pack_feat(obj_ids, hip_xy, hip_o),
+            "foot": _pack_feat(obj_ids, foot_xy, foot_o),
         }
         pixel_feat_dict = {k: v.copy() for k, v in space_feat_dict.items()}
 

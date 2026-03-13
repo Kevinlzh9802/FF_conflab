@@ -8,7 +8,7 @@ used_segs:
   # - "433"
 
 force_rerun: True
-test: True
+test: False
 use_space: True
 replace_df: True
 
