@@ -1012,13 +1012,17 @@ def plot_pose_panels(data_kp: Any,
         plt.show()
     return fig, axes
 
-def plot_panels_df(data_kp):
-    results_dir = Path(__file__).resolve().parents[2] / 'data' / 'results' / 'panel_plots'
+def plot_panels_df(data_kp, output_dir: Optional[str | Path] = None, frame_step: int = 120):
+    if output_dir is None:
+        results_dir = Path(__file__).resolve().parents[2] / 'data' / 'results' / 'panel_plots'
+    else:
+        results_dir = Path(output_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     total_frames = len(data_kp)
+    frame_step = max(1, int(frame_step))
     # plt.ioff()
-    for frame_idx in range(total_frames):
+    for frame_idx in range(0, total_frames, frame_step):
         try:
             cam_val = int(data_kp['Cam'].iloc[frame_idx])
         except Exception:

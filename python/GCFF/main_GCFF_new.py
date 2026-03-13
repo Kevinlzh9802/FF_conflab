@@ -44,46 +44,7 @@ from tests.data_quality import annotate_frame_quality
 from tests.group_spectrum import plot_target_grouping_spectrum
 
 
-# def maybe_convert_ground_csv(config: Munch) -> None:
-#     paths = getattr(config, "paths", None)
-#     if paths is None:
-#         return
-#     ground_csv = getattr(paths, "ground_csv", None)
-#     out_kp = getattr(paths, "kp", None)
-#     if not ground_csv or not out_kp:
-#         return
-
-#     need_convert = bool(config.force_rerun) or (not os.path.exists(out_kp))
-#     if (not need_convert) and os.path.exists(out_kp):
-#         try:
-#             existing = pd.read_pickle(out_kp)
-#             if "spaceCoords" not in existing.columns:
-#                 need_convert = True
-#             else:
-#                 sample = None
-#                 for value in existing["spaceCoords"]:
-#                     if value is None:
-#                         continue
-#                     sample = np.asarray(value)
-#                     break
-#                 need_convert = (
-#                     sample is None or
-#                     sample.ndim != 2 or
-#                     sample.shape[1] < 20
-#                 )
-#         except Exception:
-#             need_convert = True
-#     if not need_convert:
-#         return
-#     if not os.path.exists(ground_csv):
-#         raise FileNotFoundError(f"ground_csv not found: {ground_csv}")
-
-#     convert_ground_csv_to_data_kp(csv_path=ground_csv, output_pkl=out_kp, cam=4, vid=2, seg=8)
-#     print(f"Converted ground CSV -> data_kp: {ground_csv} -> {out_kp}")
-
-
 def gcff_experiments(config: Munch) -> pd.DataFrame:
-    maybe_convert_ground_csv(config)
 
     # read keypoint data, prioritize finished data with detections
     if config.force_rerun:
@@ -104,6 +65,8 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
     if config.test:
         data_kp = data_kp.iloc[::100].reset_index(drop=True)
         print(f"Test mode enabled: using every 100th row ({len(data_kp)} rows).")
+
+    print(f"GCFF dataframe rows in use: {len(data_kp)}")
 
     # Build features per frame for the selected clue
     if rerun:
@@ -133,9 +96,9 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
     # Save detection results as panels
     # [7,8,13,14,18]
     if config.plots.panels:
-        # plot_panels_df(data_kp)
+        plot_panels_df(data_kp, output_dir=config.paths.panel_plots)
         # plot_all_skeletons(data_kp=data_kp, frame_idx=341, show=True)
-        plot_target_grouping_spectrum(data_kp=data_kp, target_ids=[7,8,13,14,18], save_path=Path(config.paths.results) / "grouping_spectrum.png")
+        # plot_target_grouping_spectrum(data_kp=data_kp, target_ids=[7,8,13,14,18], save_path=Path(config.paths.results) / "grouping_spectrum.png")
     return data_kp
 
 def _build_frame_debug_context(data_kp: pd.DataFrame,
@@ -156,6 +119,22 @@ def _build_frame_debug_context(data_kp: pd.DataFrame,
                 pass
         context[key] = value
     return context
+
+
+def _log_gcff_progress(processed_count: int,
+                       total_count: int,
+                       context: Optional[Dict[str, Any]] = None) -> None:
+    context = context or {}
+    clue = context.get("clue", "unknown")
+    cam = context.get("Cam", "?")
+    vid = context.get("Vid", "?")
+    seg = context.get("Seg", "?")
+    timestamp = context.get("Timestamp", "?")
+    frame_idx = context.get("frame_idx", "?")
+    print(
+        f"GCFF progress: {processed_count}/{total_count} "
+        f"(clue={clue}, frame_idx={frame_idx}, Cam={cam}, Vid={vid}, Seg={seg}, Timestamp={timestamp})"
+    )
 
 
 def gcff_sequence(features, GTgroups, params, frame_contexts: Optional[List[Dict[str, Any]]] = None):
@@ -180,6 +159,9 @@ def gcff_sequence(features, GTgroups, params, frame_contexts: Optional[List[Dict
             continue
 
         debug_context = frame_contexts[idx] if frame_contexts is not None and idx < len(frame_contexts) else None
+        processed_count = idx + 1
+        if processed_count == 1 or processed_count % 500 == 0 or processed_count == T:
+            _log_gcff_progress(processed_count, T, debug_context)
         labels = graph_cut(feat, params.stride, params.mdl, debug_context=debug_context)
         groups = []
         for lab in range(int(labels.max()) + 1 if labels.size else 0):
@@ -248,10 +230,6 @@ if __name__ == '__main__':  # pragma: no cover
     
     args = parser.parse_args()
     config = set_config(args)
-
-    # info_pkl = Path("../data/results.pkl")
-    # with open(info_pkl, "rb") as f:
-    #     info = pickle.load(f)
 
     ts_display, log_path = get_log_path(config)
     # Start tee logging
