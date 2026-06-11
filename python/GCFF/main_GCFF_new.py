@@ -110,7 +110,11 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
     # Save detection results as panels
     # [7,8,13,14,18]
     if config.plots.panels:
-        plot_panels_df(data_kp, output_dir=config.paths.panel_plots)
+        if getattr(config.paths, "kp_vitpose", None):
+            from utils.plot_spacefeat import plot_spacefeat_bev_panels_df
+            plot_spacefeat_bev_panels_df(data_kp, output_dir=config.paths.panel_plots)
+        else:
+            plot_panels_df(data_kp, output_dir=config.paths.panel_plots)
         # plot_all_skeletons(data_kp=data_kp, frame_idx=341, show=True)
         # plot_target_grouping_spectrum(data_kp=data_kp, target_ids=[7,8,13,14,18], save_path=Path(config.paths.results) / "grouping_spectrum.png")
     return data_kp
