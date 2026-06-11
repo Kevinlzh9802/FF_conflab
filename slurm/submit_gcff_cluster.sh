@@ -19,6 +19,20 @@ config_path=$project_folder/python/configs/config_GCFF_cluster.yaml
 data_root=$neon_path/zonghuan/data/conflab
 gcff_root=$data_root/GCFF
 
+# ---------------------------------------------------------------------------
+# Argument parsing — override defaults via --config=<path>
+# ---------------------------------------------------------------------------
+for arg in "$@"; do
+    case "$arg" in
+        --config=*) config_path="${arg#--config=}" ;;
+        *)
+            echo "Error: unknown argument '$arg'" >&2
+            echo "Usage: sbatch $0 [--config=python/configs/config_GCFF_cluster_vitpose.yaml]" >&2
+            exit 1
+            ;;
+    esac
+done
+
 mkdir -p "$gcff_root/panel_plots" "$gcff_root/logs" "$gcff_root/results"
 
 if ! command -v apptainer >/dev/null 2>&1; then
