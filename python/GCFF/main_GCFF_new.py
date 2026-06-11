@@ -44,18 +44,32 @@ from tests.data_quality import annotate_frame_quality
 from tests.group_spectrum import plot_target_grouping_spectrum
 
 
+def _resolve_paths(config: Munch) -> tuple[str, str]:
+    """Return (input_path, finished_path) based on config.
+
+    When ``config.paths.kp_vitpose`` is set the ViTPose-specific paths are
+    used and the original ``kp`` / ``kp_finished`` files are never touched.
+    """
+    kp_vitpose = getattr(config.paths, "kp_vitpose", None)
+    if kp_vitpose:
+        return str(kp_vitpose), str(config.paths.kp_vitpose_finished)
+    return str(config.paths.kp), str(config.paths.kp_finished)
+
+
 def gcff_experiments(config: Munch) -> pd.DataFrame:
+
+    kp_input, kp_finished = _resolve_paths(config)
 
     # read keypoint data, prioritize finished data with detections
     if config.force_rerun:
-        data_kp = pd.read_pickle(config.paths.kp)
+        data_kp = pd.read_pickle(kp_input)
         rerun = True
     else:
         try:
-            data_kp = pd.read_pickle(config.paths.kp_finished)
+            data_kp = pd.read_pickle(kp_finished)
             rerun = False
         except:
-            data_kp = pd.read_pickle(config.paths.kp)
+            data_kp = pd.read_pickle(kp_input)
             rerun = True
 
     # filter and concat table by 3-digit keys in params.used_parts
@@ -82,7 +96,7 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
             data_kp[f"{clue}Res"] = results['groups']
 
         if config.replace_df:
-            data_kp.to_pickle(config.paths.kp_finished)
+            data_kp.to_pickle(kp_finished)
     
     # filter illed frames
     # data_kp = annotate_frame_quality(data_kp, thresholds=100, base_height=170.0)
