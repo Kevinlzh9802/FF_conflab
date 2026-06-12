@@ -94,19 +94,27 @@ def _plot_spectrum_per_batch(data_kp: pd.DataFrame, spectrum_dir: Path) -> None:
             print(f"  Spectrum [{batch_num}]: failed: {exc}")
 
 
-def gcff_experiments(config: Munch) -> pd.DataFrame:
+def gcff_experiments(config: Munch,
+                     clue: Optional[str] = None,
+                     detection_dir: Optional[Path] = None) -> pd.DataFrame:
+    """Run GCFF detection.
 
+    Per-clue mode: pass clue + detection_dir.  Saves a minimal detection pkl
+    (.../detection/<clue>.pkl) and skips writing data_finished.pkl and plots.
+    All-clues mode: clue=None, detection_dir=None — original behaviour.
+    """
     kp_input, kp_finished = _resolve_paths(config)
+    per_clue_mode = detection_dir is not None
 
-    # read keypoint data, prioritize finished data with detections
-    if config.force_rerun:
+    # Per-clue mode always reloads from data.pkl; all-clues mode respects force_rerun.
+    if per_clue_mode or config.force_rerun:
         data_kp = pd.read_pickle(kp_input)
         rerun = True
     else:
         try:
             data_kp = pd.read_pickle(kp_finished)
             rerun = False
-        except:
+        except Exception:
             data_kp = pd.read_pickle(kp_input)
             rerun = True
 
@@ -120,49 +128,57 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
 
     print(f"GCFF dataframe rows in use: {len(data_kp)}")
 
-    # Build features per frame for the selected clue
     if rerun:
-        for clue in config.all_clues:
+        clues_to_run = [clue] if clue else list(config.all_clues)
+        if per_clue_mode:
+            detection_dir.mkdir(parents=True, exist_ok=True)
+
+        for c in clues_to_run:
+            print(f"\nRunning GCFF for clue: {c}")
             if config.use_space:
-                features = [data_kp["spaceFeat"][k][clue] for k in range(len(data_kp))]
+                features = [data_kp["spaceFeat"][k][c] for k in range(len(data_kp))]
             else:
-                features = [data_kp["pixelFeat"][k][clue] for k in range(len(data_kp))]
+                features = [data_kp["pixelFeat"][k][c] for k in range(len(data_kp))]
             GTgroups = list(data_kp['GT']) if ('GT' in getattr(data_kp, 'columns', [])) else [None] * len(features)
-            frame_contexts = [_build_frame_debug_context(data_kp, k, clue=clue) for k in range(len(data_kp))]
+            frame_contexts = [_build_frame_debug_context(data_kp, k, clue=c) for k in range(len(data_kp))]
 
             results = gcff_sequence(features, GTgroups, config.params, frame_contexts=frame_contexts)
-            data_kp[f"{clue}Res"] = results['groups']
+            data_kp[f"{c}Res"] = results['groups']
 
-        if config.replace_df:
-            data_kp.to_pickle(kp_finished)
-    
-    # filter illed frames
-    # data_kp = annotate_frame_quality(data_kp, thresholds=100, base_height=170.0)
-    # data_kp = data_kp[data_kp['frame_good']].reset_index(drop=True)
+            if per_clue_mode:
+                det_df = pd.DataFrame({
+                    "Cam": data_kp["Cam"],
+                    "Vid": data_kp["Vid"],
+                    "Seg": data_kp["Seg"],
+                    "Timestamp": data_kp["Timestamp"],
+                    f"{c}Res": results['groups'],
+                })
+                det_path = detection_dir / f"{c}.pkl"
+                det_df.to_pickle(det_path)
+                print(f"  [{c}] Detection saved: {det_path}  ({len(det_df)} rows)")
 
-    # Cross modal analysis
-    # if config.analysis.cross_modal:
-        # windows = cross_modal_analysis(data=data_kp, save_path=config.paths.results)
-        # x = [all(y) for y in windows.frames_good]
-        # sum(x)
-    # Save detection results as panels
-    if config.plots.panels:
-        _use_bev = (
-            "spaceCoords" not in data_kp.columns
-            or data_kp["spaceCoords"].iloc[0] is None
-        )
-        if _use_bev:
-            from utils.plot_spacefeat import plot_spacefeat_bev_panels_df
-            plot_spacefeat_bev_panels_df(data_kp, output_dir=config.paths.panel_plots)
-        else:
-            plot_panels_df(data_kp, output_dir=config.paths.panel_plots)
+        # All-clues mode: save data_finished.pkl and plots as before.
+        if not per_clue_mode:
+            if config.replace_df:
+                data_kp.to_pickle(kp_finished)
 
-        # Spectrum plots — one heatmap per batch, all detected people
-        _spectrum_dir = Path(
-            getattr(config.paths, "spectrum_plots",
-                    str(Path(config.paths.panel_plots).parent / "spectrum"))
-        )
-        _plot_spectrum_per_batch(data_kp, _spectrum_dir)
+            if config.plots.panels:
+                _use_bev = (
+                    "spaceCoords" not in data_kp.columns
+                    or data_kp["spaceCoords"].iloc[0] is None
+                )
+                if _use_bev:
+                    from utils.plot_spacefeat import plot_spacefeat_bev_panels_df
+                    plot_spacefeat_bev_panels_df(data_kp, output_dir=config.paths.panel_plots)
+                else:
+                    plot_panels_df(data_kp, output_dir=config.paths.panel_plots)
+
+                _spectrum_dir = Path(
+                    getattr(config.paths, "spectrum_plots",
+                            str(Path(config.paths.panel_plots).parent / "spectrum"))
+                )
+                _plot_spectrum_per_batch(data_kp, _spectrum_dir)
+
     return data_kp
 
 def _build_frame_debug_context(data_kp: pd.DataFrame,
@@ -290,27 +306,32 @@ if __name__ == '__main__':  # pragma: no cover
     parser.add_argument('--mdl', type=float, default=None)
     parser.add_argument('--use-space', type=bool, default=None)
     parser.add_argument('--force-rerun', type=bool, default=None)
-    parser.add_argument('-test', '--test', action='store_true', help='If set, sample every 100th row in data_kp before running gcff_sequence')
-    
+    parser.add_argument('-test', '--test', action='store_true',
+                        help='If set, sample every 100th row in data_kp before running gcff_sequence')
+    parser.add_argument('--clue', default=None,
+                        choices=["head", "shoulder", "hip", "foot"],
+                        help="Single body clue to process. Omit to run all clues (default).")
+    parser.add_argument('--detection-dir', default=None,
+                        help="Directory for per-clue detection pkls. "
+                             "Providing this enables per-clue mode (skips data_finished.pkl and plots).")
+
     args = parser.parse_args()
     config = set_config(args)
 
+    detection_dir = Path(args.detection_dir) if args.detection_dir else None
+
     ts_display, log_path = get_log_path(config)
-    # Start tee logging
     start_logging(log_path)
     try:
         print(f"Logging to: {log_path}")
-        # Log start time and config details to file only
         log_only(f"Start time: {ts_display}")
         try:
             cfg_yaml = yaml.safe_dump(unmunchify(config), sort_keys=False, allow_unicode=True)
         except Exception:
             cfg_yaml = str(config)
         log_only("Config:\n\n" + cfg_yaml.rstrip())
-        res = gcff_experiments(config)
+        res = gcff_experiments(config, clue=args.clue, detection_dir=detection_dir)
     finally:
-        # Log end time and ensure logs are flushed and file closed
         end_dt = datetime.now()
         log_only(f"End time: {end_dt.strftime('%Y-%m-%d %H:%M:%S')}")
         stop_logging()
-    # print('F1_avg:', res['F1_avg'])

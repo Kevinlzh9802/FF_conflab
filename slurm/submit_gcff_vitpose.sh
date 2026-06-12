@@ -26,32 +26,42 @@ MODE="gcff"
 K="10"
 PLOT="false"
 CONFIG="${CONFIG:-$project_folder/python/configs/config_GCFF_cluster.yaml}"
+CLUE=""
+DETECTION_DIR="${DETECTION_DIR:-$gcff_root/results/detection}"
+DATA="${DATA:-$gcff_root/data.pkl}"
 FINISHED="${FINISHED:-$gcff_root/data_finished.pkl}"
 SMOOTHED="${SMOOTHED:-$gcff_root/data_finished_smoothed.pkl}"
 RESULTS="${RESULTS:-$gcff_root/results}"
 SP="${SP:-$data_root/sp_merged.pkl}"
 PANEL_PLOTS="${PANEL_PLOTS:-$gcff_root/plots/bev}"
 PLOT_STEP="${PLOT_STEP:-120}"
+OVERWRITE_FINISHED="true"
+OVERWRITE_SMOOTHED="true"
 
 # ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
 for arg in "$@"; do
     case "$arg" in
-        --mode=*)      MODE="${arg#--mode=}" ;;
-        --k=*)         K="${arg#--k=}" ;;
-        --plot=*)      PLOT="${arg#--plot=}" ;;
-        --plot)        PLOT="true" ;;
-        --config=*)    CONFIG="${arg#--config=}" ;;
-        --finished=*)  FINISHED="${arg#--finished=}" ;;
-        --smoothed=*)  SMOOTHED="${arg#--smoothed=}" ;;
-        --results=*)   RESULTS="${arg#--results=}" ;;
-        --sp=*)        SP="${arg#--sp=}" ;;
-        --plot_dir=*)  PANEL_PLOTS="${arg#--plot_dir=}" ;;
-        --plot_step=*) PLOT_STEP="${arg#--plot_step=}" ;;
+        --mode=*)               MODE="${arg#--mode=}" ;;
+        --k=*)                  K="${arg#--k=}" ;;
+        --plot=*)               PLOT="${arg#--plot=}" ;;
+        --plot)                 PLOT="true" ;;
+        --config=*)             CONFIG="${arg#--config=}" ;;
+        --clue=*)               CLUE="${arg#--clue=}" ;;
+        --detection-dir=*)      DETECTION_DIR="${arg#--detection-dir=}" ;;
+        --data=*)               DATA="${arg#--data=}" ;;
+        --finished=*)           FINISHED="${arg#--finished=}" ;;
+        --smoothed=*)           SMOOTHED="${arg#--smoothed=}" ;;
+        --results=*)            RESULTS="${arg#--results=}" ;;
+        --sp=*)                 SP="${arg#--sp=}" ;;
+        --plot_dir=*)           PANEL_PLOTS="${arg#--plot_dir=}" ;;
+        --plot_step=*)          PLOT_STEP="${arg#--plot_step=}" ;;
+        --overwrite-finished=*) OVERWRITE_FINISHED="${arg#--overwrite-finished=}" ;;
+        --overwrite-smoothed=*) OVERWRITE_SMOOTHED="${arg#--overwrite-smoothed=}" ;;
         *)
             echo "Error: unknown argument '$arg'" >&2
-            echo "Usage: sbatch $0 [--mode=gcff|smooth|analysis] [--k=5,10,20] [--plot]" >&2
+            echo "Usage: sbatch $0 [--mode=gcff|smooth|analysis] [--clue=head|shoulder|hip|foot] [--k=5,10,20] [--plot]" >&2
             exit 1
             ;;
     esac
@@ -65,7 +75,7 @@ fi
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-mkdir -p "$gcff_root/logs" "$RESULTS" "$PANEL_PLOTS"
+mkdir -p "$gcff_root/logs" "$RESULTS" "$PANEL_PLOTS" "$DETECTION_DIR"
 
 if ! command -v apptainer >/dev/null 2>&1; then
     module load apptainer
@@ -78,11 +88,14 @@ echo "Plot BEV   : $PLOT  (step=${PLOT_STEP}, dir=${PANEL_PLOTS})"
 case "$MODE" in
     gcff)
         echo "Config     : $CONFIG"
-        echo "Output     : $FINISHED"
+        echo "Clue       : ${CLUE:-all}"
+        echo "DetectDir  : $DETECTION_DIR"
         ;;
     smooth)
-        echo "Input      : $FINISHED"
-        echo "Output     : $SMOOTHED"
+        echo "Data       : $DATA"
+        echo "DetectDir  : $DETECTION_DIR"
+        echo "Finished   : $FINISHED  (overwrite=${OVERWRITE_FINISHED})"
+        echo "Smoothed   : $SMOOTHED  (overwrite=${OVERWRITE_SMOOTHED})"
         echo "k values   : $K"
         ;;
     analysis)
@@ -107,7 +120,10 @@ fi
 # ---------------------------------------------------------------------------
 case "$MODE" in
     gcff)
-        # BEV plots in gcff mode are controlled by config.plots.panels (set to True in vitpose config)
+        # Per-clue mode: pass --clue and --detection-dir to enable parallel jobs.
+        # All-clues mode (no --clue): runs all 4 clues sequentially, writes data_finished.pkl.
+        CLUE_ARG=""
+        [[ -n "$CLUE" ]] && CLUE_ARG="--clue '$CLUE' --detection-dir '$DETECTION_DIR'"
         apptainer exec \
             --bind "$project_folder:$project_folder" \
             --bind "/tudelft.net:/tudelft.net" \
@@ -118,7 +134,7 @@ case "$MODE" in
                 export PYTHONPATH='$project_folder/python:$project_folder/python/GCFF'
                 export MPLBACKEND=Agg
                 export PYTHONUNBUFFERED=1
-                python3 GCFF/main_GCFF_new.py --config '$CONFIG'
+                python3 GCFF/main_GCFF_new.py --config '$CONFIG' $CLUE_ARG
             "
         ;;
     smooth)
@@ -133,9 +149,13 @@ case "$MODE" in
                 export MPLBACKEND=Agg
                 export PYTHONUNBUFFERED=1
                 python3 GCFF/smooth_groupings.py \
+                    --data '$DATA' \
+                    --detection-dir '$DETECTION_DIR' \
                     --input '$FINISHED' \
                     --output '$SMOOTHED' \
                     --k '$K' \
+                    --overwrite-finished '$OVERWRITE_FINISHED' \
+                    --overwrite-smoothed '$OVERWRITE_SMOOTHED' \
                     $PLOT_ARGS
             "
         ;;
@@ -169,26 +189,36 @@ echo "Done: mode=$MODE"
 #    sbatch ViTPose/slurm/vitpose_to_gcff_daic.sh
 #    → data.pkl
 #
-# 2) Run GCFF detection (writes {clue}Res columns, BEV + spectrum plots via panels:True):
-#    sbatch slurm/submit_gcff_vitpose.sh --mode=gcff
-#    → data_finished.pkl  +  plots/bev/<batch>/*.png  +  plots/spectrum/<batch>.png
+# 2a) Run GCFF detection — 4 parallel jobs, one per body clue:
+#    sbatch slurm/submit_gcff_vitpose.sh --mode=gcff --clue=head
+#    sbatch slurm/submit_gcff_vitpose.sh --mode=gcff --clue=shoulder
+#    sbatch slurm/submit_gcff_vitpose.sh --mode=gcff --clue=hip
+#    sbatch slurm/submit_gcff_vitpose.sh --mode=gcff --clue=foot
+#    → results/detection/{head,shoulder,hip,foot}.pkl
 #
-# 3) Smooth per-frame groupings with sliding majority-vote window:
+#    (Alternatively, run all clues in one job — slower but no merge needed:
+#     sbatch slurm/submit_gcff_vitpose.sh --mode=gcff
+#     → data_finished.pkl directly)
+#
+# 2b) Merge per-clue detections + smooth (after all 4 jobs in 2a complete):
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=smooth --k=5,10,20
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=smooth --k=5,10,20 --plot
+#    → data_finished.pkl           (merged, all 4 clueRes columns)
 #    → data_finished_smoothed.pkl  (columns: headRes_k5 etc.)
-#    → optional: plots/bev/<batch>/*.png (unsmoothed headRes)
+#    → optional: plots/bev/<batch>/*.png + plots/spectrum/<batch>.png
 #
-# 4) Compute detection-change windows + homogeneity/split heatmaps:
+# 3) Compute detection-change windows + homogeneity/split heatmaps:
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=analysis --k=5,10,20
-#    sbatch slurm/submit_gcff_vitpose.sh --mode=analysis --k=5,10,20 --plot
 #    → results/homogeneity_k{k}.png + results/split_k{k}.png
-#    → optional: plots/bev/<batch>/*.png (unsmoothed headRes)
+#
+# Overwrite control (smooth mode):
+#    --overwrite-finished=false   skip merge if data_finished.pkl already exists
+#    --overwrite-smoothed=false   skip smooth if data_finished_smoothed.pkl already exists
 #
 # Override paths via env vars:
-#    FINISHED=/custom/path.pkl  sbatch slurm/submit_gcff_vitpose.sh --mode=smooth
-#    SP=/custom/sp.pkl          sbatch slurm/submit_gcff_vitpose.sh --mode=analysis --k=10
-#    PANEL_PLOTS=/custom/plots/ sbatch slurm/submit_gcff_vitpose.sh --mode=gcff
+#    DATA=/custom/data.pkl         sbatch slurm/submit_gcff_vitpose.sh --mode=smooth
+#    DETECTION_DIR=/custom/det/    sbatch slurm/submit_gcff_vitpose.sh --mode=gcff --clue=head
+#    SP=/custom/sp.pkl             sbatch slurm/submit_gcff_vitpose.sh --mode=analysis --k=10
 #
 # Speaking status (sp_merged.pkl):
 #   Default SP path: .../conflab/sp_merged.pkl

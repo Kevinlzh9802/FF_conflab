@@ -33,5 +33,6 @@ paths:
   sp:             /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/sp_merged.pkl
   panel_plots:    /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/plots/bev
   spectrum_plots: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/plots/spectrum
+  detection:      /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/results/detection
   log:            /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/logs/
   results:        /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/results/
