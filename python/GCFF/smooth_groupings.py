@@ -187,9 +187,6 @@ def _plot_spectrum_per_batch(
     for (cam, vid, seg), batch_df in data_kp.groupby(["Cam", "Vid", "Seg"]):
         batch_num = f"{int(cam)}{int(vid)}{int(seg)}"
         save_path = spectrum_dir / f"{batch_num}.png"
-        if save_path.exists():
-            print(f"  Spectrum [{batch_num}]: exists, skipping.")
-            continue
         target_ids = _collect_all_person_ids(batch_df)
         if not target_ids:
             print(f"  Spectrum [{batch_num}]: no person IDs found, skipping.")

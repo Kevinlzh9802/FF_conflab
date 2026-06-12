@@ -245,9 +245,6 @@ def plot_spacefeat_bev_panels_df(
         batch_dir = results_dir / batch_num
         batch_dir.mkdir(parents=True, exist_ok=True)
         fig_path = batch_dir / f"{ts:04d}_{frame_idx:06d}.png"
-        if fig_path.exists():
-            continue
-
         try:
             fig = _plot_bev_frame(row)
             fig.savefig(fig_path, dpi=120, bbox_inches="tight")
