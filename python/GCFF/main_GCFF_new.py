@@ -45,15 +45,53 @@ from tests.group_spectrum import plot_target_grouping_spectrum
 
 
 def _resolve_paths(config: Munch) -> tuple[str, str]:
-    """Return (input_path, finished_path) based on config.
-
-    When ``config.paths.kp_vitpose`` is set the ViTPose-specific paths are
-    used and the original ``kp`` / ``kp_finished`` files are never touched.
-    """
-    kp_vitpose = getattr(config.paths, "kp_vitpose", None)
-    if kp_vitpose:
-        return str(kp_vitpose), str(config.paths.kp_vitpose_finished)
+    """Return (input_path, finished_path) from config.paths.kp / kp_finished."""
     return str(config.paths.kp), str(config.paths.kp_finished)
+
+
+def _collect_all_person_ids(batch_df: pd.DataFrame) -> List[int]:
+    """Return sorted list of unique person IDs from spaceFeat across all clues and rows."""
+    all_ids: set = set()
+    for _, row in batch_df.iterrows():
+        sf = row.get("spaceFeat") or {}
+        if not isinstance(sf, dict):
+            continue
+        for arr in sf.values():
+            a = np.asarray(arr)
+            if a.ndim == 2 and a.shape[0] > 0 and a.shape[1] >= 1:
+                for pid in a[:, 0]:
+                    try:
+                        all_ids.add(int(pid))
+                    except (ValueError, TypeError):
+                        pass
+    return sorted(all_ids)
+
+
+def _plot_spectrum_per_batch(data_kp: pd.DataFrame, spectrum_dir: Path) -> None:
+    """Save one grouping-spectrum PNG per batch, using all detected person IDs."""
+    import matplotlib.pyplot as plt
+    spectrum_dir.mkdir(parents=True, exist_ok=True)
+    for (cam, vid, seg), batch_df in data_kp.groupby(["Cam", "Vid", "Seg"]):
+        batch_num = f"{int(cam)}{int(vid)}{int(seg)}"
+        save_path = spectrum_dir / f"{batch_num}.png"
+        if save_path.exists():
+            print(f"  Spectrum [{batch_num}]: exists, skipping.")
+            continue
+        target_ids = _collect_all_person_ids(batch_df)
+        if not target_ids:
+            print(f"  Spectrum [{batch_num}]: no person IDs found, skipping.")
+            continue
+        try:
+            plot_target_grouping_spectrum(
+                data_kp=batch_df.reset_index(drop=True),
+                target_ids=target_ids,
+                save_path=save_path,
+                show=False,
+            )
+            plt.close("all")
+            print(f"  Spectrum [{batch_num}]: saved {save_path}")
+        except Exception as exc:
+            print(f"  Spectrum [{batch_num}]: failed: {exc}")
 
 
 def gcff_experiments(config: Munch) -> pd.DataFrame:
@@ -108,15 +146,23 @@ def gcff_experiments(config: Munch) -> pd.DataFrame:
         # x = [all(y) for y in windows.frames_good]
         # sum(x)
     # Save detection results as panels
-    # [7,8,13,14,18]
     if config.plots.panels:
-        if getattr(config.paths, "kp_vitpose", None):
+        _use_bev = (
+            "spaceCoords" not in data_kp.columns
+            or data_kp["spaceCoords"].iloc[0] is None
+        )
+        if _use_bev:
             from utils.plot_spacefeat import plot_spacefeat_bev_panels_df
             plot_spacefeat_bev_panels_df(data_kp, output_dir=config.paths.panel_plots)
         else:
             plot_panels_df(data_kp, output_dir=config.paths.panel_plots)
-        # plot_all_skeletons(data_kp=data_kp, frame_idx=341, show=True)
-        # plot_target_grouping_spectrum(data_kp=data_kp, target_ids=[7,8,13,14,18], save_path=Path(config.paths.results) / "grouping_spectrum.png")
+
+        # Spectrum plots — one heatmap per batch, all detected people
+        _spectrum_dir = Path(
+            getattr(config.paths, "spectrum_plots",
+                    str(Path(config.paths.panel_plots).parent / "spectrum"))
+        )
+        _plot_spectrum_per_batch(data_kp, _spectrum_dir)
     return data_kp
 
 def _build_frame_debug_context(data_kp: pd.DataFrame,
