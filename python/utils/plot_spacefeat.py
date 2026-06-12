@@ -37,6 +37,67 @@ _SINGLETON_COLOR = (0.7, 0.7, 0.7)  # grey for isolated individuals
 # Per-frame helpers
 # ---------------------------------------------------------------------------
 
+def _convex_hull(points: np.ndarray) -> np.ndarray:
+    """Monotone-chain convex hull. Duplicated from utils/plots.py to avoid circular import."""
+    pts = np.unique(np.asarray(points, dtype=float), axis=0)
+    if pts.shape[0] <= 2:
+        return pts
+    pts = pts[np.lexsort((pts[:, 1], pts[:, 0]))]
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(tuple(p))
+    upper: list = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(tuple(p))
+    return np.asarray(lower[:-1] + upper[:-1], dtype=float)
+
+
+def _draw_group_polygons_bev(
+    ax: plt.Axes,
+    groups: list,
+    pid_to_xy: Dict[int, tuple],
+    color_map: Dict[int, tuple],
+) -> None:
+    """Draw convex-hull polygons for non-singleton groups in a BEV subplot."""
+    from matplotlib.patches import Polygon as MplPolygon
+
+    for g in (groups or []):
+        members = [int(p) for p in g] if g else []
+        if len(members) < 2:
+            continue
+        pts = [pid_to_xy[m] for m in members if m in pid_to_xy]
+        if len(pts) < 2:
+            continue
+        color = color_map.get(members[0], _SINGLETON_COLOR)
+        hull = _convex_hull(np.asarray(pts, dtype=float))
+        if hull.shape[0] >= 3:
+            ax.add_patch(MplPolygon(
+                hull, closed=True,
+                facecolor=(*color, 0.12), edgecolor=color, linewidth=1.5,
+            ))
+        elif hull.shape[0] == 2:
+            ax.plot(hull[:, 0], hull[:, 1], color=color, linewidth=1.5, alpha=0.6)
+
+
+def _format_group_label(groups: list) -> str:
+    """Format non-singleton groups as a compact string for subplot titles."""
+    non_single = [g for g in (groups or []) if g and len(g) > 1]
+    if not non_single:
+        return "(all singletons)"
+    return "  ".join(
+        "[" + ",".join(str(int(p)) for p in sorted(g)) + "]"
+        for g in non_single
+    )
+
+
 def _person_to_group_color(groups: list) -> Dict[int, tuple]:
     """Map person_id → matplotlib colour based on group membership.
 
@@ -59,7 +120,7 @@ def _person_to_group_color(groups: list) -> Dict[int, tuple]:
 
 def _plot_clue_ax(ax: plt.Axes, sf: Optional[np.ndarray], groups: list, clue: str) -> None:
     """Draw one BEV subplot for a single clue."""
-    ax.set_title(clue, fontsize=9)
+    ax.set_title(f"{clue}\n{_format_group_label(groups)}", fontsize=8)
     ax.set_xlabel("x (m)", fontsize=7)
     ax.set_ylabel("y (m)", fontsize=7)
     ax.set_aspect("equal", adjustable="datalim")
@@ -83,11 +144,13 @@ def _plot_clue_ax(ax: plt.Axes, sf: Optional[np.ndarray], groups: list, clue: st
         return
 
     color_map = _person_to_group_color(groups)
+    pid_to_xy: Dict[int, tuple] = {}
 
     for row in arr:
         pid = int(row[0])
         x, y, alpha = float(row[1]), float(row[2]), float(row[3])
         color = color_map.get(pid, _SINGLETON_COLOR)
+        pid_to_xy[pid] = (x, y)
 
         ax.scatter(x, y, s=_POINT_SIZE, color=color, zorder=3, edgecolors="k", linewidths=0.5)
         ax.annotate("", xy=(x + _ARROW_RADIUS * math.cos(alpha),
@@ -96,6 +159,8 @@ def _plot_clue_ax(ax: plt.Axes, sf: Optional[np.ndarray], groups: list, clue: st
                     arrowprops=dict(arrowstyle="->", color=color, lw=1.2))
         ax.text(x, y + _ARROW_RADIUS * 0.6, str(pid),
                 fontsize=6, ha="center", va="bottom", color="black", zorder=4)
+
+    _draw_group_polygons_bev(ax, groups, pid_to_xy, color_map)
 
 
 def _plot_bev_frame(row: pd.Series) -> plt.Figure:
