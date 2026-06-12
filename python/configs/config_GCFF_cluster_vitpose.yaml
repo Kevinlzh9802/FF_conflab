@@ -24,8 +24,8 @@ plots:
   panels: True
 
 params:
-  stride: 40.0
-  mdl: 6000.0
+  stride: 0.4
+  mdl: 0.6
 
 paths:
   # ViTPose-specific input/output paths.  main_GCFF_new.py detects kp_vitpose
