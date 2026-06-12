@@ -112,7 +112,7 @@ export PYTHONUNBUFFERED=1
 # Build optional --plot flag string for Python scripts
 PLOT_ARGS=""
 if [[ "$PLOT" == "true" ]]; then
-    PLOT_ARGS="--plot --finished '$FINISHED' --plot_dir '$PANEL_PLOTS' --plot_step '$PLOT_STEP'"
+    PLOT_ARGS="--plot --plot_dir '$PANEL_PLOTS' --plot_step '$PLOT_STEP'"
 fi
 
 # ---------------------------------------------------------------------------
