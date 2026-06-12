@@ -5,7 +5,7 @@
 #SBATCH --time=3:00:00
 #SBATCH --cpus-per-task=1
 #SBATCH --ntasks=1
-#SBATCH --mem=48G
+#SBATCH --mem=12G
 #SBATCH --mail-type=END
 #SBATCH --output=/home/nfs/zli33/slurm_outputs/gcff/vitpose_%j.out
 #SBATCH --error=/home/nfs/zli33/slurm_outputs/gcff/vitpose_%j.err
