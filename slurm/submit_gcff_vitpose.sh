@@ -34,6 +34,7 @@ SMOOTHED="${SMOOTHED:-$gcff_root/data_finished_smoothed.pkl}"
 RESULTS="${RESULTS:-$gcff_root/results}"
 SP="${SP:-$data_root/sp_merged.pkl}"
 PANEL_PLOTS="${PANEL_PLOTS:-$gcff_root/plots/bev}"
+SPECTRUM_PLOTS="${SPECTRUM_PLOTS:-$gcff_root/plots/spectrum}"
 PLOT_STEP="${PLOT_STEP:-120}"
 OVERWRITE_FINISHED="true"
 OVERWRITE_SMOOTHED="true"
@@ -56,6 +57,7 @@ for arg in "$@"; do
         --results=*)            RESULTS="${arg#--results=}" ;;
         --sp=*)                 SP="${arg#--sp=}" ;;
         --plot_dir=*)           PANEL_PLOTS="${arg#--plot_dir=}" ;;
+        --spectrum_dir=*)       SPECTRUM_PLOTS="${arg#--spectrum_dir=}" ;;
         --plot_step=*)          PLOT_STEP="${arg#--plot_step=}" ;;
         --overwrite-finished=*) OVERWRITE_FINISHED="${arg#--overwrite-finished=}" ;;
         --overwrite-smoothed=*) OVERWRITE_SMOOTHED="${arg#--overwrite-smoothed=}" ;;
@@ -112,7 +114,7 @@ export PYTHONUNBUFFERED=1
 # Build optional --plot flag string for Python scripts
 PLOT_ARGS=""
 if [[ "$PLOT" == "true" ]]; then
-    PLOT_ARGS="--plot --plot_dir '$PANEL_PLOTS' --plot_step '$PLOT_STEP'"
+    PLOT_ARGS="--plot --plot_dir '$PANEL_PLOTS' --spectrum_dir '$SPECTRUM_PLOTS' --plot_step '$PLOT_STEP'"
 fi
 
 # ---------------------------------------------------------------------------
@@ -205,7 +207,9 @@ echo "Done: mode=$MODE"
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=smooth --k=5,10,20 --plot
 #    → data_finished.pkl           (merged, all 4 clueRes columns)
 #    → data_finished_smoothed.pkl  (columns: headRes_k5 etc.)
-#    → optional: plots/bev/<batch>/*.png + plots/spectrum/<batch>.png
+#    → optional: plots/bev/<batch>/*.png
+#                plots/spectrum/original/<batch>.png
+#                plots/spectrum/k5/<batch>.png  (one subdir per k)
 #
 # 3) Compute detection-change windows + homogeneity/split heatmaps:
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=analysis --k=5,10,20

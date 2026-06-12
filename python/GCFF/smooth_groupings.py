@@ -177,7 +177,11 @@ def _collect_all_person_ids(batch_df: pd.DataFrame) -> List[int]:
     return sorted(all_ids)
 
 
-def _plot_spectrum_per_batch(data_kp: pd.DataFrame, spectrum_dir: Path) -> None:
+def _plot_spectrum_per_batch(
+    data_kp: pd.DataFrame,
+    spectrum_dir: Path,
+    col_suffix: str = "",
+) -> None:
     from tests.group_spectrum import plot_target_grouping_spectrum
     spectrum_dir.mkdir(parents=True, exist_ok=True)
     for (cam, vid, seg), batch_df in data_kp.groupby(["Cam", "Vid", "Seg"]):
@@ -196,6 +200,7 @@ def _plot_spectrum_per_batch(data_kp: pd.DataFrame, spectrum_dir: Path) -> None:
                 target_ids=target_ids,
                 save_path=save_path,
                 show=False,
+                col_suffix=col_suffix,
             )
             plt.close("all")
             print(f"  Spectrum [{batch_num}]: saved {save_path}")
@@ -270,6 +275,11 @@ def _parse_args() -> argparse.Namespace:
         default=120,
         help="Save one BEV figure every N rows (default: 120).",
     )
+    parser.add_argument(
+        "--spectrum_dir",
+        default=DEFAULT_SPECTRUM_PLOTS,
+        help=f"Root directory for spectrum PNG output. Subdirs original/, k{{k}}/ are created inside. Default: {DEFAULT_SPECTRUM_PLOTS}",
+    )
     return parser.parse_args()
 
 
@@ -318,8 +328,19 @@ if __name__ == "__main__":
         from utils.plot_spacefeat import plot_spacefeat_bev_panels_df
         plot_spacefeat_bev_panels_df(df, output_dir=args.plot_dir, frame_step=args.plot_step)
 
-        spectrum_dir = Path(DEFAULT_SPECTRUM_PLOTS)
-        print(f"\nSpectrum plots  →  {spectrum_dir}")
-        _plot_spectrum_per_batch(df, spectrum_dir)
+        # Spectrum plots: original + one subdir per k.
+        # Use df_smoothed (has both raw and smoothed columns); fall back to loading
+        # from disk if smoothing was skipped this session (--overwrite-smoothed=false).
+        try:
+            df_for_spec = df_smoothed
+        except NameError:
+            print(f"  Loading smoothed pkl for spectrum: {output_path}")
+            df_for_spec = pd.read_pickle(output_path)
+
+        spectrum_root = Path(args.spectrum_dir)
+        print(f"\nSpectrum plots  →  {spectrum_root}/{{original,{','.join(f'k{k}' for k in ks)}}}/")
+        _plot_spectrum_per_batch(df_for_spec, spectrum_root / "original", col_suffix="")
+        for k in ks:
+            _plot_spectrum_per_batch(df_for_spec, spectrum_root / f"k{k}", col_suffix=f"_k{k}")
 
     print("\nDone.")

@@ -80,8 +80,9 @@ def _build_target_state(row: pd.Series,
                         clue: str,
                         target_ids: Sequence[int],
                         target_set: set[int],
-                        source_priority: Sequence[str]) -> GroupState:
-    groups = _normalize_groups(row.get(f"{clue}Res"))
+                        source_priority: Sequence[str],
+                        col_suffix: str = "") -> GroupState:
+    groups = _normalize_groups(row.get(f"{clue}Res{col_suffix}"))
     selected_groups: List[Tuple[int, ...]] = []
     covered_targets: set[int] = set()
     for group in groups:
@@ -172,7 +173,8 @@ def plot_target_grouping_spectrum(data_kp: pd.DataFrame,
                                   source_priority: Sequence[str] = ("spaceFeat", "pixelFeat"),
                                   figsize: Tuple[float, float] = (16.0, 5.5),
                                   save_path: Optional[Path] = None,
-                                  show: bool = True):
+                                  show: bool = True,
+                                  col_suffix: str = ""):
     """
     Plot grouping spectra over time for selected people IDs across all clues.
 
@@ -200,9 +202,9 @@ def plot_target_grouping_spectrum(data_kp: pd.DataFrame,
     if len(data_kp) == 0:
         raise ValueError("data_kp is empty.")
 
-    valid_clues = [str(clue) for clue in clues if f"{clue}Res" in data_kp.columns]
+    valid_clues = [str(clue) for clue in clues if f"{clue}Res{col_suffix}" in data_kp.columns]
     if not valid_clues:
-        raise ValueError(f"No clue result columns found for clues={list(clues)}.")
+        raise ValueError(f"No clue result columns found for clues={list(clues)} with suffix='{col_suffix}'.")
 
     states_by_clue: Dict[str, List[GroupState]] = {clue: [] for clue in valid_clues}
     all_states: List[GroupState] = []
@@ -216,6 +218,7 @@ def plot_target_grouping_spectrum(data_kp: pd.DataFrame,
                 target_ids=target_ids_ordered,
                 target_set=target_set,
                 source_priority=source_priority,
+                col_suffix=col_suffix,
             )
             states_by_clue[clue].append(state)
             all_states.append(state)

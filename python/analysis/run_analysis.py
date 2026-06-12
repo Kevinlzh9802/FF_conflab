@@ -40,6 +40,7 @@ DEFAULT_INPUT = f"{NEON}/zonghuan/data/conflab/GCFF/data_finished_smoothed.pkl"
 DEFAULT_RESULTS = f"{NEON}/zonghuan/data/conflab/GCFF/results"
 DEFAULT_FINISHED = f"{NEON}/zonghuan/data/conflab/GCFF/data_finished.pkl"
 DEFAULT_PANEL_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/plots/bev"
+DEFAULT_SPECTRUM_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/plots/spectrum"
 
 # Add the python directory to path so analysis/spatial imports work
 _HERE = Path(__file__).resolve().parent
@@ -47,8 +48,64 @@ _PYTHON_ROOT = _HERE.parent
 if str(_PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(_PYTHON_ROOT))
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 from analysis.cross_modal import detect_group_num_breakpoints
 from analysis.spatial import spatial_scores_df
+
+
+# ---------------------------------------------------------------------------
+# Spectrum plot helpers (mirrors smooth_groupings.py)
+# ---------------------------------------------------------------------------
+
+def _collect_all_person_ids(batch_df: pd.DataFrame) -> List[int]:
+    all_ids: set = set()
+    for _, row in batch_df.iterrows():
+        sf = row.get("spaceFeat") or {}
+        if not isinstance(sf, dict):
+            continue
+        for arr in sf.values():
+            a = np.asarray(arr)
+            if a.ndim == 2 and a.shape[0] > 0 and a.shape[1] >= 1:
+                for pid in a[:, 0]:
+                    try:
+                        all_ids.add(int(pid))
+                    except (ValueError, TypeError):
+                        pass
+    return sorted(all_ids)
+
+
+def _plot_spectrum_per_batch(
+    data_kp: pd.DataFrame,
+    spectrum_dir: Path,
+    col_suffix: str = "",
+) -> None:
+    from tests.group_spectrum import plot_target_grouping_spectrum
+    spectrum_dir.mkdir(parents=True, exist_ok=True)
+    for (cam, vid, seg), batch_df in data_kp.groupby(["Cam", "Vid", "Seg"]):
+        batch_num = f"{int(cam)}{int(vid)}{int(seg)}"
+        save_path = spectrum_dir / f"{batch_num}.png"
+        if save_path.exists():
+            print(f"  Spectrum [{batch_num}]: exists, skipping.")
+            continue
+        target_ids = _collect_all_person_ids(batch_df)
+        if not target_ids:
+            print(f"  Spectrum [{batch_num}]: no person IDs found, skipping.")
+            continue
+        try:
+            plot_target_grouping_spectrum(
+                data_kp=batch_df.reset_index(drop=True),
+                target_ids=target_ids,
+                save_path=save_path,
+                show=False,
+                col_suffix=col_suffix,
+            )
+            plt.close("all")
+            print(f"  Spectrum [{batch_num}]: saved {save_path}")
+        except Exception as exc:
+            print(f"  Spectrum [{batch_num}]: failed: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +236,11 @@ def _parse_args() -> argparse.Namespace:
         default=120,
         help="Save one BEV figure every N rows (default: 120).",
     )
+    parser.add_argument(
+        "--spectrum_dir",
+        default=DEFAULT_SPECTRUM_PLOTS,
+        help=f"Root directory for spectrum PNG output. Subdirs original/, k{{k}}/ are created inside. Default: {DEFAULT_SPECTRUM_PLOTS}",
+    )
     return parser.parse_args()
 
 
@@ -210,5 +272,13 @@ if __name__ == "__main__":
         finished_df = pd.read_pickle(finished_path)
         from utils.plot_spacefeat import plot_spacefeat_bev_panels_df
         plot_spacefeat_bev_panels_df(finished_df, output_dir=args.plot_dir, frame_step=args.plot_step)
+
+        # Spectrum plots: original + one subdir per k.
+        # `data` (smoothed pkl) retains raw {clue}Res columns alongside {clue}Res_k{k}.
+        spectrum_root = Path(args.spectrum_dir)
+        print(f"\nSpectrum plots  →  {spectrum_root}/{{original,{','.join(f'k{k}' for k in ks)}}}/")
+        _plot_spectrum_per_batch(data, spectrum_root / "original", col_suffix="")
+        for k in ks:
+            _plot_spectrum_per_batch(data, spectrum_root / f"k{k}", col_suffix=f"_k{k}")
 
     print("\nDone.")
