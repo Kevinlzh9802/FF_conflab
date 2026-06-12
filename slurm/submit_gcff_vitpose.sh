@@ -25,12 +25,12 @@ gcff_root=$data_root/GCFF
 MODE="gcff"
 K="10"
 PLOT="false"
-CONFIG="${CONFIG:-$project_folder/python/configs/config_GCFF_cluster_vitpose.yaml}"
-FINISHED="${FINISHED:-$gcff_root/data_vitpose_finished.pkl}"
-SMOOTHED="${SMOOTHED:-$gcff_root/data_vitpose_finished_smoothed.pkl}"
+CONFIG="${CONFIG:-$project_folder/python/configs/config_GCFF_cluster.yaml}"
+FINISHED="${FINISHED:-$gcff_root/data_finished.pkl}"
+SMOOTHED="${SMOOTHED:-$gcff_root/data_finished_smoothed.pkl}"
 RESULTS="${RESULTS:-$gcff_root/results}"
 SP="${SP:-$data_root/sp_merged.pkl}"
-PANEL_PLOTS="${PANEL_PLOTS:-$gcff_root/panel_plots_vitpose}"
+PANEL_PLOTS="${PANEL_PLOTS:-$gcff_root/plots/bev}"
 PLOT_STEP="${PLOT_STEP:-120}"
 
 # ---------------------------------------------------------------------------
@@ -167,23 +167,23 @@ echo "Done: mode=$MODE"
 #
 # 1) Convert ViTPose pkls to GCFF format:
 #    sbatch ViTPose/slurm/vitpose_to_gcff_daic.sh
-#    → data_vitpose.pkl
+#    → data.pkl
 #
-# 2) Run GCFF detection (writes {clue}Res columns, BEV plots via panels:True):
+# 2) Run GCFF detection (writes {clue}Res columns, BEV + spectrum plots via panels:True):
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=gcff
-#    → data_vitpose_finished.pkl  +  panel_plots_vitpose/bev_*.png
+#    → data_finished.pkl  +  plots/bev/<batch>/*.png  +  plots/spectrum/<batch>.png
 #
 # 3) Smooth per-frame groupings with sliding majority-vote window:
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=smooth --k=5,10,20
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=smooth --k=5,10,20 --plot
-#    → data_vitpose_finished_smoothed.pkl  (columns: headRes_k5 etc.)
-#    → optional: panel_plots_vitpose/bev_*.png (unsmoothed headRes)
+#    → data_finished_smoothed.pkl  (columns: headRes_k5 etc.)
+#    → optional: plots/bev/<batch>/*.png (unsmoothed headRes)
 #
 # 4) Compute detection-change windows + homogeneity/split heatmaps:
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=analysis --k=5,10,20
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=analysis --k=5,10,20 --plot
 #    → results/homogeneity_k{k}.png + results/split_k{k}.png
-#    → optional: panel_plots_vitpose/bev_*.png (unsmoothed headRes)
+#    → optional: plots/bev/<batch>/*.png (unsmoothed headRes)
 #
 # Override paths via env vars:
 #    FINISHED=/custom/path.pkl  sbatch slurm/submit_gcff_vitpose.sh --mode=smooth

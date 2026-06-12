@@ -5,7 +5,7 @@ all_clues:
   - foot
 
 used_segs:
-  # - "433"
+  # Filter by 3-digit <Cam><Vid><Seg> keys, e.g. "228". Empty = use all.
 
 force_rerun: True
 test: False
@@ -18,6 +18,9 @@ analysis:
   cross_modal: False
 
 plots:
+  # BEV panel plots use spaceFeat + {clue}Res columns (no spaceCoords/pixelCoords needed).
+  # main_GCFF_new.py detects ViTPose mode and calls plot_spacefeat_bev_panels_df instead
+  # of the standard plot_panels_df.
   panels: True
 
 params:
@@ -25,10 +28,10 @@ params:
   mdl: 6000.0
 
 paths:
-  kp: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/data.pkl
-  kp_finished: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/data_finished.pkl
-  sp: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/sp_merged.pkl
-  frames: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/frames/
-  panel_plots: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/panel_plots
-  log: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/logs/
-  results: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/results/
+  kp:             /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/data.pkl
+  kp_finished:    /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/data_finished.pkl
+  sp:             /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/sp_merged.pkl
+  panel_plots:    /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/plots/bev
+  spectrum_plots: /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/plots/spectrum
+  log:            /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/logs/
+  results:        /tudelft.net/staff-umbrella/neon/zonghuan/data/conflab/GCFF/results/

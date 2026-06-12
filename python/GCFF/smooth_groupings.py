@@ -12,7 +12,7 @@ hipRes_k{k}, footRes_k{k}.  All existing columns are preserved.
 
 Usage
 -----
-# Default k=10, read data_vitpose_finished.pkl, write data_vitpose_finished_smoothed.pkl:
+# Default k=10, read data_finished.pkl, write data_finished_smoothed.pkl:
 python GCFF/smooth_groupings.py
 
 # Multiple k values:
@@ -20,8 +20,8 @@ python GCFF/smooth_groupings.py --k=5,10,20
 
 # Explicit paths:
 python GCFF/smooth_groupings.py \\
-    --input  /path/to/data_vitpose_finished.pkl \\
-    --output /path/to/data_vitpose_finished_smoothed.pkl \\
+    --input  /path/to/data_finished.pkl \\
+    --output /path/to/data_finished_smoothed.pkl \\
     --k 5,10,20
 """
 from __future__ import annotations
@@ -35,9 +35,9 @@ import numpy as np
 import pandas as pd
 
 NEON = "/tudelft.net/staff-umbrella/neon"
-DEFAULT_INPUT = f"{NEON}/zonghuan/data/conflab/GCFF/data_vitpose_finished.pkl"
-DEFAULT_OUTPUT = f"{NEON}/zonghuan/data/conflab/GCFF/data_vitpose_finished_smoothed.pkl"
-DEFAULT_PANEL_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/panel_plots_vitpose"
+DEFAULT_INPUT = f"{NEON}/zonghuan/data/conflab/GCFF/data_finished.pkl"
+DEFAULT_OUTPUT = f"{NEON}/zonghuan/data/conflab/GCFF/data_finished_smoothed.pkl"
+DEFAULT_PANEL_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/plots/bev"
 
 CLUE_COLS = ["headRes", "shoulderRes", "hipRes", "footRes"]
 
@@ -131,12 +131,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input",
         default=DEFAULT_INPUT,
-        help=f"Input pkl (data_vitpose_finished.pkl). Default: {DEFAULT_INPUT}",
+        help=f"Input pkl (data_finished.pkl). Default: {DEFAULT_INPUT}",
     )
     parser.add_argument(
         "--output",
         default=DEFAULT_OUTPUT,
-        help=f"Output pkl (data_vitpose_finished_smoothed.pkl). Default: {DEFAULT_OUTPUT}",
+        help=f"Output pkl (data_finished_smoothed.pkl). Default: {DEFAULT_OUTPUT}",
     )
     parser.add_argument(
         "--k",
@@ -152,7 +152,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--finished",
         default=DEFAULT_INPUT,
-        help=f"Path to data_vitpose_finished.pkl used for BEV plotting. Default: {DEFAULT_INPUT}",
+        help=f"Path to data_finished.pkl used for BEV plotting. Default: {DEFAULT_INPUT}",
     )
     parser.add_argument(
         "--plot_dir",

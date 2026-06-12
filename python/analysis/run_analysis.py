@@ -2,7 +2,7 @@
 run_analysis.py
 
 Run detection-change-event windowing and spatial homogeneity/split score analysis
-on k-smoothed GCFF grouping results from data_vitpose_finished_smoothed.pkl.
+on k-smoothed GCFF grouping results from data_finished_smoothed.pkl.
 
 For each k value the script:
   1. Detects windows bounded by grouping changes in the smoothed {clue}Res_k{k} columns
@@ -21,8 +21,8 @@ python analysis/run_analysis.py --k=5,10,20 \\
 
 # With BEV panel plots (reads unsmoothed finished pkl):
 python analysis/run_analysis.py --k=10 --plot \\
-    --finished /path/to/data_vitpose_finished.pkl \\
-    --plot_dir /path/to/panel_plots_vitpose/
+    --finished /path/to/data_finished.pkl \\
+    --plot_dir /path/to/plots/bev/
 """
 from __future__ import annotations
 
@@ -36,10 +36,10 @@ import numpy as np
 import pandas as pd
 
 NEON = "/tudelft.net/staff-umbrella/neon"
-DEFAULT_INPUT = f"{NEON}/zonghuan/data/conflab/GCFF/data_vitpose_finished_smoothed.pkl"
+DEFAULT_INPUT = f"{NEON}/zonghuan/data/conflab/GCFF/data_finished_smoothed.pkl"
 DEFAULT_RESULTS = f"{NEON}/zonghuan/data/conflab/GCFF/results"
-DEFAULT_FINISHED = f"{NEON}/zonghuan/data/conflab/GCFF/data_vitpose_finished.pkl"
-DEFAULT_PANEL_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/panel_plots_vitpose"
+DEFAULT_FINISHED = f"{NEON}/zonghuan/data/conflab/GCFF/data_finished.pkl"
+DEFAULT_PANEL_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/plots/bev"
 
 # Add the python directory to path so analysis/spatial imports work
 _HERE = Path(__file__).resolve().parent
@@ -166,7 +166,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--finished",
         default=DEFAULT_FINISHED,
-        help=f"Path to data_vitpose_finished.pkl used for BEV plotting. Default: {DEFAULT_FINISHED}",
+        help=f"Path to data_finished.pkl used for BEV plotting. Default: {DEFAULT_FINISHED}",
     )
     parser.add_argument(
         "--plot_dir",

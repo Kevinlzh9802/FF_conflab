@@ -27,7 +27,7 @@ for arg in "$@"; do
         --config=*) config_path="${arg#--config=}" ;;
         *)
             echo "Error: unknown argument '$arg'" >&2
-            echo "Usage: sbatch $0 [--config=python/configs/config_GCFF_cluster_vitpose.yaml]" >&2
+            echo "Usage: sbatch $0 [--config=python/configs/config_GCFF_cluster.yaml]" >&2
             exit 1
             ;;
     esac
