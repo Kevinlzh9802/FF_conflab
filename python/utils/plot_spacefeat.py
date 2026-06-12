@@ -66,19 +66,19 @@ def _plot_clue_ax(ax: plt.Axes, sf: Optional[np.ndarray], groups: list, clue: st
     ax.tick_params(labelsize=6)
 
     if sf is None or (hasattr(sf, "__len__") and len(sf) == 0):
-        ax.text(0.5, 0.5, "no data", transform=ax.transAxes,
+        ax.text(0.5, 0.5, f"no data ({clue})", transform=ax.transAxes,
                 ha="center", va="center", color="grey", fontsize=8)
         return
 
     try:
         arr = np.asarray(sf, dtype=np.float64)
     except Exception:
-        ax.text(0.5, 0.5, "bad data", transform=ax.transAxes,
+        ax.text(0.5, 0.5, f"bad data ({clue})", transform=ax.transAxes,
                 ha="center", va="center", color="grey", fontsize=8)
         return
 
     if arr.ndim != 2 or arr.shape[1] < 4 or arr.shape[0] == 0:
-        ax.text(0.5, 0.5, "no data", transform=ax.transAxes,
+        ax.text(0.5, 0.5, f"no data ({clue}, shape={np.asarray(sf).shape})", transform=ax.transAxes,
                 ha="center", va="center", color="grey", fontsize=8)
         return
 
@@ -141,12 +141,25 @@ def plot_spacefeat_bev_panels_df(
         GCFF DataFrame with at minimum `spaceFeat`, `{clue}Res`,
         `Cam`, `Vid`, `Seg`, `Timestamp` columns.
     output_dir:
-        Directory where PNG files are written (created if absent).
+        BEV root directory. A per-batch subdirectory ``<Cam><Vid><Seg>/``
+        is created inside it for each batch. Files are named
+        ``{Timestamp:04d}_{row_idx:06d}.png``.
     frame_step:
         Save one figure every frame_step rows (default 120).
     """
     results_dir = Path(output_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
+
+    # Diagnostic: show spaceFeat structure of the first row so empty-plot issues are visible.
+    _sf_diag = data_kp.iloc[0].get("spaceFeat")
+    print(
+        f"[BEV diag] spaceFeat type={type(_sf_diag)}, "
+        f"keys={list(_sf_diag.keys()) if isinstance(_sf_diag, dict) else 'not a dict'}"
+    )
+    if isinstance(_sf_diag, dict):
+        for _c, _arr in _sf_diag.items():
+            _a = np.asarray(_arr)
+            print(f"  [{_c}] shape={_a.shape}  dtype={_a.dtype}")
 
     total = len(data_kp)
     frame_step = max(1, int(frame_step))
@@ -163,8 +176,10 @@ def plot_spacefeat_bev_panels_df(
             cam = vid = seg = 0
             ts = frame_idx
 
-        filename = f"bev_{cam}{vid}{seg}_{ts}_{frame_idx}.png"
-        fig_path = results_dir / filename
+        batch_num = f"{cam}{vid}{seg}"
+        batch_dir = results_dir / batch_num
+        batch_dir.mkdir(parents=True, exist_ok=True)
+        fig_path = batch_dir / f"{ts:04d}_{frame_idx:06d}.png"
         if fig_path.exists():
             continue
 
