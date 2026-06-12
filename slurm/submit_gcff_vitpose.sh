@@ -2,7 +2,7 @@
 #SBATCH --job-name=gcff-vitpose
 #SBATCH --partition=insy,general
 #SBATCH --qos=short
-#SBATCH --time=3:59:00
+#SBATCH --time=3:00:00
 #SBATCH --cpus-per-task=1
 #SBATCH --ntasks=1
 #SBATCH --mem=48G
