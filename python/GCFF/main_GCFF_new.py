@@ -91,6 +91,35 @@ def _plot_spectrum_per_batch(data_kp: pd.DataFrame, spectrum_dir: Path) -> None:
             print(f"  Spectrum [{batch_num}]: failed: {exc}")
 
 
+def _run_sample_bev(
+    data_kp: pd.DataFrame,
+    clues_to_run: list,
+    config: Munch,
+    frame_step: int = 3000,
+) -> None:
+    """Run GCFF on sampled frames and save per-clue single-panel BEV diagnostics.
+
+    Samples every frame_step rows, runs graph_cut per clue, then writes one PNG
+    per sampled frame per clue into config.paths.panel_plots/samples/{clue}/.
+    Always overwrites. Does not modify data_kp or save any DataFrame.
+    """
+    from utils.plot_spacefeat import plot_sample_bev_per_clue
+
+    sample_df = data_kp.iloc[::frame_step].copy().reset_index(drop=True)
+    sample_dir = Path(config.paths.panel_plots) / "samples"
+    print(f"\nSample BEV: {len(sample_df)} frames (every {frame_step})  →  {sample_dir}")
+
+    feat_col = "spaceFeat" if config.use_space else "pixelFeat"
+    for c in clues_to_run:
+        features = []
+        for k in range(len(sample_df)):
+            fd = sample_df[feat_col].iloc[k]
+            features.append(fd.get(c) if isinstance(fd, dict) else None)
+        results = gcff_sequence(features, [None] * len(features), config.params)
+        sample_df[f"{c}Res"] = results["groups"]
+        plot_sample_bev_per_clue(sample_df, sample_dir / c, c)
+
+
 def gcff_experiments(config: Munch,
                      clue: Optional[str] = None,
                      detection_dir: Optional[Path] = None) -> pd.DataFrame:
@@ -129,6 +158,8 @@ def gcff_experiments(config: Munch,
         clues_to_run = [clue] if clue else list(config.all_clues)
         if per_clue_mode:
             detection_dir.mkdir(parents=True, exist_ok=True)
+
+        _run_sample_bev(data_kp, clues_to_run, config)
 
         for c in clues_to_run:
             print(f"\nRunning GCFF for clue: {c}")
