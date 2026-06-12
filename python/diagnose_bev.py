@@ -118,14 +118,19 @@ def print_stats(df: pd.DataFrame, batch: int) -> pd.DataFrame:
             print(f"    {clue:10s}: {nonempty}/{len(bdf)} frames non-empty ({pct:.1f}%)  "
                   f"mean={mean_n:.2f} people")
 
-        # Inspect first row
+        # Raw spaceFeat inspection (no type assumptions)
         first_sf = bdf.iloc[0].get("spaceFeat")
-        print(f"\n  First row spaceFeat:")
-        print(f"    type = {type(first_sf)}")
-        if isinstance(first_sf, dict):
-            print(f"    keys = {list(first_sf.keys())}")
+        print(f"\n  First row spaceFeat (raw):")
+        print(f"    type            = {type(first_sf)}")
+        print(f"    isinstance dict = {isinstance(first_sf, dict)}")
+        if hasattr(first_sf, "keys"):
+            print(f"    keys            = {list(first_sf.keys())}")
             for clue in CLUES:
-                arr = first_sf.get(clue)
+                try:
+                    arr = first_sf[clue]
+                except Exception as e:
+                    print(f"    [{clue}] → key error: {e}")
+                    continue
                 if arr is None:
                     print(f"    [{clue}] → None")
                 else:
@@ -133,9 +138,24 @@ def print_stats(df: pd.DataFrame, batch: int) -> pd.DataFrame:
                     print(f"    [{clue}] → shape={a.shape}  dtype={a.dtype}", end="")
                     if a.ndim == 2 and a.shape[0] > 0:
                         print(f"  first_person={a[0]}", end="")
+                    elif a.ndim == 1 and a.shape[0] > 0:
+                        print(f"  (1-D! first_elem={a[0]}  type={type(a[0])})", end="")
                     print()
         else:
-            print(f"    value = {first_sf}")
+            print(f"    value = {repr(first_sf)[:200]}")
+
+        # Check spaceCoords: all-None means ViTPose pkl; has data means original conflab pkl
+        if "spaceCoords" in bdf.columns:
+            sc0 = bdf.iloc[0].get("spaceCoords")
+            sc_notnull = bdf["spaceCoords"].apply(lambda x: x is not None).sum()
+            print(f"\n  spaceCoords: first={repr(sc0)[:80]}  non-null rows={sc_notnull}/{len(bdf)}")
+            if sc_notnull == 0:
+                print("    → all None: this is a ViTPose pkl")
+            else:
+                print("    → has data: this is an ORIGINAL conflab pkl (NOT vitpose)")
+                print("      BEV plotting expects the ViTPose pkl — you may have downloaded")
+                print("      the wrong file. Look for the fresh data_finished.pkl produced")
+                print("      by submit_gcff_vitpose.sh --mode=gcff (after vitpose_to_gcff ran).")
 
         # Find first non-empty row per clue
         print(f"\n  First non-empty row per clue:")
