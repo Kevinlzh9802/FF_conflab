@@ -186,11 +186,15 @@ def _run_for_k_on_data(
 
     print(f"  [{label} k={k}] Computing spatial scores ...")
     result = spatial_scores_df(windows, feature_cols=clue_cols)
-    if result is None or (isinstance(result, tuple) and len(result) == 2 and result[0] is None):
-        print(f"  [{label} k={k}] spatial_scores_df returned no figures (all-NaN). Skipping save.")
-        return windows  # still return windows so stats can be saved
+    if result is None:
+        print(f"  [{label} k={k}] spatial_scores_df returned None. Skipping save.")
+        return windows
 
     fig_h, fig_s = result
+    if not hasattr(fig_h, "savefig"):
+        # spatial_scores_df returned matrices (empty df or all-NaN) rather than figures
+        print(f"  [{label} k={k}] spatial_scores_df returned matrices (empty or all-NaN). Skipping save.")
+        return windows
 
     results_dir.mkdir(parents=True, exist_ok=True)
     hom_path = results_dir / f"homogeneity_k{k}.png"
