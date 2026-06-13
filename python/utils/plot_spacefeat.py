@@ -6,7 +6,7 @@ BEV (bird's eye view) panel plots for GCFF ViTPose results.
 Generates one figure per sampled frame with a 2×2 grid of subplots — one
 per body-part clue (head / shoulder / hip / foot).  Each subplot shows person
 positions and orientations from `spaceFeat`, colour-coded by group assignment
-from the corresponding `{clue}Res` column.
+from the corresponding `{clue}Res` column.  Coordinates are in centimetres.
 
 Requires only `spaceFeat` and `{clue}Res` columns; does not need
 `spaceCoords` or `pixelCoords` (unavailable in ViTPose data).
@@ -25,8 +25,8 @@ import pandas as pd
 CLUES = ["head", "shoulder", "hip", "foot"]
 CLUE_RES_COLS = [f"{c}Res" for c in CLUES]
 
-# Radius of orientation arrow (in the same units as spaceFeat x/y, i.e. metres)
-_ARROW_RADIUS = 0.15
+# Radius of orientation arrow (in the same units as spaceFeat x/y, i.e. cm)
+_ARROW_RADIUS = 15
 _POINT_SIZE = 80
 
 _GROUP_COLORS = plt.cm.get_cmap("tab10").colors  # 10 distinct colours
@@ -121,8 +121,8 @@ def _person_to_group_color(groups: list) -> Dict[int, tuple]:
 def _plot_clue_ax(ax: plt.Axes, sf: Optional[np.ndarray], groups: list, clue: str) -> None:
     """Draw one BEV subplot for a single clue."""
     ax.set_title(f"{clue}\n{_format_group_label(groups)}", fontsize=8)
-    ax.set_xlabel("x (m)", fontsize=7)
-    ax.set_ylabel("y (m)", fontsize=7)
+    ax.set_xlabel("x (cm)", fontsize=7)
+    ax.set_ylabel("y (cm)", fontsize=7)
     ax.set_aspect("equal", adjustable="datalim")
     ax.tick_params(labelsize=6)
 
@@ -259,67 +259,3 @@ def plot_spacefeat_bev_panels_df(
 
     print(f"BEV plots: saved {saved} figures to {results_dir}")
 
-
-# ---------------------------------------------------------------------------
-# Sample BEV helpers (single-clue panels for diagnostic plots)
-# ---------------------------------------------------------------------------
-
-def _plot_bev_single_clue_fig(row: pd.Series, clue: str) -> plt.Figure:
-    """Single-panel BEV figure for one clue."""
-    sf_dict = row.get("spaceFeat", {}) or {}
-    sf = sf_dict.get(clue) if isinstance(sf_dict, dict) else None
-    groups = row.get(f"{clue}Res") or []
-
-    fig, ax = plt.subplots(1, 1, figsize=(6, 5))
-    _plot_clue_ax(ax, sf, groups, clue)
-
-    try:
-        cam = int(row.get("Cam", 0))
-        vid = int(row.get("Vid", 0))
-        seg = int(row.get("Seg", 0))
-        ts = int(row.get("Timestamp", 0))
-    except Exception:
-        cam = vid = seg = ts = 0
-
-    fig.suptitle(f"BEV [{clue}]  Cam={cam} Vid={vid} Seg={seg} t={ts}", fontsize=10)
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
-    return fig
-
-
-def plot_sample_bev_per_clue(
-    data_kp: pd.DataFrame,
-    output_dir,
-    clue: str,
-) -> None:
-    """Save one single-clue BEV PNG per row in data_kp (pass an already-sampled DataFrame).
-
-    Always overwrites existing files.
-    """
-    out = Path(output_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    saved = 0
-
-    for frame_idx in range(len(data_kp)):
-        row = data_kp.iloc[frame_idx]
-        try:
-            cam = int(row.get("Cam", 0))
-            vid = int(row.get("Vid", 0))
-            seg = int(row.get("Seg", 0))
-            ts = int(row.get("Timestamp", frame_idx))
-        except Exception:
-            cam = vid = seg = ts = frame_idx
-
-        fig_path = out / f"{cam}{vid}{seg}_{ts:04d}_{frame_idx:06d}.png"
-        try:
-            fig = _plot_bev_single_clue_fig(row, clue)
-            fig.savefig(fig_path, dpi=120, bbox_inches="tight")
-            plt.close(fig)
-            saved += 1
-        except Exception as exc:
-            print(f"  Warning: sample BEV [{clue}] frame {frame_idx}: {exc}")
-            try:
-                plt.close("all")
-            except Exception:
-                pass
-
-    print(f"Sample BEV [{clue}]: saved {saved} figures to {out}")
