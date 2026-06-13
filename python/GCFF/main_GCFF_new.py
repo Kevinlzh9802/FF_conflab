@@ -97,13 +97,14 @@ def _run_sample_bev(
     config: Munch,
     frame_step: int = 3000,
 ) -> None:
-    """Run GCFF on sampled frames and save per-clue single-panel BEV diagnostics.
+    """Run GCFF on sampled frames and save 4-panel BEV diagnostics to bev/samples/.
 
-    Samples every frame_step rows, runs graph_cut per clue, then writes one PNG
-    per sampled frame per clue into config.paths.panel_plots/samples/{clue}/.
-    Always overwrites. Does not modify data_kp or save any DataFrame.
+    Samples every frame_step rows, runs GCFF for each clue in clues_to_run, then
+    writes 4-panel BEV PNGs (same layout as the main BEV) into
+    config.paths.panel_plots/samples/{CamVidSeg}/. Always overwrites.
+    Does not modify data_kp or save any DataFrame.
     """
-    from utils.plot_spacefeat import plot_sample_bev_per_clue
+    from utils.plot_spacefeat import plot_spacefeat_bev_panels_df
 
     sample_df = data_kp.iloc[::frame_step].copy().reset_index(drop=True)
     sample_dir = Path(config.paths.panel_plots) / "samples"
@@ -117,7 +118,8 @@ def _run_sample_bev(
             features.append(fd.get(c) if isinstance(fd, dict) else None)
         results = gcff_sequence(features, [None] * len(features), config.params)
         sample_df[f"{c}Res"] = results["groups"]
-        plot_sample_bev_per_clue(sample_df, sample_dir / c, c)
+
+    plot_spacefeat_bev_panels_df(sample_df, output_dir=sample_dir, frame_step=1)
 
 
 def gcff_experiments(config: Munch,

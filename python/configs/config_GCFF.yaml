@@ -21,8 +21,8 @@ plots:
   panels: True
 
 params:
-  stride: 0.4
-  mdl: 0.6
+  stride: 40.0
+  mdl: 6000.0
 
 paths:
   kp: ../data/sam4d_converted/data.pkl
