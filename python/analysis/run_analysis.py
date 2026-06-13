@@ -341,6 +341,14 @@ def _parse_args() -> argparse.Namespace:
         help="Save one BEV figure every N rows (default: 120).",
     )
     parser.add_argument(
+        "--frames_root",
+        default=f"{NEON}/zonghuan/data/conflab/bbox_kp",
+        help=(
+            "Root containing {batch}/images/{frame_id:08d}.jpg for BEV pixel overlay. "
+            f"Default: {NEON}/zonghuan/data/conflab/bbox_kp"
+        ),
+    )
+    parser.add_argument(
         "--spectrum_dir",
         default=DEFAULT_SPECTRUM_PLOTS,
         help=f"Root directory for spectrum PNG output. Subdirs original/, k{{k}}/ are created inside. Default: {DEFAULT_SPECTRUM_PLOTS}",
@@ -390,7 +398,12 @@ if __name__ == "__main__":
         print(f"\nBEV plots: loading unsmoothed results from {finished_path}")
         finished_df = pd.read_pickle(finished_path)
         from utils.plot_spacefeat import plot_spacefeat_bev_panels_df
-        plot_spacefeat_bev_panels_df(finished_df, output_dir=args.plot_dir, frame_step=args.plot_step)
+        plot_spacefeat_bev_panels_df(
+            finished_df,
+            output_dir=args.plot_dir,
+            frame_step=args.plot_step,
+            frames_root=args.frames_root,
+        )
 
         # Spectrum plots: original + one subdir per k.
         # `data` (smoothed pkl) retains raw {clue}Res columns alongside {clue}Res_k{k}.

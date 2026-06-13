@@ -36,6 +36,7 @@ SP="${SP:-$data_root/sp_merged.pkl}"
 PANEL_PLOTS="${PANEL_PLOTS:-$gcff_root/results/bev}"
 SPECTRUM_PLOTS="${SPECTRUM_PLOTS:-$gcff_root/results/spectrum}"
 PLOT_STEP="${PLOT_STEP:-120}"
+FRAMES_ROOT_BEV="${FRAMES_ROOT_BEV:-$data_root/bbox_kp}"
 OVERWRITE_FINISHED="true"
 OVERWRITE_SMOOTHED="true"
 PER_SEGMENT="false"
@@ -64,6 +65,7 @@ for arg in "$@"; do
         --overwrite-smoothed=*) OVERWRITE_SMOOTHED="${arg#--overwrite-smoothed=}" ;;
         --per-segment=*)        PER_SEGMENT="${arg#--per-segment=}" ;;
         --per-segment)          PER_SEGMENT="true" ;;
+        --frames-root=*)        FRAMES_ROOT_BEV="${arg#--frames-root=}" ;;
         *)
             echo "Error: unknown argument '$arg'" >&2
             echo "Usage: sbatch $0 [--mode=gcff|smooth|analysis] [--clue=head|shoulder|hip|foot] [--k=5,10,20] [--plot]" >&2
@@ -116,7 +118,7 @@ export PYTHONUNBUFFERED=1
 # Build optional --plot flag string for Python scripts
 PLOT_ARGS=""
 if [[ "$PLOT" == "true" ]]; then
-    PLOT_ARGS="--plot --plot_dir '$PANEL_PLOTS' --spectrum_dir '$SPECTRUM_PLOTS' --plot_step '$PLOT_STEP'"
+    PLOT_ARGS="--plot --plot_dir '$PANEL_PLOTS' --spectrum_dir '$SPECTRUM_PLOTS' --plot_step '$PLOT_STEP' --frames_root '$FRAMES_ROOT_BEV'"
 fi
 
 PER_SEGMENT_ARG=""

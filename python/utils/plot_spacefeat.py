@@ -245,18 +245,17 @@ def _plot_all_keypoints_ax(ax: plt.Axes, sf_dict: dict) -> None:
     ax.legend(handles=handles, fontsize=6, loc="upper right")
 
 
-def _plot_pixel_overlay_ax(ax: plt.Axes, row: pd.Series) -> None:
+def _plot_pixel_overlay_ax(ax: plt.Axes, row: pd.Series, img_path=None) -> None:
     """2D pixel keypoints on frame image, or a dark placeholder if data is absent.
 
-    pixelCoords is {clue: (n_people, 4) array [person_id, u_rel, v_rel, orientation]}
+    pixelFeat is {clue: (n_people, 4) array [person_id, u_rel, v_rel, orientation]}
     where u_rel = u/1920 and v_rel = v/1080 are in [0, 1].  When a background
-    image is loaded, coords are scaled to image pixel dimensions automatically.
+    image is loaded via img_path, coords are scaled to image pixel dimensions.
     """
     ax.set_title("2D keypoints (pixel)", fontsize=8)
     ax.tick_params(labelsize=6)
 
-    pixel_data = row.get("pixelCoords") if hasattr(row, "get") else None
-    img_path = row.get("img_path") if hasattr(row, "get") else None
+    pixel_data = row.get("pixelFeat") if hasattr(row, "get") else None
 
     img_w, img_h = 1.0, 1.0  # relative [0, 1] space when no image
     img_loaded = False
@@ -294,12 +293,13 @@ def _plot_pixel_overlay_ax(ax: plt.Axes, row: pd.Series) -> None:
         ax.scatter(u, v, s=15, color=color, zorder=3, edgecolors="k", linewidths=0.3)
 
 
-def _plot_bev_frame(row: pd.Series) -> plt.Figure:
+def _plot_bev_frame(row: pd.Series, img_path=None) -> plt.Figure:
     """Create a 2×3 BEV figure for one DataFrame row.
 
     Left two columns (2×2): one subplot per body-clue (head/shoulder/hip/foot).
     Top-right: all clues overlaid in one space plot, coloured by clue.
     Bottom-right: 2D pixel keypoint overlay on the real frame image.
+    img_path: optional Path to the frame JPEG; derived from frames_root in the caller.
     """
     sf_dict = row.get("spaceFeat", {}) or {}
 
@@ -314,7 +314,7 @@ def _plot_bev_frame(row: pd.Series) -> plt.Figure:
         _plot_clue_ax(ax, sf, groups, clue)
 
     _plot_all_keypoints_ax(axes[0, 2], sf_dict)
-    _plot_pixel_overlay_ax(axes[1, 2], row)
+    _plot_pixel_overlay_ax(axes[1, 2], row, img_path=img_path)
 
     try:
         cam = int(row.get("Cam", 0))
@@ -337,6 +337,7 @@ def plot_spacefeat_bev_panels_df(
     data_kp: pd.DataFrame,
     output_dir,
     frame_step: int = 120,
+    frames_root=None,
 ) -> None:
     """Generate BEV panel figures every frame_step rows and save as PNG.
 
@@ -344,16 +345,20 @@ def plot_spacefeat_bev_panels_df(
     ----------
     data_kp:
         GCFF DataFrame with at minimum `spaceFeat`, `{clue}Res`,
-        `Cam`, `Vid`, `Seg`, `Timestamp` columns.
+        `Cam`, `Vid`, `Seg`, `Timestamp`, `frame_id` columns.
     output_dir:
         BEV root directory. A per-batch subdirectory ``<Cam><Vid><Seg>/``
         is created inside it for each batch. Files are named
         ``{Timestamp:04d}_{row_idx:06d}.png``.
     frame_step:
         Save one figure every frame_step rows (default 120).
+    frames_root:
+        Optional root directory containing ``{batch}/images/{frame_id:08d}.jpg``
+        frame images for the pixel overlay panel. Pass None to show placeholder.
     """
     results_dir = Path(output_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
+    frames_root = Path(frames_root) if frames_root is not None else None
 
     # Diagnostic: show spaceFeat structure of the first row so empty-plot issues are visible.
     _sf_diag = data_kp.iloc[0].get("spaceFeat")
@@ -381,12 +386,21 @@ def plot_spacefeat_bev_panels_df(
             cam = vid = seg = 0
             ts = frame_idx
 
+        # Derive frame image path if frames_root was provided.
+        # Timestamp is 0-based sequential and matches the image filenames directly.
+        img_path = None
+        if frames_root is not None:
+            batch = f"{cam}{vid}{seg}"
+            candidate = frames_root / batch / "images" / f"{ts:08d}.jpg"
+            if candidate.is_file():
+                img_path = candidate
+
         batch_num = f"{cam}{vid}{seg}"
         batch_dir = results_dir / batch_num
         batch_dir.mkdir(parents=True, exist_ok=True)
         fig_path = batch_dir / f"{ts:04d}_{frame_idx:06d}.png"
         try:
-            fig = _plot_bev_frame(row)
+            fig = _plot_bev_frame(row, img_path=img_path)
             fig.savefig(fig_path, dpi=120, bbox_inches="tight")
             plt.close(fig)
             saved += 1
