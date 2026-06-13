@@ -33,11 +33,12 @@ FINISHED="${FINISHED:-$gcff_root/data_finished.pkl}"
 SMOOTHED="${SMOOTHED:-$gcff_root/data_finished_smoothed.pkl}"
 RESULTS="${RESULTS:-$gcff_root/results}"
 SP="${SP:-$data_root/sp_merged.pkl}"
-PANEL_PLOTS="${PANEL_PLOTS:-$gcff_root/plots/bev}"
-SPECTRUM_PLOTS="${SPECTRUM_PLOTS:-$gcff_root/plots/spectrum}"
+PANEL_PLOTS="${PANEL_PLOTS:-$gcff_root/results/bev}"
+SPECTRUM_PLOTS="${SPECTRUM_PLOTS:-$gcff_root/results/spectrum}"
 PLOT_STEP="${PLOT_STEP:-120}"
 OVERWRITE_FINISHED="true"
 OVERWRITE_SMOOTHED="true"
+PER_SEGMENT="false"
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -61,6 +62,8 @@ for arg in "$@"; do
         --plot_step=*)          PLOT_STEP="${arg#--plot_step=}" ;;
         --overwrite-finished=*) OVERWRITE_FINISHED="${arg#--overwrite-finished=}" ;;
         --overwrite-smoothed=*) OVERWRITE_SMOOTHED="${arg#--overwrite-smoothed=}" ;;
+        --per-segment=*)        PER_SEGMENT="${arg#--per-segment=}" ;;
+        --per-segment)          PER_SEGMENT="true" ;;
         *)
             echo "Error: unknown argument '$arg'" >&2
             echo "Usage: sbatch $0 [--mode=gcff|smooth|analysis] [--clue=head|shoulder|hip|foot] [--k=5,10,20] [--plot]" >&2
@@ -103,6 +106,7 @@ case "$MODE" in
         echo "Results    : $RESULTS"
         echo "k values   : $K"
         echo "SP path    : $SP"
+        echo "Per-segment: $PER_SEGMENT"
         ;;
 esac
 
@@ -113,6 +117,11 @@ export PYTHONUNBUFFERED=1
 PLOT_ARGS=""
 if [[ "$PLOT" == "true" ]]; then
     PLOT_ARGS="--plot --plot_dir '$PANEL_PLOTS' --spectrum_dir '$SPECTRUM_PLOTS' --plot_step '$PLOT_STEP'"
+fi
+
+PER_SEGMENT_ARG=""
+if [[ "$PER_SEGMENT" == "true" ]]; then
+    PER_SEGMENT_ARG="--per-segment"
 fi
 
 # ---------------------------------------------------------------------------
@@ -175,7 +184,8 @@ case "$MODE" in
                     --results_dir '$RESULTS' \
                     --k '$K' \
                     --sp '$SP' \
-                    $PLOT_ARGS
+                    $PLOT_ARGS \
+                    $PER_SEGMENT_ARG
             "
         ;;
 esac
@@ -212,6 +222,10 @@ echo "Done: mode=$MODE"
 # 3) Compute detection-change windows + homogeneity/split heatmaps:
 #    sbatch slurm/submit_gcff_vitpose.sh --mode=analysis --k=5,10,20
 #    → results/homogeneity_k{k}.png + results/split_k{k}.png
+#
+#    Per-segment mode (each <Cam,Vid,Seg> treated independently):
+#    sbatch slurm/submit_gcff_vitpose.sh --mode=analysis --k=5,10,20 --per-segment
+#    → results/per-segment/{CamVidSeg}/homogeneity_k{k}.png + split_k{k}.png
 #
 # Overwrite control (smooth mode):
 #    --overwrite-finished=false   skip merge if data_finished.pkl already exists

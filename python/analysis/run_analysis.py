@@ -39,8 +39,8 @@ NEON = "/tudelft.net/staff-umbrella/neon"
 DEFAULT_INPUT = f"{NEON}/zonghuan/data/conflab/GCFF/data_finished_smoothed.pkl"
 DEFAULT_RESULTS = f"{NEON}/zonghuan/data/conflab/GCFF/results"
 DEFAULT_FINISHED = f"{NEON}/zonghuan/data/conflab/GCFF/data_finished.pkl"
-DEFAULT_PANEL_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/plots/bev"
-DEFAULT_SPECTRUM_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/plots/spectrum"
+DEFAULT_PANEL_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/results/bev"
+DEFAULT_SPECTRUM_PLOTS = f"{NEON}/zonghuan/data/conflab/GCFF/results/spectrum"
 
 # Add the python directory to path so analysis/spatial imports work
 _HERE = Path(__file__).resolve().parent
@@ -106,8 +106,153 @@ def _plot_spectrum_per_batch(
 
 
 # ---------------------------------------------------------------------------
+# Window statistics
+# ---------------------------------------------------------------------------
+
+def _compute_window_stats(windows: pd.DataFrame, group_cols: List[str]) -> pd.DataFrame:
+    """Return a DataFrame with one row per group-key containing window count + length stats."""
+    stat_cols = ["n_windows", "length_mean", "length_median", "length_min", "length_max", "length_std"]
+    rows = []
+    for keys, grp in windows.groupby(group_cols):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        row = dict(zip(group_cols, keys))
+        lengths = grp["length"].dropna()
+        n = len(lengths)
+        row.update({
+            "n_windows":     n,
+            "length_mean":   float(lengths.mean())   if n else float("nan"),
+            "length_median": float(lengths.median()) if n else float("nan"),
+            "length_min":    float(lengths.min())    if n else float("nan"),
+            "length_max":    float(lengths.max())    if n else float("nan"),
+            "length_std":    float(lengths.std())    if n else float("nan"),
+        })
+        rows.append(row)
+    return pd.DataFrame(rows, columns=group_cols + stat_cols) if rows else pd.DataFrame(columns=group_cols + stat_cols)
+
+
+# ---------------------------------------------------------------------------
 # Per-k analysis
 # ---------------------------------------------------------------------------
+
+def _run_for_k_on_data(
+    data: pd.DataFrame,
+    k: int,
+    results_dir: Path,
+    sp_path: Optional[str],
+    label: str,
+) -> Optional[pd.DataFrame]:
+    """Shared core: detect windows, apply speaking filter, compute and save scores.
+
+    Returns the final windows DataFrame (after all filtering) so callers can
+    compute additional statistics, or None on early exit.
+    """
+    clue_cols = [f"headRes_k{k}", f"shoulderRes_k{k}", f"hipRes_k{k}", f"footRes_k{k}"]
+
+    missing = [c for c in clue_cols if c not in data.columns]
+    if missing:
+        print(f"  [{label} k={k}] WARNING: columns missing: {missing}. Skipping.")
+        return None
+
+    print(f"\n[{label} k={k}] Detecting grouping-change windows using columns: {clue_cols}")
+    windows = detect_group_num_breakpoints(data, clues=clue_cols)
+
+    if windows.empty:
+        print(f"  [{label} k={k}] No windows found. Skipping spatial scores.")
+        return None
+
+    lengths = windows["length"].dropna()
+    print(
+        f"  [{label} k={k}] Windows (raw): {len(windows)}  "
+        f"length mean={lengths.mean():.1f}  median={lengths.median():.1f}  "
+        f"min={lengths.min():.0f}  max={lengths.max():.0f}"
+    )
+
+    if sp_path and Path(sp_path).is_file():
+        from analysis.cross_modal import count_speaker_groups, filter_windows
+        print(f"  [{label} k={k}] Applying speaking filter from: {sp_path}")
+        windows = count_speaker_groups(windows, speaking_status_path=sp_path)
+        windows = filter_windows(windows)
+        print(f"  [{label} k={k}] After speaking filter: {len(windows)} windows")
+    else:
+        if sp_path:
+            print(f"  [{label} k={k}] WARNING: sp file not found at '{sp_path}'. Speaking filter skipped.")
+        else:
+            print(f"  [{label} k={k}] Note: speaking filter skipped (--sp not provided).")
+
+    if windows.empty:
+        print(f"  [{label} k={k}] No windows after filtering. Skipping spatial scores.")
+        return None
+
+    print(f"  [{label} k={k}] Computing spatial scores ...")
+    result = spatial_scores_df(windows, feature_cols=clue_cols)
+    if result is None or (isinstance(result, tuple) and len(result) == 2 and result[0] is None):
+        print(f"  [{label} k={k}] spatial_scores_df returned no figures (all-NaN). Skipping save.")
+        return windows  # still return windows so stats can be saved
+
+    fig_h, fig_s = result
+
+    results_dir.mkdir(parents=True, exist_ok=True)
+    hom_path = results_dir / f"homogeneity_k{k}.png"
+    split_path = results_dir / f"split_k{k}.png"
+    fig_h.savefig(hom_path, dpi=150, bbox_inches="tight")
+    fig_s.savefig(split_path, dpi=150, bbox_inches="tight")
+    print(f"  [{label} k={k}] Saved: {hom_path}")
+    print(f"  [{label} k={k}] Saved: {split_path}")
+
+    try:
+        plt.close(fig_h)
+        plt.close(fig_s)
+    except Exception:
+        pass
+
+    return windows
+
+
+def run_for_k_per_segment(
+    data: pd.DataFrame,
+    k: int,
+    results_dir: Path,
+    sp_path: Optional[str] = None,
+) -> None:
+    """Per-segment variant: treat each (Cam, Vid, Seg) as an independent sequence.
+
+    Uses Timestamp as frame order within each segment instead of concat_ts.
+    Metrics PNGs → results_dir/metrics/per-segment/{CamVidSeg}/
+    Window stats → results_dir/windows/per-segment/{CamVidSeg}/windows_k{k}.csv
+    """
+    clue_cols = [f"headRes_k{k}", f"shoulderRes_k{k}", f"hipRes_k{k}", f"footRes_k{k}"]
+
+    missing = [c for c in clue_cols if c not in data.columns]
+    if missing:
+        print(f"  [per-seg k={k}] WARNING: columns missing: {missing}. Skipping.")
+        return
+
+    for (cam, vid, seg), seg_df in data.groupby(["Cam", "Vid", "Seg"]):
+        seg_key = f"{int(cam)}{int(vid)}{int(seg)}"
+        print(f"\n[per-seg k={k}] Segment {seg_key}: {len(seg_df)} rows")
+
+        seg_data = seg_df.copy()
+        seg_data["concat_ts"] = seg_data["Timestamp"]
+
+        windows = _run_for_k_on_data(
+            data=seg_data,
+            k=k,
+            results_dir=results_dir / "metrics" / "per-segment" / seg_key,
+            sp_path=sp_path,
+            label=f"per-seg/{seg_key}",
+        )
+
+        if windows is not None and not windows.empty:
+            w = windows.copy()
+            w["Seg"] = int(seg)
+            stats = _compute_window_stats(w, ["Cam", "Vid", "Seg"])
+            seg_win_dir = results_dir / "windows" / "per-segment" / seg_key
+            seg_win_dir.mkdir(parents=True, exist_ok=True)
+            csv_path = seg_win_dir / f"windows_k{k}.csv"
+            stats.to_csv(csv_path, index=False)
+            print(f"  [per-seg/{seg_key} k={k}] Window stats → {csv_path}")
+
 
 def run_for_k(
     data: pd.DataFrame,
@@ -115,65 +260,15 @@ def run_for_k(
     results_dir: Path,
     sp_path: Optional[str] = None,
 ) -> None:
-    clue_cols = [f"headRes_k{k}", f"shoulderRes_k{k}", f"hipRes_k{k}", f"footRes_k{k}"]
-
-    missing = [c for c in clue_cols if c not in data.columns]
-    if missing:
-        print(f"  [k={k}] WARNING: columns missing in input pkl: {missing}. Skipping.")
-        return
-
-    print(f"\n[k={k}] Detecting grouping-change windows using columns: {clue_cols}")
-    windows = detect_group_num_breakpoints(data, clues=clue_cols)
-
-    if windows.empty:
-        print(f"  [k={k}] No windows found. Skipping spatial scores.")
-        return
-
-    lengths = windows["length"].dropna()
-    print(
-        f"  [k={k}] Windows (raw): {len(windows)}  "
-        f"length mean={lengths.mean():.1f}  median={lengths.median():.1f}  "
-        f"min={lengths.min():.0f}  max={lengths.max():.0f}"
-    )
-
-    # Speaking-based filtering (requires sp_merged.pkl)
-    if sp_path and Path(sp_path).is_file():
-        from analysis.cross_modal import count_speaker_groups, filter_windows
-        print(f"  [k={k}] Applying speaking filter from: {sp_path}")
-        windows = count_speaker_groups(windows, speaking_status_path=sp_path)
-        windows = filter_windows(windows)
-        print(f"  [k={k}] After speaking filter: {len(windows)} windows")
-    else:
-        if sp_path:
-            print(f"  [k={k}] WARNING: sp file not found at '{sp_path}'. Speaking filter skipped.")
-        else:
-            print(f"  [k={k}] Note: speaking filter skipped (--sp not provided).")
-
-    if windows.empty:
-        print(f"  [k={k}] No windows after filtering. Skipping spatial scores.")
-        return
-
-    print(f"  [k={k}] Computing spatial scores ...")
-    result = spatial_scores_df(windows, feature_cols=clue_cols)
-    if result is None or (isinstance(result, tuple) and len(result) == 2 and result[0] is None):
-        print(f"  [k={k}] spatial_scores_df returned no figures (all-NaN). Skipping save.")
-        return
-
-    fig_h, fig_s = result
-
-    hom_path = results_dir / f"homogeneity_k{k}.png"
-    split_path = results_dir / f"split_k{k}.png"
-    fig_h.savefig(hom_path, dpi=150, bbox_inches="tight")
-    fig_s.savefig(split_path, dpi=150, bbox_inches="tight")
-    print(f"  [k={k}] Saved: {hom_path}")
-    print(f"  [k={k}] Saved: {split_path}")
-
-    try:
-        import matplotlib.pyplot as plt
-        plt.close(fig_h)
-        plt.close(fig_s)
-    except Exception:
-        pass
+    """Global analysis for k: metrics PNGs → results_dir/metrics/, window stats → results_dir/windows/."""
+    windows = _run_for_k_on_data(data, k, results_dir / "metrics", sp_path, label="global")
+    if windows is not None and not windows.empty:
+        stats = _compute_window_stats(windows, ["Cam", "Vid"])
+        windows_dir = results_dir / "windows"
+        windows_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = windows_dir / f"windows_k{k}.csv"
+        stats.to_csv(csv_path, index=False)
+        print(f"  [global k={k}] Window stats → {csv_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +290,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--results_dir",
         default=DEFAULT_RESULTS,
-        help=f"Directory for output heatmap PNGs. Default: {DEFAULT_RESULTS}",
+        help=(
+            f"Root results directory. Subdirs metrics/, windows/, bev/, spectrum/ are created inside. "
+            f"Default: {DEFAULT_RESULTS}"
+        ),
     )
     parser.add_argument(
         "--k",
@@ -238,6 +336,15 @@ def _parse_args() -> argparse.Namespace:
         default=DEFAULT_SPECTRUM_PLOTS,
         help=f"Root directory for spectrum PNG output. Subdirs original/, k{{k}}/ are created inside. Default: {DEFAULT_SPECTRUM_PLOTS}",
     )
+    parser.add_argument(
+        "--per-segment",
+        action="store_true",
+        help=(
+            "Treat every (Cam, Vid, Seg) as an independent sequence (discard concat_ts). "
+            "Saves metrics to --results_dir/metrics/per-segment/<CamVidSeg>/ "
+            "and window stats to --results_dir/windows/per-segment/<CamVidSeg>/."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -259,9 +366,15 @@ if __name__ == "__main__":
     print(f"Results dir : {results_dir}")
     print(f"k values    : {ks}")
     print(f"sp path     : {args.sp or '(none — speaking filter disabled)'}")
+    print(f"Per-segment : {args.per_segment}")
 
-    for k in ks:
-        run_for_k(data, k, results_dir, sp_path=args.sp)
+    if args.per_segment:
+        print("\n--- Per-segment analysis ---")
+        for k in ks:
+            run_for_k_per_segment(data, k, results_dir, sp_path=args.sp)
+    else:
+        for k in ks:
+            run_for_k(data, k, results_dir, sp_path=args.sp)
 
     if args.plot:
         finished_path = Path(args.finished)
