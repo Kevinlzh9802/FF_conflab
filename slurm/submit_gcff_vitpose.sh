@@ -77,8 +77,6 @@ fi
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-mkdir -p "$gcff_root/logs" "$RESULTS" "$PANEL_PLOTS" "$DETECTION_DIR"
-
 if ! command -v apptainer >/dev/null 2>&1; then
     module load apptainer
 fi
