@@ -223,7 +223,7 @@ def run_for_k_per_segment(
 
     Uses Timestamp as frame order within each segment instead of concat_ts.
     Metrics PNGs → results_dir/metrics/per-segment/{CamVidSeg}/
-    Window stats → results_dir/windows/per-segment/{CamVidSeg}/windows_k{k}.csv
+    Window stats → results_dir/windows/per-segment/windows_k{k}.csv  (all segments, one file)
     """
     clue_cols = [f"headRes_k{k}", f"shoulderRes_k{k}", f"hipRes_k{k}", f"footRes_k{k}"]
 
@@ -231,6 +231,8 @@ def run_for_k_per_segment(
     if missing:
         print(f"  [per-seg k={k}] WARNING: columns missing: {missing}. Skipping.")
         return
+
+    all_stats: List[pd.DataFrame] = []
 
     for (cam, vid, seg), seg_df in data.groupby(["Cam", "Vid", "Seg"]):
         seg_key = f"{int(cam)}{int(vid)}{int(seg)}"
@@ -250,12 +252,15 @@ def run_for_k_per_segment(
         if windows is not None and not windows.empty:
             w = windows.copy()
             w["Seg"] = int(seg)
-            stats = _compute_window_stats(w, ["Cam", "Vid", "Seg"])
-            seg_win_dir = results_dir / "windows" / "per-segment" / seg_key
-            seg_win_dir.mkdir(parents=True, exist_ok=True)
-            csv_path = seg_win_dir / f"windows_k{k}.csv"
-            stats.to_csv(csv_path, index=False)
-            print(f"  [per-seg/{seg_key} k={k}] Window stats → {csv_path}")
+            all_stats.append(_compute_window_stats(w, ["Cam", "Vid", "Seg"]))
+
+    if all_stats:
+        combined = pd.concat(all_stats, ignore_index=True)
+        win_dir = results_dir / "windows" / "per-segment"
+        win_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = win_dir / f"windows_k{k}.csv"
+        combined.to_csv(csv_path, index=False)
+        print(f"  [per-seg k={k}] Window stats ({len(combined)} segments) → {csv_path}")
 
 
 def run_for_k(
